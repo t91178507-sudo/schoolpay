@@ -2,6 +2,8 @@ import { MongoClient } from "mongodb";
 
 const uri = process.env.MONGODB_URI;
 
+console.log("🔥 ENV VALUE:", process.env.MONGODB_URI);
+
 // ✅ ALWAYS CHECK ENV AT RUNTIME, NOT BUILD
 if (!uri) {
   console.error("❌ MONGODB_URI is missing");
