@@ -1,10 +1,9 @@
-import { connectDB } from "../../../../../lib/mongodb";
+import { connectDB } from "../../../lib/mongodb";
 
 // ✅ GET INVOICE BY TOKEN
 export async function GET(req, context) {
   try {
-    // ✅ unwrap params properly
-    const { token } = await context.params;
+    const { token } = context.params; // ✅ FIXED
 
     const db = await connectDB();
 
@@ -30,4 +29,3 @@ export async function GET(req, context) {
     );
   }
 }
-``
