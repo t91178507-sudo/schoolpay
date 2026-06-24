@@ -1,4 +1,5 @@
-import { connectDB } from "../../../../../lib/mongodb";
+import { connectDB } from "../../../../lib/mongodb";
+``
 
 // ✅ GET INVOICE BY TOKEN
 export async function GET(req, { params }) {

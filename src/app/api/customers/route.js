@@ -1,4 +1,5 @@
 import { connectDB } from "../../../lib/mongodb";
+``
 
 // ✅ GET ALL CUSTOMERS
 export async function GET() {

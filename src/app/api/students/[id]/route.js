@@ -1,4 +1,5 @@
 import { connectDB } from "../../../../lib/mongodb";
+``
 import { ObjectId } from "mongodb";
 
 // ✅ DELETE STUDENT
