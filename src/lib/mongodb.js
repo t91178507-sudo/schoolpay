@@ -2,35 +2,27 @@ import { MongoClient } from "mongodb";
 
 const uri = process.env.MONGODB_URI;
 
+// ✅ ALWAYS CHECK ENV AT RUNTIME, NOT BUILD
+if (!uri) {
+  console.error("❌ MONGODB_URI is missing");
+}
+
 let client;
 let clientPromise;
 
-if (!uri) {
-  console.warn("⚠️ MONGODB_URI is not defined");
-} else {
-  console.log("🔌 Connecting to MongoDB...");
-}
-
-if (process.env.NODE_ENV === "development") {
-  if (!global._mongoClientPromise && uri) {
+if (!global._mongoClientPromise) {
+  try {
     client = new MongoClient(uri);
     global._mongoClientPromise = client.connect().then((client) => {
       console.log("✅ Connected to MongoDB");
       return client;
     });
-  }
-  clientPromise = global._mongoClientPromise;
-} else {
-  if (uri) {
-    client = new MongoClient(uri);
-    clientPromise = client.connect().then((client) => {
-      console.log("✅ Connected to MongoDB");
-      return client;
-    });
+  } catch (error) {
+    console.error("❌ MongoDB Connection failed:", error);
   }
 }
 
-export default clientPromise;
+clientPromise = global._mongoClientPromise;
 
 export const connectDB = async () => {
   if (!clientPromise) {
@@ -40,4 +32,3 @@ export const connectDB = async () => {
   const client = await clientPromise;
   return client.db("schoolpay");
 };
-``
