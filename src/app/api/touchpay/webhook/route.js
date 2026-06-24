@@ -1,4 +1,4 @@
-import { connectDB } from "../../../lib/mongodb"; // ✅ FIXED PATH
+import { connectDB } from "@/lib/mongodb";// ✅ FIXED PATH
 
 export async function POST(req) {
   try {
