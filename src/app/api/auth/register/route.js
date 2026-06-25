@@ -24,9 +24,12 @@ export async function POST(req) {
     }
 
     const result = await db.collection("users").insertOne({
+      fullName: body.fullName,
       email: body.email,
       password: body.password,
-      schoolName: body.schoolName,
+      businessName: body.businessName,
+      businessType: body.businessType,
+      role: body.role || "Admin",
       createdAt: new Date(),
     });
 
@@ -34,8 +37,11 @@ export async function POST(req) {
       success: true,
       user: {
         _id: result.insertedId,
+        fullName: body.fullName,
         email: body.email,
-        schoolName: body.schoolName,
+        businessName: body.businessName,
+        businessType: body.businessType,
+        role: body.role || "Admin",
       },
     });
 

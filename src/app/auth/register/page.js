@@ -61,19 +61,44 @@ export default function Register() {
     setLoading(true);
 
     try {
-      // ✅ Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          email: formData.email,
+          password: formData.password,
+          businessName: formData.businessName,
+          businessType: formData.businessType,
+          role: formData.role,
+        }),
+      });
 
-      // ✅ Temporary local storage (replace with DB later)
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("userName", formData.fullName);
-      localStorage.setItem("businessName", formData.businessName);
-      localStorage.setItem("businessType", formData.businessType);
+      let data;
 
-      router.push("/dashboard");
+      try {
+        data = await res.json();
+      } catch (err) {
+        setError("Server returned invalid response");
+        setLoading(false);
+        return;
+      }
+
+      if (res.ok && data.success) {
+        localStorage.setItem("isLoggedIn", "true");
+        localStorage.setItem("userName", formData.fullName);
+        localStorage.setItem("businessName", formData.businessName);
+        localStorage.setItem("businessType", formData.businessType);
+
+        router.push("/dashboard");
+      } else {
+        setError(data.error || "Registration failed. Please try again.");
+      }
 
     } catch (err) {
-      setError("Registration failed. Please try again.");
+      setError("Connection error. Please check your network and try again.");
     } finally {
       setLoading(false);
     }
