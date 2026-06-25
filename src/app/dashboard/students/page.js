@@ -117,11 +117,18 @@ export default function Customers() {
 
       const paymentLink = `${window.location.origin}/pay/${token}`;
 
+      const now = new Date();
+      const formattedDate =
+        now.toLocaleDateString() +
+        " " +
+        now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
       const message = `Hello ${customer.name},
 
 Please make payment for ${customer.category}
 
 Amount: ₦${amount.toLocaleString()}
+Date: ${formattedDate}
 
 Payment Link:
 ${paymentLink}`;

@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import CreateInvoiceModal from "../../../components/CreateInvoiceModal";
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const loadData = async () => {
     try {
@@ -57,24 +55,51 @@ export default function Invoices() {
     }
   };
 
+  // ✅ Converts a local Nigerian number (e.g. 08012345678) into the
+  // international format WhatsApp's wa.me links require (2348012345678),
+  // WITHOUT changing how the number is stored or displayed anywhere else.
+  // Same helper used on the Customers page, kept consistent here.
+  const toWhatsAppNumber = (rawPhone) => {
+    if (!rawPhone) return "";
+
+    let digits = rawPhone.replace(/\D/g, "");
+
+    if (digits.startsWith("234")) {
+      return digits;
+    }
+
+    if (digits.startsWith("0")) {
+      return "234" + digits.slice(1);
+    }
+
+    return "234" + digits;
+  };
+
   const shareWhatsApp = (inv) => {
-    const phone = inv.phone?.startsWith("0")
-      ? inv.phone.slice(1)
-      : inv.phone;
+    if (!inv.phone) return alert("No phone number");
 
-    if (!phone) return alert("No phone number");
+    const whatsappPhone = toWhatsAppNumber(inv.phone);
 
+    const invoiceDate = inv.date ? new Date(inv.date) : new Date();
+    const formattedDate =
+      invoiceDate.toLocaleDateString() +
+      " " +
+      invoiceDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+    // ✅ Same message format used when an invoice is first generated
+    // from the Customers page, kept identical here for consistency.
     const message = `Hello ${inv.student || inv.customer},
 
-Please make payment.
+Please make payment for ${inv.class || inv.category || "your invoice"}
 
 Amount: ₦${Number(inv.amount).toLocaleString()}
+Date: ${formattedDate}
 
-Pay here:
+Payment Link:
 ${window.location.origin}/pay/${inv.token}`;
 
     window.open(
-      `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+      `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`,
       "_blank"
     );
   };
@@ -110,16 +135,6 @@ ${window.location.origin}/pay/${inv.token}`;
           </p>
         </div>
 
-        {/* CREATE BUTTON */}
-        <div className="flex justify-end">
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-medium text-lg shadow-sm transition-all"
-          >
-            + Create Invoice
-          </button>
-        </div>
-
         {/* STATS CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
@@ -145,11 +160,11 @@ ${window.location.origin}/pay/${inv.token}`;
         </div>
 
         {/* TABLE */}
-        <div className="bg-white rounded-3xl shadow border overflow-hidden">
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-50 border-b">
+                <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="px-8 py-5 text-left text-sm font-medium text-gray-500">Customer</th>
                   <th className="px-8 py-5 text-left text-sm font-medium text-gray-500">Amount</th>
                   <th className="px-8 py-5 text-left text-sm font-medium text-gray-500">Status</th>
@@ -191,32 +206,44 @@ ${window.location.origin}/pay/${inv.token}`;
                     </td>
 
                     <td className="px-8 py-6 text-sm text-gray-500">
-                      {inv.date ? new Date(inv.date).toLocaleDateString() : "—"}
+                      {inv.date
+                        ? new Date(inv.date).toLocaleDateString() +
+                          " " +
+                          new Date(inv.date).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "—"}
                     </td>
 
-                    <td className="px-8 py-6 text-right space-x-3">
-                      {inv.status !== "Paid" && (
+                    <td className="px-8 py-6">
+                      <div className="flex items-center justify-end gap-2">
+                        {inv.status !== "Paid" && (
+                          <button
+                            onClick={() => markPaid(inv._id)}
+                            title="Mark as Paid"
+                            className="bg-green-600 hover:bg-green-700 text-white w-9 h-9 rounded-xl text-sm font-medium transition flex items-center justify-center"
+                          >
+                            ✓
+                          </button>
+                        )}
+
                         <button
-                          onClick={() => markPaid(inv._id)}
-                          className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-2xl text-sm font-medium transition"
+                          onClick={() => shareWhatsApp(inv)}
+                          title="Share on WhatsApp"
+                          className="bg-[#25D366] hover:bg-[#20BA5C] text-white w-9 h-9 rounded-xl text-sm font-medium transition flex items-center justify-center"
                         >
-                          Mark as Paid
+                          📱
                         </button>
-                      )}
 
-                      <button
-                        onClick={() => shareWhatsApp(inv)}
-                        className="bg-[#25D366] hover:bg-[#20BA5C] text-white px-5 py-2.5 rounded-2xl text-sm font-medium transition"
-                      >
-                        📱 WhatsApp
-                      </button>
-
-                      <button
-                        onClick={() => deleteInvoice(inv._id)}
-                        className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-sm font-medium transition"
-                      >
-                        Delete
-                      </button>
+                        <button
+                          onClick={() => deleteInvoice(inv._id)}
+                          title="Delete"
+                          className="bg-red-600 hover:bg-red-700 text-white w-9 h-9 rounded-xl text-sm font-medium transition flex items-center justify-center"
+                        >
+                          🗑
+                        </button>
+                      </div>
                     </td>
 
                   </tr>
@@ -232,12 +259,6 @@ ${window.location.origin}/pay/${inv.token}`;
           </div>
         </div>
       </div>
-
-      <CreateInvoiceModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onInvoiceAdded={loadData}
-      />
     </div>
   );
 }
