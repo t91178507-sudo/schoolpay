@@ -2,6 +2,16 @@
 
 import { useState, useEffect } from "react";
 
+// ✅ Same business categories used on the Register page, kept consistent
+const businessTypes = [
+  "School",
+  "Estate",
+  "Hospital",
+  "Distributor",
+  "Fuel Supplier",
+  "Professional Service",
+];
+
 export default function AddCustomerModal({ 
   isOpen, 
   onClose, 
@@ -124,15 +134,20 @@ export default function AddCustomerModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-            <input 
-              type="text" 
-              name="category" 
-              value={formData.category} 
-              onChange={handleChange} 
-              required 
+            <select
+              name="category"
+              value={formData.category}
+              onChange={handleChange}
+              required
               className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Medical Bill, School Fees, Rent, etc."
-            />
+            >
+              <option value="">Select Category</option>
+              {businessTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
