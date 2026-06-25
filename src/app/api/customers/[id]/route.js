@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 
 export async function DELETE(request, { params }) {
   try {
-    const { id } = params; // ✅ FIXED
+    const { id } = await params; // ✅ FIXED
 
     if (!id) {
       return Response.json(

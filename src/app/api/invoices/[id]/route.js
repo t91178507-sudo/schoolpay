@@ -1,5 +1,4 @@
 import { connectDB } from "../../../../lib/mongodb";
-``
 import { ObjectId } from "mongodb";
 
 export async function DELETE(request, { params }) {

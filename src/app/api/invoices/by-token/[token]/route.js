@@ -1,10 +1,9 @@
 import { connectDB } from "../../../../../lib/mongodb";
-``
 
 // ✅ GET INVOICE BY TOKEN
 export async function GET(req, context) {
   try {
-    const { token } = context.params; // ✅ FIXED
+    const { token } = await context.params; // ✅ FIXED
 
     const db = await connectDB();
 
