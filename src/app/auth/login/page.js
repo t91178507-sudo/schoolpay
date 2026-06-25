@@ -23,55 +23,50 @@ export default function Login() {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  setLoading(true);
-  setError("");
-
-  try {
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      
-body: JSON.stringify({
-  name: formData.name,
-  class: formData.class,
-  parent: formData.parent,
-  phone: formData.parentPhone, // ✅ MAP IT HERE
-  parentEmail: formData.parentEmail,
-}),
-
-    });
-
-    let data;
+    setLoading(true);
+    setError("");
 
     try {
-      data = await res.json();
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+
+      let data;
+
+      try {
+        data = await res.json();
+      } catch (err) {
+        setError("Server returned invalid response");
+        setLoading(false);
+        return;
+      }
+
+      if (res.ok) {
+        localStorage.setItem("isLoggedIn", "true");
+
+        setTimeout(() => {
+          router.replace("/dashboard");
+        }, 200);
+
+      } else {
+        setError(data.message || "Invalid credentials");
+      }
+
     } catch (err) {
-      setError("Server returned invalid response");
+      setError("Connection error. Check your API.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    if (res.ok) {
-      localStorage.setItem("isLoggedIn", "true");
-
-      setTimeout(() => {
-        router.replace("/dashboard");
-      }, 200);
-
-    } else {
-      setError(data.message || "Invalid credentials");
-    }
-
-  } catch (err) {
-    setError("Connection error. Check your API.");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
