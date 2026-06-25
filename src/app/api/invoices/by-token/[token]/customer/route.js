@@ -1,8 +1,9 @@
 import { connectDB } from "../../../../../../lib/mongodb";
 
 // ✅ Given one invoice's token, find ALL invoices belonging to the
-// same customer (matched by phone number, since that's the most
-// reliable shared field between invoices for the same person).
+// same customer. Matched by customerToken — a stable reference to
+// the customer's own token, saved on every invoice at creation time.
+// This avoids unreliable matching by phone number or name.
 export async function GET(req, context) {
   try {
     const { token } = await context.params;
@@ -18,11 +19,13 @@ export async function GET(req, context) {
       );
     }
 
-    // Match by phone number — the most reliable shared identifier
-    // between invoices for the same customer in this data model.
-    const matchQuery = baseInvoice.phone
-      ? { phone: baseInvoice.phone }
-      : { student: baseInvoice.student };
+    // Match by customerToken if present (reliable, stable link).
+    // Fall back to matching just this single invoice by its own
+    // token if customerToken is missing (e.g. older invoices
+    // created before this field existed).
+    const matchQuery = baseInvoice.customerToken
+      ? { customerToken: baseInvoice.customerToken }
+      : { token: baseInvoice.token };
 
     const allInvoices = await db
       .collection("invoices")
