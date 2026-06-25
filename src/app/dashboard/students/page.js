@@ -52,47 +52,72 @@ export default function Customers() {
     }
   };
 
-const generateInvoice = async (customer) => {
-  try {
-    const phone =
-      customer.phone ||
-      customer.customerPhone ||
-      customer.parentPhone ||
-      "";
+  // ✅ Converts a local Nigerian number (e.g. 08012345678) into the
+  // international format WhatsApp's wa.me links require (2348012345678),
+  // WITHOUT changing how the number is stored or displayed anywhere else.
+  const toWhatsAppNumber = (rawPhone) => {
+    if (!rawPhone) return "";
 
-    if (!phone) {
-      alert("No phone number");
-      return;
+    // Strip everything except digits (handles spaces, dashes, +, etc.)
+    let digits = rawPhone.replace(/\D/g, "");
+
+    if (digits.startsWith("234")) {
+      // Already has the country code
+      return digits;
     }
 
-    const amount = Number(customer.amount || 0);
+    if (digits.startsWith("0")) {
+      // Local format e.g. 08012345678 -> 2348012345678
+      return "234" + digits.slice(1);
+    }
 
-    const token =
-      customer.token ||
-      "inv_" + Math.random().toString(36).substring(2, 10);
+    // Fallback: assume it's a 10-digit local number missing the leading 0
+    return "234" + digits;
+  };
 
-    // ✅ SAVE INVOICE
-    const res = await fetch("/api/invoices", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        student: customer.name,
-        class: customer.category,
-        amount,
-        status: "Unpaid",
-        token,
-        phone,
-        date: new Date().toISOString(),
-      }),
-    });
+  const generateInvoice = async (customer) => {
+    try {
+      const phone =
+        customer.phone ||
+        customer.customerPhone ||
+        customer.parentPhone ||
+        "";
 
-    if (!res.ok) throw new Error("Invoice failed");
+      if (!phone) {
+        alert("No phone number");
+        return;
+      }
 
-    const paymentLink = `${window.location.origin}/pay/${token}`;
+      const whatsappPhone = toWhatsAppNumber(phone);
 
-    const message = `Hello ${customer.name},
+      const amount = Number(customer.amount || 0);
+
+      const token =
+        customer.token ||
+        "inv_" + Math.random().toString(36).substring(2, 10);
+
+      // ✅ SAVE INVOICE
+      const res = await fetch("/api/invoices", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          student: customer.name,
+          class: customer.category,
+          amount,
+          status: "Unpaid",
+          token,
+          phone,
+          date: new Date().toISOString(),
+        }),
+      });
+
+      if (!res.ok) throw new Error("Invoice failed");
+
+      const paymentLink = `${window.location.origin}/pay/${token}`;
+
+      const message = `Hello ${customer.name},
 
 Please make payment for ${customer.category}
 
@@ -101,17 +126,16 @@ Amount: ₦${amount.toLocaleString()}
 Payment Link:
 ${paymentLink}`;
 
-    window.open(
-      `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
-      "_blank"
-    );
+      window.open(
+        `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`,
+        "_blank"
+      );
 
-  } catch (error) {
-    console.error(error);
-    alert("Failed to generate invoice");
-  }
-};
-
+    } catch (error) {
+      console.error(error);
+      alert("Failed to generate invoice");
+    }
+  };
 
   if (loading) {
     return (
