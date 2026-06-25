@@ -10,6 +10,7 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
+  // The invoice currently being paid (null while showing the picker)
   const [activeInvoice, setActiveInvoice] = useState(null);
   const [payAmount, setPayAmount] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -31,9 +32,15 @@ export default function PaymentPage() {
 
         const pending = data.invoices.filter((inv) => inv.status !== "Paid");
 
+        // If there's exactly one pending invoice, skip the picker
+        // and go straight to the payment screen for it.
         if (pending.length === 1) {
           openInvoice(pending[0]);
         }
+        // If there's more than one, leave activeInvoice as null
+        // so the picker renders below.
+        // If there are zero pending (all paid), the picker will
+        // show everything marked as paid.
 
       } catch (err) {
         console.error(err);
@@ -133,24 +140,26 @@ export default function PaymentPage() {
   }
 
   const { customer, invoices } = customerData;
-  const businessName = customer?.businessName || "Payment";
 
-  // ✅ PICKER VIEW
+  // ✅ PICKER VIEW — shown when there's no single active invoice
+  // (i.e. more than one pending invoice, or all are already paid)
   if (!activeInvoice) {
     return (
       <div className="min-h-screen bg-[#FAFAFA] py-16 px-4">
         <div className="max-w-md mx-auto">
 
-          <div className="mb-8 px-1">
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-              {businessName}
-            </h1>
-            <p className="text-slate-600 mt-1">Select an invoice to pay</p>
+          <div className="mb-6 px-1">
+            <span className="text-[13px] font-semibold tracking-wide text-slate-900 uppercase">
+              {customer.businessName || "Payment"}
+            </span>
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200 shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
             <div className="px-8 py-6 border-b border-slate-100">
-              <p className="text-lg font-semibold text-slate-900">
+              <p className="text-[12px] font-medium text-slate-500 uppercase tracking-wide">
+                Select an invoice to pay
+              </p>
+              <p className="text-lg font-semibold text-slate-900 mt-1">
                 {customer.name}
               </p>
             </div>
@@ -207,7 +216,7 @@ export default function PaymentPage() {
     );
   }
 
-  // ✅ PAYMENT VIEW
+  // ✅ PAYMENT VIEW — shown once a single invoice is active
   const isPaid = activeInvoice.status === "Paid";
   const showBackButton = invoices.length > 1;
 
@@ -215,20 +224,28 @@ export default function PaymentPage() {
     <div className="min-h-screen bg-[#FAFAFA] py-16 px-4">
       <div className="max-w-md mx-auto">
 
-        {showBackButton && (
-          <button
-            onClick={() => setActiveInvoice(null)}
-            className="text-[13px] font-medium text-slate-500 hover:text-slate-700 mb-3 px-1 block"
+        <div className="flex items-center justify-between mb-6 px-1">
+          {showBackButton ? (
+            <button
+              onClick={() => setActiveInvoice(null)}
+              className="text-[13px] font-medium text-slate-500 hover:text-slate-700"
+            >
+              ← All invoices
+            </button>
+          ) : (
+            <span className="text-[13px] font-semibold tracking-wide text-slate-900 uppercase">
+              {customer.businessName || "Payment"}
+            </span>
+          )}
+          <span
+            className={`text-[11px] font-medium px-2.5 py-1 rounded-full border ${
+              isPaid
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                : "bg-amber-50 text-amber-700 border-amber-200"
+            }`}
           >
-            ← All invoices
-          </button>
-        )}
-
-        <div className="mb-8 px-1">
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-            {businessName}
-          </h1>
-          <p className="text-slate-600 mt-1">Payment Request</p>
+            {isPaid ? "Paid" : "Awaiting payment"}
+          </span>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
