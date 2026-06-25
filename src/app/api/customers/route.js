@@ -1,5 +1,5 @@
 import { connectDB } from "../../../lib/mongodb";
-``
+import { ObjectId } from "mongodb";
 
 // ✅ GET ALL CUSTOMERS
 export async function GET() {
@@ -23,6 +23,7 @@ export async function GET() {
   }
 }
 
+// ✅ DELETE CUSTOMER
 export async function DELETE(req, context) {
   try {
     const { id } = await context.params;
@@ -40,10 +41,14 @@ export async function DELETE(req, context) {
     return Response.json({ message: "Deleted ✅" });
 
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    console.error("DELETE CUSTOMER ERROR:", error);
+
+    return Response.json(
+      { error: error.message },
+      { status: 500 }
+    );
   }
 }
-
 
 // ✅ CREATE CUSTOMER
 export async function POST(request) {
