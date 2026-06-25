@@ -150,7 +150,7 @@ export default function Dashboard() {
           </div>
 
           <Link
-            href="/dashboard/customers"
+            href="/dashboard/students"
             className="text-blue-600 text-sm font-medium mt-6 inline-block hover:underline"
           >
             View all customers →

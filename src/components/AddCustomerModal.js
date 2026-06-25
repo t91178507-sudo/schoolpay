@@ -51,8 +51,14 @@ export default function AddCustomerModal({
     try {
       const token = "inv_" + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
 
+      const businessName =
+        typeof window !== "undefined"
+          ? localStorage.getItem("businessName") || ""
+          : "";
+
       const customerData = {
         ...formData,
+        businessName,
         token,
         paymentLink: `/pay/${token}`,
         createdAt: new Date().toISOString(),
@@ -76,6 +82,7 @@ export default function AddCustomerModal({
           customer: formData.name,
           amount: Number(formData.amount),
           category: formData.category,
+          businessName,
           status: "Unpaid",
           token: token,
           date: new Date().toISOString(),

@@ -52,6 +52,9 @@ export default function Login() {
 
       if (res.ok) {
         localStorage.setItem("isLoggedIn", "true");
+        localStorage.setItem("userName", data.user?.fullName || "");
+        localStorage.setItem("businessName", data.user?.businessName || "");
+        localStorage.setItem("businessType", data.user?.businessType || "");
 
         setTimeout(() => {
           router.replace("/dashboard");
