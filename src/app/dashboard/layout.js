@@ -6,7 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 
 const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: "📊" },
-  { name: "Customers", href: "/dashboard/students", icon: "👨‍🎓" },
+  { name: "Categories", href: "/dashboard/students", icon: "👨‍🎓" },
+  { name: "Customer Overview", href: "/dashboard/customers", icon: "👥" },
   { name: "Invoices", href: "/dashboard/invoices", icon: "📄" },
   { name: "Payments", href: "/dashboard/payments", icon: "💰" },
   { name: "Settings", href: "/dashboard/settings", icon: "⚙️" },
@@ -41,7 +42,7 @@ export default function DashboardLayout({ children }) {
 
     return () => clearInterval(interval);
   }, []);
-  ``
+
   const formattedDate = currentTime.toLocaleDateString(undefined, {
     weekday: "long",
     year: "numeric",
