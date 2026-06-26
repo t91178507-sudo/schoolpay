@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { authFetch } from "../lib/authFetch";
+import { generateInvoiceToken } from "../lib/invoiceUtils";
 
 export default function CreateInvoiceModal({ isOpen, onClose, onInvoiceAdded }) {
   const [formData, setFormData] = useState({
-    student: "",
+    customer: "",
     amount: "",
-    class: "",
-    date: new Date().toISOString().split("T")[0], // Today's date
+    category: "",
+    date: new Date().toISOString().split("T")[0],
   });
   const [loading, setLoading] = useState(false);
 
@@ -17,21 +19,24 @@ export default function CreateInvoiceModal({ isOpen, onClose, onInvoiceAdded }) 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.student || !formData.amount) {
-      alert("Student name and amount are required");
+    if (!formData.customer || !formData.amount) {
+      alert("Customer name and amount are required");
       return;
     }
 
     setLoading(true);
 
     try {
-      const res = await fetch("/api/invoices", {
+      const token = generateInvoiceToken("inv");
+
+      const res = await authFetch("/api/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
           amount: Number(formData.amount),
           status: "Unpaid",
+          token,
         }),
       });
 
@@ -39,11 +44,10 @@ export default function CreateInvoiceModal({ isOpen, onClose, onInvoiceAdded }) 
         const newInvoice = await res.json();
         onInvoiceAdded?.(newInvoice);
         onClose();
-        // Reset form
         setFormData({
-          student: "",
+          customer: "",
           amount: "",
-          class: "",
+          category: "",
           date: new Date().toISOString().split("T")[0],
         });
       } else {
@@ -62,22 +66,20 @@ export default function CreateInvoiceModal({ isOpen, onClose, onInvoiceAdded }) 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden">
-        {/* Header */}
         <div className="px-8 py-6 border-b">
           <h2 className="text-2xl font-semibold text-gray-900">Create New Invoice</h2>
-          <p className="text-gray-500 mt-1">Generate school fees invoice</p>
+          <p className="text-gray-500 mt-1">Generate an invoice for a customer</p>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Student Name
+              Customer Name
             </label>
             <input
               type="text"
-              name="student"
-              value={formData.student}
+              name="customer"
+              value={formData.customer}
               onChange={handleChange}
               required
               className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -103,15 +105,15 @@ export default function CreateInvoiceModal({ isOpen, onClose, onInvoiceAdded }) 
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Class
+                Category
               </label>
               <input
                 type="text"
-                name="class"
-                value={formData.class}
+                name="category"
+                value={formData.category}
                 onChange={handleChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Primary 5"
+                placeholder="Consulting"
               />
             </div>
           </div>
@@ -129,7 +131,6 @@ export default function CreateInvoiceModal({ isOpen, onClose, onInvoiceAdded }) 
             />
           </div>
 
-          {/* Buttons */}
           <div className="flex gap-4 pt-6">
             <button
               type="button"

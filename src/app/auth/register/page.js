@@ -3,15 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { emitSessionChange } from "../../../lib/clientSession";
 
-// Business Types (kept from your original)
 const businessTypes = [
-  "School",
-  "Estate",
-  "Hospital",
-  "Distributor",
-  "Fuel Supplier",
+  "Retail",
   "Professional Service",
+  "Healthcare",
+  "Real Estate",
+  "Distribution",
+  "Hospitality",
 ];
 
 export default function Register() {
@@ -26,7 +26,6 @@ export default function Register() {
     country: "",
     acceptTerms: false,
   });
-
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -87,12 +86,13 @@ export default function Register() {
         localStorage.setItem("userName", `${formData.firstName} ${formData.lastName}`);
         localStorage.setItem("businessName", formData.businessName);
         localStorage.setItem("businessType", formData.businessType);
+        emitSessionChange();
 
         router.push("/dashboard");
       } else {
         setError(data.error || "Registration failed. Please try again.");
       }
-    } catch (err) {
+    } catch {
       setError("Connection error. Please check your network.");
     } finally {
       setLoading(false);
@@ -101,76 +101,70 @@ export default function Register() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left Side - Branding */}
-      <div className="hidden lg:flex w-1/2 bg-[#4C1D95] text-white relative overflow-hidden flex-col justify-center p-12">
+      <div className="hidden lg:flex w-1/2 bg-[#123B5D] text-white relative overflow-hidden flex-col justify-center p-12">
         <div className="absolute top-10 left-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-2xl font-bold">
+            <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-2xl font-bold">
               ₦
             </div>
-            <span className="text-3xl font-bold tracking-tight">payaza</span>
+            <span className="text-3xl font-bold tracking-tight">InvoiceHub</span>
           </div>
         </div>
 
         <div className="max-w-lg mt-20">
           <h1 className="text-5xl font-bold leading-tight mb-6">
-            Experience <span className="text-green-400">smooth, easy</span> payments
+            Set up billing that feels
+            <span className="text-emerald-300"> organized from day one</span>
           </h1>
 
-          <div className="bg-[#3B1A7A] rounded-3xl p-8 mt-16 relative">
+          <div className="bg-[#0E2E48] rounded-3xl p-8 mt-16 relative">
             <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 bg-gray-300 rounded-full"></div>
+              <div className="w-12 h-12 bg-slate-300 rounded-full"></div>
               <div>
-                <p className="font-semibold">Chidinma Obj</p>
-                <p className="text-sm text-green-300">CEO, Stitches and Stride</p>
+                <p className="font-semibold">Samuel Okoye</p>
+                <p className="text-sm text-emerald-300">Finance Lead, Oakline Studio</p>
               </div>
             </div>
-            
+
             <p className="italic text-lg leading-relaxed">
-              "Payaza made it easy to manage transactions of my branches all around the globe"
+              &ldquo;We went from scattered follow-ups to a clear invoice workflow the whole team could trust.&rdquo;
             </p>
 
-            <div className="absolute bottom-6 right-8 text-6xl opacity-20">“</div>
+            <div className="absolute bottom-6 right-8 text-6xl opacity-20">&quot;</div>
           </div>
         </div>
       </div>
 
-      {/* Right Side - Registration Form */}
       <div className="flex-1 flex items-center justify-center p-6 bg-gray-50">
         <div className="w-full max-w-lg">
           <div className="bg-white rounded-3xl shadow-xl p-10">
             <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900">Get started with InvoiceHUB</h2>
+              <h2 className="text-3xl font-bold text-gray-900">Create your InvoiceHub account</h2>
               <p className="text-gray-600 mt-2 text-sm">
-                Welcome to InvoiceHUB. Everything you need to manage invoices and payment collection is right here<br />
-                continue with the following
+                Set up your business profile and start managing invoices in one place.
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <input
-                    type="text"
-                    name="firstName"
-                    placeholder="First Name"
-                    value={formData.firstName}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-600"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="text"
-                    name="lastName"
-                    placeholder="Last Name"
-                    value={formData.lastName}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-600"
-                  />
-                </div>
+                <input
+                  type="text"
+                  name="firstName"
+                  placeholder="First Name"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
+                />
+                <input
+                  type="text"
+                  name="lastName"
+                  placeholder="Last Name"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
+                />
               </div>
 
               <input
@@ -180,7 +174,7 @@ export default function Register() {
                 value={formData.businessName}
                 onChange={handleChange}
                 required
-                className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-600"
+                className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
               />
 
               <input
@@ -190,7 +184,7 @@ export default function Register() {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-600"
+                className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
               />
 
               <select
@@ -198,7 +192,7 @@ export default function Register() {
                 value={formData.businessType}
                 onChange={handleChange}
                 required
-                className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-600"
+                className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
               >
                 <option value="">Select Business Type</option>
                 {businessTypes.map((type) => (
@@ -215,7 +209,7 @@ export default function Register() {
                 value={formData.country}
                 onChange={handleChange}
                 required
-                className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-600"
+                className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
               />
 
               <div className="relative">
@@ -226,14 +220,14 @@ export default function Register() {
                   value={formData.password}
                   onChange={handleChange}
                   required
-                  className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-500"
                 >
-                  {showPassword ? "🙈" : "👁️"}
+                  {showPassword ? "Hide" : "Show"}
                 </button>
               </div>
 
@@ -245,14 +239,14 @@ export default function Register() {
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   required
-                  className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-500"
                 >
-                  {showConfirmPassword ? "🙈" : "👁️"}
+                  {showConfirmPassword ? "Hide" : "Show"}
                 </button>
               </div>
 
@@ -268,19 +262,19 @@ export default function Register() {
                   name="acceptTerms"
                   checked={formData.acceptTerms}
                   onChange={handleChange}
-                  className="w-5 h-5 accent-purple-700"
+                  className="w-5 h-5 accent-sky-700"
                   required
                 />
                 <label className="text-sm text-gray-600">
-                  Accept <span className="text-purple-700">Terms & Conditions</span> and{" "}
-                  <span className="text-purple-700">Privacy Policy</span>
+                  Accept <span className="text-sky-800">Terms & Conditions</span> and{" "}
+                  <span className="text-sky-800">Privacy Policy</span>
                 </label>
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 bg-[#6B21A8] hover:bg-[#5B1A8F] disabled:bg-purple-300 text-white font-semibold rounded-2xl text-lg transition-all"
+                className="w-full py-4 bg-[#123B5D] hover:bg-[#0E2E48] disabled:bg-sky-300 text-white font-semibold rounded-2xl text-lg transition-all"
               >
                 {loading ? "Creating Account..." : "Create my account"}
               </button>
@@ -288,15 +282,11 @@ export default function Register() {
 
             <p className="text-center text-sm text-gray-600 mt-8">
               Have an account?{" "}
-              <Link href="/login" className="text-purple-700 font-medium hover:underline">
+              <Link href="/auth/login" className="text-sky-800 font-medium hover:underline">
                 Log in
               </Link>
             </p>
           </div>
-
-          <p className="text-center text-xs text-gray-500 mt-8">
-            © 2026 Payaza Africa Limited is fully licensed by the Central Bank of Nigeria.
-          </p>
         </div>
       </div>
     </div>

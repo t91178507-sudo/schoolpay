@@ -3,27 +3,21 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { authFetch } from "../../lib/authFetch";
+import { useBusinessSession } from "../../lib/clientSession";
 
 export default function Dashboard() {
+  const session = useBusinessSession();
   const [stats, setStats] = useState({
     totalCustomers: 0,
     totalRevenue: 0,
     paidInvoices: 0,
     unpaidInvoices: 0,
   });
-
-  const [businessName, setBusinessName] = useState("");
-  const [recentInvoices, setRecentInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // ✅ NEW: DATE + TIME STATE
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState(null);
 
   useEffect(() => {
-    const name = localStorage.getItem("businessName");
-    if (name) setBusinessName(name);
-
     const fetchDashboardData = async () => {
       try {
         const [customersRes, invoicesRes] = await Promise.all([
@@ -39,7 +33,7 @@ export default function Dashboard() {
           0
         );
 
-        const paid = invoices.filter(inv => inv.status === "Paid").length;
+        const paid = invoices.filter((inv) => inv.status === "Paid").length;
         const unpaid = invoices.length - paid;
 
         setStats({
@@ -48,13 +42,6 @@ export default function Dashboard() {
           paidInvoices: paid,
           unpaidInvoices: unpaid,
         });
-
-        const sortedInvoices = [...invoices].sort(
-          (a, b) => new Date(b.date || 0) - new Date(a.date || 0)
-        );
-
-        setRecentInvoices(sortedInvoices.slice(0, 5));
-
       } catch (err) {
         console.error(err);
         setError("Failed to load dashboard data");
@@ -66,27 +53,22 @@ export default function Dashboard() {
     fetchDashboardData();
   }, []);
 
-  // ✅ NEW: LIVE CLOCK
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000); // updates every second
-
+    const interval = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // ✅ FORMAT DATE & TIME
-  const formattedDate = currentTime.toLocaleDateString(undefined, {
+  const formattedDate = currentTime?.toLocaleDateString(undefined, {
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
-  });
+  }) || "";
 
-  const formattedTime = currentTime.toLocaleTimeString([], {
+  const formattedTime = currentTime?.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
-  });
+  }) || "";
 
   if (loading) {
     return (
@@ -117,23 +99,16 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-
-      {/* ✅ HEADER */}
       <div>
         <h1 className="text-4xl font-semibold text-gray-900">
-          Welcome, {businessName || "Your Business"}
+          Welcome, {session.businessName || "Your Business"}
         </h1>
-
-        {/* ✅ NEW DATE + TIME DISPLAY */}
-        <p className="text-gray-600 mt-2">
-          {formattedDate} • {formattedTime}
+        <p className="text-gray-600 mt-2 min-h-[1.75rem]">
+          {currentTime ? `${formattedDate} • ${formattedTime}` : ""}
         </p>
       </div>
 
-      {/* STATS GRID */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-
-        {/* TOTAL CUSTOMERS */}
         <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
@@ -151,14 +126,13 @@ export default function Dashboard() {
           </div>
 
           <Link
-            href="/dashboard/students"
+            href="/dashboard/categories"
             className="text-blue-600 text-sm font-medium mt-6 inline-block hover:underline"
           >
             View all customers →
           </Link>
         </div>
 
-        {/* TOTAL REVENUE */}
         <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
@@ -176,7 +150,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* PAID */}
         <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -186,12 +159,11 @@ export default function Dashboard() {
               </p>
             </div>
             <div className="w-14 h-14 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center text-3xl">
-              ✅
+              ✓
             </div>
           </div>
         </div>
 
-        {/* UNPAID */}
         <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -212,7 +184,6 @@ export default function Dashboard() {
             Manage invoices →
           </Link>
         </div>
-
       </div>
     </div>
   );

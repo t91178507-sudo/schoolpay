@@ -41,7 +41,8 @@ export async function POST(req) {
     // not a full object — it wraps it internally as { userId }.
     const token = signToken(user._id);
 
-    const { password, ...userData } = user;
+    const userData = { ...user };
+    delete userData.password;
 
     return Response.json({
       success: true,

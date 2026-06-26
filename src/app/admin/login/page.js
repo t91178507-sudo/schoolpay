@@ -31,7 +31,7 @@ export default function AdminLogin() {
       } else {
         setError(data.error || "Invalid credentials");
       }
-    } catch (err) {
+    } catch {
       setError("Connection error. Please try again.");
     } finally {
       setLoading(false);
@@ -45,7 +45,7 @@ export default function AdminLogin() {
           <div className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4">
             🔐
           </div>
-          <h1 className="text-xl font-semibold text-white">BackOffice Admin</h1>
+          <h1 className="text-xl font-semibold text-white">InvoiceHub Admin</h1>
           <p className="text-slate-400 text-sm mt-1">Platform administration</p>
         </div>
 
@@ -61,7 +61,7 @@ export default function AdminLogin() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                placeholder="admin@schoolpay.com"
+                placeholder="admin@invoicehub.com"
               />
             </div>
 

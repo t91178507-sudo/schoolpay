@@ -3,17 +3,66 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
+const MONNIFY_SDK_SRC = "https://sdk.monnify.com/plugin/monnify.js";
+
+function parseAmount(value) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.replace(/[^0-9.]/g, "");
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  if (value && typeof value === "object") {
+    const asString = value.toString?.();
+    if (asString && asString !== "[object Object]") {
+      const normalized = asString.replace(/[^0-9.]/g, "");
+      const parsed = Number(normalized);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export default function PaymentPage() {
   const { token } = useParams();
-
   const [customerData, setCustomerData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-
-  // The invoice currently being paid (null while showing the picker)
   const [activeInvoice, setActiveInvoice] = useState(null);
   const [payAmount, setPayAmount] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [launchingPayment, setLaunchingPayment] = useState(false);
+  const [sdkReady, setSdkReady] = useState(
+    () => typeof window !== "undefined" && Boolean(window.MonnifySDK)
+  );
+
+  const openInvoice = (invoice) => {
+    setActiveInvoice(invoice);
+    setPayAmount(parseAmount(invoice.amount));
+  };
+
+  useEffect(() => {
+    if (window.MonnifySDK) {
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = MONNIFY_SDK_SRC;
+    script.async = true;
+    script.onload = () => setSdkReady(true);
+    script.onerror = () => setSdkReady(false);
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -31,17 +80,7 @@ export default function PaymentPage() {
         setCustomerData(data);
 
         const pending = data.invoices.filter((inv) => inv.status !== "Paid");
-
-        // If there's exactly one pending invoice, skip the picker
-        // and go straight to the payment screen for it.
-        if (pending.length === 1) {
-          openInvoice(pending[0]);
-        }
-        // If there's more than one, leave activeInvoice as null
-        // so the picker renders below.
-        // If there are zero pending (all paid), the picker will
-        // show everything marked as paid.
-
+        if (pending.length === 1) openInvoice(pending[0]);
       } catch (err) {
         console.error(err);
         setError(true);
@@ -53,57 +92,65 @@ export default function PaymentPage() {
     fetchCustomerInvoices();
   }, [token]);
 
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src =
-      "https://touchpay.gutouch.net/touchpayv2/script/touchpaynr/prod_touchpay-0.0.1.js";
-    script.async = true;
-
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
-
-  const openInvoice = (invoice) => {
-    setActiveInvoice(invoice);
-    setPayAmount(Number(invoice.amount));
-  };
-
-  const payWithTouchPay = () => {
+  const payWithMonnify = async () => {
     if (!activeInvoice) return;
+    const invoiceAmount = parseAmount(activeInvoice.amount);
 
-    if (payAmount > activeInvoice.amount) {
-      alert("Amount cannot be more than invoice amount");
-      return;
-    }
-
-    if (payAmount <= 0) {
+    if (invoiceAmount <= 0) {
       alert("Enter a valid amount");
       return;
     }
 
-    const transactionId = new Date().getTime();
+    setLaunchingPayment(true);
 
-    if (!window.sendPaymentInfos) {
-      alert("Payment system not loaded yet. Please wait.");
+    try {
+      const res = await fetch("/api/monnify/checkout-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: activeInvoice.token,
+          invoiceId: activeInvoice._id,
+          amount: invoiceAmount,
+          origin: window.location.origin,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.checkoutConfig) {
+        throw new Error(data.error || "Unable to launch Monnify payment");
+      }
+
+      if (!window.MonnifySDK?.initialize) {
+        throw new Error("Monnify SDK is not available yet");
+      }
+
+      window.MonnifySDK.initialize({
+        ...data.checkoutConfig,
+        onComplete: (response) => {
+          if (!response?.paymentReference) {
+            setLaunchingPayment(false);
+            alert("Payment was not completed.");
+            return;
+          }
+
+          const params = new URLSearchParams({
+            paymentReference: response.paymentReference,
+            invoiceId: data.invoiceId,
+          });
+
+          window.location.href = `/pay/success/${activeInvoice.token}?${params.toString()}`;
+        },
+        onClose: () => {
+          setLaunchingPayment(false);
+        },
+      });
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Unable to start Monnify payment");
+      setLaunchingPayment(false);
       return;
     }
-
-    window.sendPaymentInfos(
-      transactionId,
-      "NGTST0005",
-      "B2E7NB4n54OjG2ggsc39UU6aHTCQN81uMQqRLermopbvQiBXJS",
-      `${window.location.origin}/pay/success/${activeInvoice.token}`,
-      `${window.location.origin}/pay/${activeInvoice.token}`,
-      payAmount,
-      activeInvoice.student,
-      "school@example.com",
-      activeInvoice.token,
-      customerData?.customer?.businessName || "Payment",
-      activeInvoice.phone || "08000000000"
-    );
   };
 
   const copyToken = () => {
@@ -140,17 +187,34 @@ export default function PaymentPage() {
   }
 
   const { customer, invoices } = customerData;
+  const hasInvoices = Array.isArray(invoices) && invoices.length > 0;
 
-  // ✅ PICKER VIEW — shown when there's no single active invoice
-  // (i.e. more than one pending invoice, or all are already paid)
+  if (!hasInvoices) {
+    return (
+      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6">
+        <div className="text-center max-w-sm">
+          <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center mx-auto mb-4">
+            <span className="text-slate-500 text-xl">i</span>
+          </div>
+          <h1 className="text-lg font-semibold text-slate-900">
+            No invoices available yet
+          </h1>
+          <p className="text-sm text-slate-500 mt-2">
+            {customer?.businessName || "This account"} has not shared any invoice on
+            this payment link yet.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (!activeInvoice) {
     return (
       <div className="min-h-screen bg-[#FAFAFA] py-16 px-4">
         <div className="max-w-md mx-auto">
-
           <div className="mb-6 px-1">
             <span className="text-[13px] font-semibold tracking-wide text-slate-900 uppercase">
-              {customer.businessName || "Payment"}
+              {customer.businessName || "Invoice Payment"}
             </span>
           </div>
 
@@ -173,14 +237,12 @@ export default function PaymentPage() {
                     onClick={() => !isPaid && openInvoice(inv)}
                     disabled={isPaid}
                     className={`w-full text-left px-8 py-5 flex items-center justify-between transition-colors ${
-                      isPaid
-                        ? "cursor-not-allowed opacity-60"
-                        : "hover:bg-slate-50"
+                      isPaid ? "cursor-not-allowed opacity-60" : "hover:bg-slate-50"
                     }`}
                   >
                     <div>
                       <p className="font-semibold text-slate-900 tabular-nums">
-                        ₦{Number(inv.amount).toLocaleString()}
+                        N{Number(inv.amount).toLocaleString()}
                       </p>
                       <p className="text-[12px] text-slate-400 mt-1">
                         {inv.date
@@ -190,7 +252,7 @@ export default function PaymentPage() {
                               hour: "2-digit",
                               minute: "2-digit",
                             })
-                          : "—"}
+                          : "-"}
                       </p>
                     </div>
                     <span
@@ -209,32 +271,34 @@ export default function PaymentPage() {
           </div>
 
           <p className="text-center text-[12px] text-slate-400 mt-6">
-            Powered by SchoolPay
+            Powered by InvoiceHub
           </p>
         </div>
       </div>
     );
   }
 
-  // ✅ PAYMENT VIEW — shown once a single invoice is active
   const isPaid = activeInvoice.status === "Paid";
   const showBackButton = invoices.length > 1;
+  const customerName =
+    activeInvoice.customer || activeInvoice.customerName || activeInvoice.student;
+  const invoiceCategory = activeInvoice.category || activeInvoice.class || "-";
+  const invoiceAmount = parseAmount(activeInvoice.amount);
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] py-16 px-4">
       <div className="max-w-md mx-auto">
-
         <div className="flex items-center justify-between mb-6 px-1">
           {showBackButton ? (
             <button
               onClick={() => setActiveInvoice(null)}
               className="text-[13px] font-medium text-slate-500 hover:text-slate-700"
             >
-              ← All invoices
+              Back to all invoices
             </button>
           ) : (
             <span className="text-[13px] font-semibold tracking-wide text-slate-900 uppercase">
-              {customer.businessName || "Payment"}
+              {customer.businessName || "Invoice Payment"}
             </span>
           )}
           <span
@@ -249,19 +313,18 @@ export default function PaymentPage() {
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
-
           <div className="px-8 pt-8 pb-7 border-b border-slate-100">
             <p className="text-[12px] font-medium text-slate-500 uppercase tracking-wide">
               Invoice amount
             </p>
             <p className="text-[34px] font-semibold text-slate-900 mt-1 tabular-nums">
-              ₦{activeInvoice.amount.toLocaleString()}
+              N{Number(activeInvoice.amount).toLocaleString()}
             </p>
           </div>
 
           <div className="px-8 py-6 space-y-4">
-            <DetailRow label="Customer name" value={activeInvoice.student} />
-            <DetailRow label="Customer category" value={activeInvoice.class || "—"} />
+            <DetailRow label="Customer name" value={customerName} />
+            <DetailRow label="Category" value={invoiceCategory} />
             <DetailRow
               label="Invoice token"
               value={
@@ -287,44 +350,42 @@ export default function PaymentPage() {
 
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-medium">
-                ₦
+                N
               </span>
               <input
                 type="number"
                 value={payAmount}
-                onChange={(e) => {
-                  const value = Number(e.target.value);
-                  if (value <= activeInvoice.amount) {
-                    setPayAmount(value);
-                  }
-                }}
-                className="w-full pl-9 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-[15px] font-medium text-slate-900 tabular-nums focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-colors"
+                readOnly
+                className="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-[15px] font-medium text-slate-900 tabular-nums focus:outline-none"
               />
             </div>
-
-            {payAmount > activeInvoice.amount && (
-              <p className="text-red-600 text-[13px] mt-2">
-                Cannot exceed ₦{activeInvoice.amount.toLocaleString()}
-              </p>
-            )}
+            <p className="mt-2 text-[12px] text-slate-400">
+              Each payment settles one selected invoice in full.
+            </p>
           </div>
 
           <div className="px-8 pb-8 pt-2">
             <button
-              onClick={payWithTouchPay}
-              disabled={isPaid}
+              onClick={payWithMonnify}
+              disabled={isPaid || launchingPayment || !sdkReady}
               className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-medium text-[15px] transition-colors"
             >
-              {isPaid ? "Already paid" : `Pay ₦${payAmount.toLocaleString()}`}
+              {isPaid
+                ? "Already paid"
+                : launchingPayment
+                  ? "Opening Monnify..."
+                  : !sdkReady
+                    ? "Loading Monnify..."
+                    : `Pay N${invoiceAmount.toLocaleString()}`}
             </button>
             <p className="text-center text-[12px] text-slate-400 mt-3">
-              Secured by TouchPay
+              Secured by Monnify
             </p>
           </div>
         </div>
 
         <p className="text-center text-[12px] text-slate-400 mt-6">
-          Powered by SchoolPay
+          Powered by InvoiceHub
         </p>
       </div>
     </div>

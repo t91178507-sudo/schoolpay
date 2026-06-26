@@ -59,7 +59,7 @@ export default function AdminInvoices() {
                 <tr key={inv._id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 text-slate-600">{inv.ownerBusinessName}</td>
                   <td className="px-6 py-4 font-medium text-slate-900">
-                    {inv.student || inv.customer || "—"}
+                    {inv.customer || inv.customerName || inv.student || "—"}
                   </td>
                   <td className="px-6 py-4 text-slate-900 font-medium">
                     ₦{Number(inv.amount || 0).toLocaleString()}

@@ -1,12 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import {
+  emitSessionChange,
+  useBusinessSession,
+  useDarkModePreference,
+  useHydrated,
+} from "../../lib/clientSession";
 
 const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: "📊" },
-  { name: "Categories", href: "/dashboard/students", icon: "👨‍🎓" },
+  { name: "Categories", href: "/dashboard/categories", icon: "🗂️" },
   { name: "Customer Overview", href: "/dashboard/customers", icon: "👥" },
   { name: "Invoices", href: "/dashboard/invoices", icon: "📄" },
   { name: "Payments", href: "/dashboard/payments", icon: "💰" },
@@ -14,67 +20,56 @@ const navItems = [
 ];
 
 export default function DashboardLayout({ children }) {
-  const [currentTime, setCurrentTime] = useState(new Date())
+  const [currentTime, setCurrentTime] = useState(null);
   const pathname = usePathname();
   const router = useRouter();
+  const session = useBusinessSession();
+  const darkMode = useDarkModePreference();
+  const isHydrated = useHydrated();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  // Check authentication
   useEffect(() => {
-    const loggedIn = localStorage.getItem("isLoggedIn") === "true";
-
-    if (!loggedIn) {
-      router.push("/auth/login");
-    } else {
-      setIsAuthenticated(true);
+    if (!isHydrated) {
+      return;
     }
 
-    setCheckingAuth(false);
-  }, [router]);
+    if (!session.isLoggedIn) {
+      router.replace("/auth/login");
+    }
+  }, [isHydrated, router, session.isLoggedIn]);
 
   useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
     const interval = setInterval(() => {
       setCurrentTime(new Date());
-    }, 1000); // updates every second
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isHydrated]);
 
-  const formattedDate = currentTime.toLocaleDateString(undefined, {
+  const formattedDate = currentTime?.toLocaleDateString(undefined, {
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
-  });
+  }) || "";
 
-  const formattedTime = currentTime.toLocaleTimeString([], {
+  const formattedTime = currentTime?.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
-  });
+  }) || "";
 
-
-  // Dark mode
   useEffect(() => {
-    const savedMode = localStorage.getItem("darkMode") === "true";
-    setDarkMode(savedMode);
-    if (savedMode) {
-      document.documentElement.classList.add("dark");
-    }
-  }, []);
+    document.documentElement.classList.toggle("dark", darkMode);
+  }, [darkMode]);
 
   const toggleDarkMode = () => {
     const newMode = !darkMode;
-    setDarkMode(newMode);
     localStorage.setItem("darkMode", newMode);
-
-    if (newMode) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    emitSessionChange();
   };
 
   const handleLogout = () => {
@@ -83,18 +78,17 @@ export default function DashboardLayout({ children }) {
     localStorage.removeItem("userName");
     localStorage.removeItem("businessName");
     localStorage.removeItem("businessType");
-    router.push("/auth/login");
+    emitSessionChange();
+    router.replace("/auth/login");
   };
 
-  if (checkingAuth) {
+  if (!isHydrated || !session.isLoggedIn) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-600"></div>
       </div>
     );
   }
-
-  if (!isAuthenticated) return null;
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
@@ -163,17 +157,21 @@ export default function DashboardLayout({ children }) {
             </button>
 
 
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              {formattedDate} • {formattedTime}
+            <div className="text-sm text-gray-500 dark:text-gray-400 min-w-[220px] text-right">
+              {currentTime ? `${formattedDate} • ${formattedTime}` : ""}
             </div>
 
             <div className="flex items-center gap-3">
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">Admin User</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Manager</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {session.userName || "User"}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {session.businessType || "Business"}
+                </p>
               </div>
               <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-medium">
-                A
+                {(session.userName || "U").charAt(0).toUpperCase()}
               </div>
             </div>
           </div>

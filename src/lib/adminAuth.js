@@ -13,7 +13,7 @@ if (!ADMIN_JWT_SECRET) {
 // ✅ Hardcoded single admin account. Not stored in the users
 // collection — this is intentionally separate from the regular
 // business-owner accounts.
-const ADMIN_EMAIL = "admin@schoolpay.com";
+const ADMIN_EMAIL = "admin@invoicehub.com";
 const ADMIN_PASSWORD_HASH =
   "$2b$10$1BR.DWJJuIWodYxBM6cLre9pqY4ZK7IEE/hGTTuQwWS3Xjtif.H6.";
 
@@ -51,7 +51,7 @@ export function verifyAdminToken(req) {
     }
 
     return decoded;
-  } catch (error) {
+  } catch {
     return null;
   }
 }

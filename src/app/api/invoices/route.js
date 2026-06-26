@@ -1,5 +1,6 @@
 import { connectDB } from "../../../lib/mongodb";
 import { requireAuth } from "../../../lib/auth";
+import { generateInvoiceToken } from "../../../lib/invoiceUtils";
 
 // ✅ GET ALL INVOICES — only the ones belonging to the logged-in user
 export async function GET(req) {
@@ -33,9 +34,12 @@ export async function POST(req) {
 
     const db = await connectDB();
     const body = await req.json();
+    const invoiceToken = body.token || generateInvoiceToken("inv");
 
     const result = await db.collection("invoices").insertOne({
       ...body,
+      token: invoiceToken,
+      customerToken: body.customerToken || invoiceToken,
       ownerId: userId,
       createdAt: new Date(),
     });
@@ -43,6 +47,7 @@ export async function POST(req) {
     return Response.json({
       success: true,
       insertedId: result.insertedId,
+      token: invoiceToken,
     });
 
   } catch (error) {

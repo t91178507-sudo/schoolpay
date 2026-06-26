@@ -30,10 +30,15 @@ export default function AdminUsers() {
   };
 
   useEffect(() => {
-    loadUsers();
+    const initialLoad = setTimeout(() => {
+      loadUsers();
+    }, 0);
     // Refresh every 30s so the Online/Offline status stays current
     const interval = setInterval(loadUsers, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initialLoad);
+      clearInterval(interval);
+    };
   }, []);
 
   if (loading) {

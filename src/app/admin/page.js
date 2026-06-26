@@ -15,7 +15,7 @@ export default function AdminDashboard() {
         if (!res.ok) throw new Error("Failed to load stats");
         const data = await res.json();
         setStats(data);
-      } catch (err) {
+      } catch {
         setError("Failed to load platform stats");
       } finally {
         setLoading(false);

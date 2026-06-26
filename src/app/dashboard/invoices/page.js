@@ -20,12 +20,15 @@ export default function Invoices() {
   };
 
   useEffect(() => {
-    loadData();
+    const initialLoad = setTimeout(() => {
+      loadData();
+    }, 0);
+    return () => clearTimeout(initialLoad);
   }, []);
 
   const markPaid = async (id) => {
-    setInvoices(prev =>
-      prev.map(inv =>
+    setInvoices((prev) =>
+      prev.map((inv) =>
         inv._id === id ? { ...inv, status: "Paid" } : inv
       )
     );
@@ -56,42 +59,34 @@ export default function Invoices() {
     }
   };
 
-  // ✅ Converts a local Nigerian number (e.g. 08012345678) into the
-  // international format WhatsApp's wa.me links require (2348012345678),
-  // WITHOUT changing how the number is stored or displayed anywhere else.
-  // Same helper used on the Customers page, kept consistent here.
   const toWhatsAppNumber = (rawPhone) => {
     if (!rawPhone) return "";
 
     let digits = rawPhone.replace(/\D/g, "");
 
-    if (digits.startsWith("234")) {
-      return digits;
-    }
-
-    if (digits.startsWith("0")) {
-      return "234" + digits.slice(1);
-    }
+    if (digits.startsWith("234")) return digits;
+    if (digits.startsWith("0")) return "234" + digits.slice(1);
 
     return "234" + digits;
   };
 
   const shareWhatsApp = (inv) => {
     if (!inv.phone) return alert("No phone number");
+    if (!inv.token) return alert("This invoice does not have a payment link yet");
 
     const whatsappPhone = toWhatsAppNumber(inv.phone);
-
     const invoiceDate = inv.date ? new Date(inv.date) : new Date();
     const formattedDate =
       invoiceDate.toLocaleDateString() +
       " " +
       invoiceDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-    // ✅ Same message format used when an invoice is first generated
-    // from the Customers page, kept identical here for consistency.
-    const message = `Hello ${inv.student || inv.customer},
+    const customerName = inv.customer || inv.customerName || inv.student || "Customer";
+    const invoiceCategory = inv.category || inv.class || "this invoice";
 
-Please make payment for ${inv.class || inv.category || "your invoice"}
+    const message = `Hello ${customerName},
+
+Please make payment for ${invoiceCategory}
 
 Amount: ₦${Number(inv.amount).toLocaleString()}
 Date: ${formattedDate}
@@ -111,7 +106,7 @@ ${window.location.origin}/pay/${inv.token}`;
   );
 
   const unpaidCount = invoices.filter(
-    inv => inv.status !== "Paid"
+    (inv) => inv.status !== "Paid"
   ).length;
 
   if (loading) {
@@ -125,18 +120,13 @@ ${window.location.origin}/pay/${inv.token}`;
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-6 space-y-8">
-
-        {/* HEADER */}
         <div>
-          <h1 className="text-4xl font-semibold text-gray-900">
-            Invoices
-          </h1>
+          <h1 className="text-4xl font-semibold text-gray-900">Invoices</h1>
           <p className="text-gray-600 mt-2">
-            Manage all customer invoices and payments
+            Manage customer invoices and payment status
           </p>
         </div>
 
-        {/* STATS CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
             <p className="text-gray-500 text-sm">Total Invoices</p>
@@ -160,13 +150,13 @@ ${window.location.origin}/pay/${inv.token}`;
           </div>
         </div>
 
-        {/* TABLE */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="px-8 py-5 text-left text-sm font-medium text-gray-500">Customer</th>
+                  <th className="px-8 py-5 text-left text-sm font-medium text-gray-500">Category</th>
                   <th className="px-8 py-5 text-left text-sm font-medium text-gray-500">Amount</th>
                   <th className="px-8 py-5 text-left text-sm font-medium text-gray-500">Status</th>
                   <th className="px-8 py-5 text-left text-sm font-medium text-gray-500">Phone</th>
@@ -177,78 +167,85 @@ ${window.location.origin}/pay/${inv.token}`;
               </thead>
 
               <tbody className="divide-y divide-gray-100">
-                {invoices.map((inv) => (
-                  <tr key={inv._id} className="hover:bg-gray-50 transition-colors">
+                {invoices.map((inv) => {
+                  const customerName = inv.customer || inv.customerName || inv.student;
+                  const invoiceCategory = inv.category || inv.class;
 
-                    <td className="px-8 py-6 font-medium text-gray-900">
-                      {inv.student || inv.customer}
-                    </td>
+                  return (
+                    <tr key={inv._id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-8 py-6 font-medium text-gray-900">
+                        {customerName}
+                      </td>
 
-                    <td className="px-8 py-6 font-semibold text-gray-900">
-                      ₦{Number(inv.amount).toLocaleString()}
-                    </td>
+                      <td className="px-8 py-6 text-gray-600">
+                        {invoiceCategory || "—"}
+                      </td>
 
-                    <td className="px-8 py-6">
-                      <span className={`px-4 py-1.5 rounded-full text-sm font-medium ${
-                        inv.status === "Paid"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-orange-100 text-orange-700"
-                      }`}>
-                        {inv.status || "Unpaid"}
-                      </span>
-                    </td>
+                      <td className="px-8 py-6 font-semibold text-gray-900">
+                        ₦{Number(inv.amount).toLocaleString()}
+                      </td>
 
-                    <td className="px-8 py-6 text-gray-600">
-                      {inv.phone || "—"}
-                    </td>
+                      <td className="px-8 py-6">
+                        <span className={`px-4 py-1.5 rounded-full text-sm font-medium ${
+                          inv.status === "Paid"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-orange-100 text-orange-700"
+                        }`}>
+                          {inv.status || "Unpaid"}
+                        </span>
+                      </td>
 
-                    <td className="px-8 py-6 text-xs font-mono text-gray-500">
-                      {inv.token ? inv.token.substring(0, 12) + "..." : "—"}
-                    </td>
+                      <td className="px-8 py-6 text-gray-600">
+                        {inv.phone || "—"}
+                      </td>
 
-                    <td className="px-8 py-6 text-sm text-gray-500">
-                      {inv.date
-                        ? new Date(inv.date).toLocaleDateString() +
-                          " " +
-                          new Date(inv.date).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
-                        : "—"}
-                    </td>
+                      <td className="px-8 py-6 text-xs font-mono text-gray-500">
+                        {inv.token ? inv.token.substring(0, 12) + "..." : "—"}
+                      </td>
 
-                    <td className="px-8 py-6">
-                      <div className="flex items-center justify-end gap-2">
-                        {inv.status !== "Paid" && (
+                      <td className="px-8 py-6 text-sm text-gray-500">
+                        {inv.date
+                          ? new Date(inv.date).toLocaleDateString() +
+                            " " +
+                            new Date(inv.date).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "—"}
+                      </td>
+
+                      <td className="px-8 py-6">
+                        <div className="flex items-center justify-end gap-2">
+                          {inv.status !== "Paid" && (
+                            <button
+                              onClick={() => markPaid(inv._id)}
+                              title="Mark as Paid"
+                              className="bg-green-600 hover:bg-green-700 text-white w-9 h-9 rounded-xl text-sm font-medium transition flex items-center justify-center"
+                            >
+                              ✓
+                            </button>
+                          )}
+
                           <button
-                            onClick={() => markPaid(inv._id)}
-                            title="Mark as Paid"
-                            className="bg-green-600 hover:bg-green-700 text-white w-9 h-9 rounded-xl text-sm font-medium transition flex items-center justify-center"
+                            onClick={() => shareWhatsApp(inv)}
+                            title="Share on WhatsApp"
+                            className="bg-[#25D366] hover:bg-[#20BA5C] text-white w-9 h-9 rounded-xl text-sm font-medium transition flex items-center justify-center"
                           >
-                            ✓
+                            W
                           </button>
-                        )}
 
-                        <button
-                          onClick={() => shareWhatsApp(inv)}
-                          title="Share on WhatsApp"
-                          className="bg-[#25D366] hover:bg-[#20BA5C] text-white w-9 h-9 rounded-xl text-sm font-medium transition flex items-center justify-center"
-                        >
-                          📱
-                        </button>
-
-                        <button
-                          onClick={() => deleteInvoice(inv._id)}
-                          title="Delete"
-                          className="bg-red-600 hover:bg-red-700 text-white w-9 h-9 rounded-xl text-sm font-medium transition flex items-center justify-center"
-                        >
-                          🗑
-                        </button>
-                      </div>
-                    </td>
-
-                  </tr>
-                ))}
+                          <button
+                            onClick={() => deleteInvoice(inv._id)}
+                            title="Delete"
+                            className="bg-red-600 hover:bg-red-700 text-white w-9 h-9 rounded-xl text-sm font-medium transition flex items-center justify-center"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
 

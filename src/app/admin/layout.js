@@ -1,8 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import {
+  emitSessionChange,
+  useAdminSession,
+  useHydrated,
+} from "../../lib/clientSession";
 
 const navItems = [
   { name: "Dashboard", href: "/admin", icon: "📊" },
@@ -16,45 +21,37 @@ const navItems = [
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { adminToken } = useAdminSession();
+  const isLoginPage = pathname === "/admin/login";
+  const isHydrated = useHydrated();
 
   useEffect(() => {
-    const token = localStorage.getItem("adminToken");
-
-    if (pathname === "/admin/login") {
-      setCheckingAuth(false);
+    if (!isHydrated) {
       return;
     }
 
-    if (!token) {
-      router.push("/admin/login");
-    } else {
-      setIsAuthenticated(true);
+    if (!isLoginPage && !adminToken) {
+      router.replace("/admin/login");
     }
-
-    setCheckingAuth(false);
-  }, [pathname, router]);
+  }, [adminToken, isHydrated, isLoginPage, router]);
 
   const handleLogout = () => {
     localStorage.removeItem("adminToken");
-    router.push("/admin/login");
+    emitSessionChange();
+    router.replace("/admin/login");
   };
 
-  // Login page renders without the sidebar shell
-  if (pathname === "/admin/login") {
+  if (isLoginPage) {
     return children;
   }
 
-  if (checkingAuth) {
+  if (!isHydrated || !adminToken) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-slate-400"></div>
       </div>
     );
   }
-
-  if (!isAuthenticated) return null;
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">

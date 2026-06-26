@@ -8,7 +8,6 @@ export default function CustomersOverview() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
   const [historyCustomer, setHistoryCustomer] = useState(null);
 
   const loadData = async () => {
@@ -32,14 +31,18 @@ export default function CustomersOverview() {
   };
 
   useEffect(() => {
-    loadData();
+    const initialLoad = setTimeout(() => {
+      loadData();
+    }, 0);
+    return () => clearTimeout(initialLoad);
   }, []);
 
-  // ✅ Build one summary row per unique customer, aggregating all
-  // invoices that match by name (invoice.student === customer.name)
   const customerRows = customers.map((customer) => {
     const customerInvoices = invoices.filter(
-      (inv) => (inv.student || inv.customer) === customer.name
+      (inv) =>
+        (customer.token && inv.customerToken === customer.token) ||
+        (!customer.token &&
+          (inv.customer || inv.customerName || inv.student) === customer.name)
     );
 
     const totalAmount = customerInvoices.reduce(
@@ -49,16 +52,14 @@ export default function CustomersOverview() {
 
     const amountPaid = customerInvoices
       .filter((inv) => inv.status === "Paid")
-      .reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
-
-    const amountPending = totalAmount - amountPaid;
+      .reduce((sum, inv) => sum + Number(inv.paidAmount || inv.amount || 0), 0);
 
     return {
       ...customer,
       invoiceCount: customerInvoices.length,
       totalAmount,
       amountPaid,
-      amountPending,
+      amountPending: totalAmount - amountPaid,
       invoices: customerInvoices,
     };
   });
@@ -90,8 +91,6 @@ export default function CustomersOverview() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-6 space-y-8">
-
-        {/* HEADER */}
         <div>
           <h1 className="text-3xl font-semibold text-gray-900">Customers</h1>
           <p className="text-gray-600 mt-1">
@@ -99,7 +98,6 @@ export default function CustomersOverview() {
           </p>
         </div>
 
-        {/* TABLE */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -118,7 +116,6 @@ export default function CustomersOverview() {
               <tbody className="divide-y divide-gray-100">
                 {customerRows.map((customer) => (
                   <tr key={customer._id} className="hover:bg-gray-50 transition-colors">
-
                     <td className="px-8 py-6">
                       <p className="font-medium text-gray-900">{customer.name}</p>
                       <p className="text-xs text-gray-400">{customer.category || "—"}</p>
@@ -154,7 +151,6 @@ export default function CustomersOverview() {
                         View Payment History
                       </button>
                     </td>
-
                   </tr>
                 ))}
               </tbody>
@@ -169,11 +165,9 @@ export default function CustomersOverview() {
         </div>
       </div>
 
-      {/* PAYMENT HISTORY MODAL */}
       {historyCustomer && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
-
             <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-semibold text-gray-900">

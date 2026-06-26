@@ -1,21 +1,22 @@
 import { connectDB } from "../../../../lib/mongodb";
-``
 import Invoice from "../../../../models/Invoice";
 
 export async function POST(req) {
-  await connectDB();                    // ← Fixed
+  await connectDB();
 
   try {
     const body = await req.json();
-    const { students } = body;
+    const customers = body.customers || body.students || [];
 
-    if (!students || students.length === 0) {
-      return Response.json({ error: "No students" }, { status: 400 });
+    if (customers.length === 0) {
+      return Response.json({ error: "No customers provided" }, { status: 400 });
     }
 
-    const invoices = students.map((student) => ({
-      student: student.name,
-      amount: student.fees || 0,
+    const invoices = customers.map((customer) => ({
+      customer: customer.name,
+      customerName: customer.name,
+      category: customer.category || customer.class || "",
+      amount: customer.amount || customer.fees || 0,
       status: "Unpaid",
       date: new Date(),
     }));
@@ -23,7 +24,6 @@ export async function POST(req) {
     const result = await Invoice.insertMany(invoices);
 
     return Response.json(result);
-
   } catch (error) {
     console.error("BULK INVOICE ERROR:", error);
     return Response.json({ error: error.message }, { status: 500 });

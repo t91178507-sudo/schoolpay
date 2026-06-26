@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { authFetch } from "../lib/authFetch";
+import { generateInvoiceToken } from "../lib/invoiceUtils";
 
 export default function AddCustomerModal({ 
   isOpen, 
@@ -19,12 +20,6 @@ export default function AddCustomerModal({
 
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      setFormData(prev => ({ ...prev, category: defaultCategory }));
-    }
-  }, [isOpen, defaultCategory]);
-
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -39,7 +34,7 @@ export default function AddCustomerModal({
     setSubmitting(true);
 
     try {
-      const token = "inv_" + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+      const token = generateInvoiceToken("inv");
 
       const businessName =
         typeof window !== "undefined"
@@ -122,7 +117,7 @@ export default function AddCustomerModal({
               onChange={handleChange}
               required
               className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g. School, Hospital, Estate, or your own category"
+              placeholder="e.g. Retail, VIP Clients, Real Estate, or your own category"
             />
           </div>
 
