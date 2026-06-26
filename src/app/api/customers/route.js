@@ -1,14 +1,17 @@
 import { connectDB } from "../../../lib/mongodb";
-import { ObjectId } from "mongodb";
+import { requireAuth, touchLastActive } from "../../../lib/auth";
 
-// ✅ GET ALL CUSTOMERS
-export async function GET() {
+// ✅ GET ALL CUSTOMERS — only the ones belonging to the logged-in user
+export async function GET(req) {
   try {
+    const userId = requireAuth(req);
+
     const db = await connectDB();
+    touchLastActive(db, userId);
 
     const customers = await db
       .collection("customers")
-      .find({})
+      .find({ ownerId: userId })
       .toArray();
 
     return Response.json(customers);
@@ -16,62 +19,40 @@ export async function GET() {
   } catch (error) {
     console.error("GET CUSTOMERS ERROR:", error);
 
+    const status = error.status || 500;
     return Response.json(
-      { error: error.message },
-      { status: 500 }
+      { error: error.message || "Server error" },
+      { status }
     );
   }
 }
 
-// ✅ DELETE CUSTOMER
-export async function DELETE(req, context) {
+// ✅ CREATE CUSTOMER — tagged with the logged-in user's ID
+export async function POST(req) {
   try {
-    const { id } = await context.params;
+    const userId = requireAuth(req);
 
     const db = await connectDB();
-
-    const result = await db.collection("customers").deleteOne({
-      _id: new ObjectId(id),
-    });
-
-    if (result.deletedCount === 0) {
-      return Response.json({ error: "Customer not found" }, { status: 404 });
-    }
-
-    return Response.json({ message: "Deleted ✅" });
-
-  } catch (error) {
-    console.error("DELETE CUSTOMER ERROR:", error);
-
-    return Response.json(
-      { error: error.message },
-      { status: 500 }
-    );
-  }
-}
-
-// ✅ CREATE CUSTOMER
-export async function POST(request) {
-  try {
-    const db = await connectDB();
-    const data = await request.json();
+    const body = await req.json();
 
     const result = await db.collection("customers").insertOne({
-      ...data,
+      ...body,
+      ownerId: userId,
       createdAt: new Date(),
     });
 
     return Response.json({
-      message: "Customer created ✅",
-      id: result.insertedId,
+      success: true,
+      insertedId: result.insertedId,
     });
 
   } catch (error) {
     console.error("CREATE CUSTOMER ERROR:", error);
 
+    const status = error.status || 500;
     return Response.json(
-      { error: error.message },
-      { status: 500 }
+      { error: error.message || "Server error" },
+      { status }
     );
   }
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { authFetch } from "../../lib/authFetch";
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -26,8 +27,8 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
       try {
         const [customersRes, invoicesRes] = await Promise.all([
-          fetch("/api/customers"),
-          fetch("/api/invoices"),
+          authFetch("/api/customers"),
+          authFetch("/api/invoices"),
         ]);
 
         const customers = customersRes.ok ? await customersRes.json() : [];

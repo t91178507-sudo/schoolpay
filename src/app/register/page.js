@@ -13,8 +13,10 @@ export default function Register() {
     schoolName: "",
     role: "Manager",
   });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
   const router = useRouter();
 
   const handleChange = (e) => {
@@ -25,6 +27,7 @@ export default function Register() {
     e.preventDefault();
     setError("");
 
+    // ✅ VALIDATION
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -37,16 +40,42 @@ export default function Register() {
 
     setLoading(true);
 
-     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          email: formData.email,
+          password: formData.password,
+          businessName: formData.schoolName,
+          role: formData.role,
+        }),
+      });
 
-      // Store basic info (you can improve this with real backend later)
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("userName", formData.fullName);
+      const data = await res.json();
 
-      router.push("/dashboard");
+      if (!res.ok) {
+        setError(data.error || "Registration failed");
+        return;
+      }
+
+      // ✅ OPTIONAL: auto login after register
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("userName", formData.fullName);
+        localStorage.setItem("businessName", formData.schoolName);
+
+        window.location.href = "/dashboard";
+      } else {
+        // ✅ redirect to login if no token returned
+        router.push("/auth/login");
+      }
+
     } catch (err) {
+      console.error(err);
       setError("Registration failed. Please try again.");
     } finally {
       setLoading(false);
@@ -56,7 +85,7 @@ export default function Register() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
-        {/* Logo */}
+
         <div className="flex justify-center mb-10">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center text-4xl">
@@ -73,6 +102,7 @@ export default function Register() {
           <h2 className="text-3xl font-semibold text-center mb-2 text-gray-900 dark:text-white">
             Create Account
           </h2>
+
           <p className="text-gray-600 dark:text-gray-400 text-center mb-8">
             Set up your school management system
           </p>
@@ -84,101 +114,72 @@ export default function Register() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Full Name
-              </label>
-              <input
-                type="text"
-                name="fullName"
-                value={formData.fullName}
-                onChange={handleChange}
-                required
-                className="w-full px-5 py-4 border border-gray-300 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                placeholder="John Doe"
-              />
-            </div>
+            <input
+              type="text"
+              name="fullName"
+              value={formData.fullName}
+              onChange={handleChange}
+              required
+              placeholder="Full Name"
+              className="w-full px-5 py-4 border rounded-2xl"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                School Name
-              </label>
-              <input
-                type="text"
-                name="schoolName"
-                value={formData.schoolName}
-                onChange={handleChange}
-                required
-                className="w-full px-5 py-4 border border-gray-300 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                placeholder="Springfield International School"
-              />
-            </div>
+            <input
+              type="text"
+              name="schoolName"
+              value={formData.schoolName}
+              onChange={handleChange}
+              required
+              placeholder="School Name"
+              className="w-full px-5 py-4 border rounded-2xl"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Email Address
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                className="w-full px-5 py-4 border border-gray-300 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                placeholder="admin@school.com"
-              />
-            </div>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+              placeholder="Email"
+              className="w-full px-5 py-4 border rounded-2xl"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Password
-              </label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                className="w-full px-5 py-4 border border-gray-300 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                placeholder="••••••••"
-              />
-            </div>
+            <input
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+              placeholder="Password"
+              className="w-full px-5 py-4 border rounded-2xl"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                required
-                className="w-full px-5 py-4 border border-gray-300 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                placeholder="••••••••"
-              />
-            </div>
+            <input
+              type="password"
+              name="confirmPassword"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              required
+              placeholder="Confirm Password"
+              className="w-full px-5 py-4 border rounded-2xl"
+            />
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-4 rounded-2xl transition text-lg mt-4"
+              className="w-full bg-blue-600 text-white py-4 rounded-2xl"
             >
-              {loading ? "Creating Account..." : "Create Account"}
+              {loading ? "Creating..." : "Create Account"}
             </button>
           </form>
 
-          <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-8">
+          <p className="text-center text-sm mt-6 text-gray-500">
             Already have an account?{" "}
-            <Link href="/login" className="text-blue-600 hover:underline">
-              Sign in here
+            <Link href="/auth/login" className="text-blue-600">
+              Login
             </Link>
           </p>
         </div>
-
-        <p className="text-center text-xs text-gray-400 mt-8">
-          © 2026 SchoolPay. All rights reserved.
-        </p>
       </div>
     </div>
   );

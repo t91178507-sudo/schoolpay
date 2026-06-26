@@ -79,7 +79,10 @@ export default function DashboardLayout({ children }) {
 
   const handleLogout = () => {
     localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("authToken");
     localStorage.removeItem("userName");
+    localStorage.removeItem("businessName");
+    localStorage.removeItem("businessType");
     router.push("/auth/login");
   };
 

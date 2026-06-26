@@ -1,16 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
-// ✅ Same business categories used on the Register page, kept consistent
-const businessTypes = [
-  "School",
-  "Estate",
-  "Hospital",
-  "Distributor",
-  "Fuel Supplier",
-  "Professional Service",
-];
+import { authFetch } from "../lib/authFetch";
 
 export default function AddCustomerModal({ 
   isOpen, 
@@ -23,7 +14,6 @@ export default function AddCustomerModal({
     phone: "",
     email: "",
     category: defaultCategory,
-    amount: "",
     location: "",
   });
 
@@ -41,7 +31,7 @@ export default function AddCustomerModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.phone || !formData.category || !formData.amount) {
+    if (!formData.name || !formData.phone || !formData.category) {
       alert("Please fill all required fields");
       return;
     }
@@ -64,7 +54,7 @@ export default function AddCustomerModal({
         createdAt: new Date().toISOString(),
       };
 
-      const res = await fetch("/api/customers", {
+      const res = await authFetch("/api/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(customerData),
@@ -74,32 +64,16 @@ export default function AddCustomerModal({
 
       const newCustomer = await res.json();
 
-      // Auto-create Invoice
-      await fetch("/api/invoices", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customer: formData.name,
-          amount: Number(formData.amount),
-          category: formData.category,
-          businessName,
-          status: "Unpaid",
-          token: token,
-          date: new Date().toISOString(),
-        }),
-      });
-
       onCustomerAdded?.(newCustomer);
       onClose();
 
-      alert(`✅ Customer added under ${formData.category}!\nPayment Link: ${window.location.origin}/pay/${token}`);
+      alert(`✅ Customer added under ${formData.category}!`);
 
       setFormData({
         name: "",
         phone: "",
         email: "",
         category: defaultCategory,
-        amount: "",
         location: "",
       });
     } catch (error) {
@@ -118,7 +92,7 @@ export default function AddCustomerModal({
         <div className="px-8 py-6 border-b">
           <h2 className="text-2xl font-semibold text-gray-900">Add New Customer</h2>
           <p className="text-gray-500 mt-1">
-            {defaultCategory ? `Adding to category: ${defaultCategory}` : "A unique payment link will be generated"}
+            {defaultCategory ? `Adding to category: ${defaultCategory}` : "Enter the customer's details"}
           </p>
         </div>
 
@@ -141,32 +115,14 @@ export default function AddCustomerModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-            <select
+            <input
+              type="text"
               name="category"
               value={formData.category}
               onChange={handleChange}
               required
               className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select Category</option>
-              {businessTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Amount to Pay (₦)</label>
-            <input 
-              type="number" 
-              name="amount" 
-              value={formData.amount} 
-              onChange={handleChange} 
-              required 
-              className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500" 
-              placeholder="45000" 
+              placeholder="e.g. School, Hospital, Estate, or your own category"
             />
           </div>
 

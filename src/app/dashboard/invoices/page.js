@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { authFetch } from "../../../lib/authFetch";
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
@@ -8,7 +9,7 @@ export default function Invoices() {
 
   const loadData = async () => {
     try {
-      const res = await fetch("/api/invoices");
+      const res = await authFetch("/api/invoices");
       const data = res.ok ? await res.json() : [];
       setInvoices(Array.isArray(data) ? data : []);
     } catch {
@@ -30,7 +31,7 @@ export default function Invoices() {
     );
 
     try {
-      await fetch(`/api/invoices/${id}`, { method: "PUT" });
+      await authFetch(`/api/invoices/${id}`, { method: "PUT" });
     } catch {
       loadData();
     }
@@ -40,7 +41,7 @@ export default function Invoices() {
     if (!confirm("Delete this invoice?")) return;
 
     try {
-      const res = await fetch(`/api/invoices/${id}`, {
+      const res = await authFetch(`/api/invoices/${id}`, {
         method: "DELETE",
       });
 

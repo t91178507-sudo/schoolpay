@@ -1,42 +1,57 @@
 import { connectDB } from "../../../lib/mongodb";
+import { requireAuth } from "../../../lib/auth";
 
-// ✅ GET ALL INVOICES
-export async function GET() {
+// ✅ GET ALL INVOICES — only the ones belonging to the logged-in user
+export async function GET(req) {
   try {
+    const userId = requireAuth(req);
+
     const db = await connectDB();
+
     const invoices = await db
       .collection("invoices")
-      .find({})
-      .sort({ date: -1 })
+      .find({ ownerId: userId })
       .toArray();
 
     return Response.json(invoices);
+
   } catch (error) {
-    console.error("GET Invoices Error:", error);
-    return Response.json([], { status: 200 });
+    console.error("GET INVOICES ERROR:", error);
+
+    const status = error.status || 500;
+    return Response.json(
+      { error: error.message || "Server error" },
+      { status }
+    );
   }
 }
 
-// ✅ CREATE INVOICE
-export async function POST(request) {
+// ✅ CREATE INVOICE — tagged with the logged-in user's ID
+export async function POST(req) {
   try {
-    const db = await connectDB();
-    const data = await request.json();
+    const userId = requireAuth(req);
 
-    const invoice = await db.collection("invoices").insertOne({
-      ...data,
+    const db = await connectDB();
+    const body = await req.json();
+
+    const result = await db.collection("invoices").insertOne({
+      ...body,
+      ownerId: userId,
       createdAt: new Date(),
     });
 
-    return Response.json(
-      {
-        ...data,
-        _id: invoice.insertedId,
-      },
-      { status: 201 }
-    );
+    return Response.json({
+      success: true,
+      insertedId: result.insertedId,
+    });
+
   } catch (error) {
-    console.error("POST Invoice Error:", error);
-    return Response.json({ error: "Failed to create invoice" }, { status: 500 });
+    console.error("CREATE INVOICE ERROR:", error);
+
+    const status = error.status || 500;
+    return Response.json(
+      { error: error.message || "Server error" },
+      { status }
+    );
   }
 }
