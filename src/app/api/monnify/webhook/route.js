@@ -1,5 +1,7 @@
 import { connectDB } from "../../../../lib/mongodb";
 import { parseAmount } from "../../../../lib/monnify";
+import { markInvoicePaid } from "../../../../lib/paymentLifecycle";
+import { ensureQuickPayPaidInvoice } from "../../../../lib/quickPay";
 
 export async function POST(req) {
   try {
@@ -16,36 +18,47 @@ export async function POST(req) {
       pendingPaymentReference: eventData.paymentReference,
     });
 
-    if (!invoice) {
+    const amountPaid = parseAmount(eventData.amountPaid);
+
+    if (invoice) {
+      const expectedAmount = parseAmount(
+        invoice.pendingPaymentAmount ?? invoice.amount
+      );
+
+      if (eventData.paymentStatus !== "PAID" || amountPaid !== expectedAmount) {
+        return Response.json({ success: true });
+      }
+
+      await markInvoicePaid(db, invoice, {
+        paidAt: new Date(),
+        paidAmount: amountPaid,
+        paymentReference: eventData.paymentReference,
+        paymentProvider: "Monnify",
+        verificationMethod: "webhook",
+      });
+
       return Response.json({ success: true });
     }
 
-    const amountPaid = parseAmount(eventData.amountPaid);
-    const expectedAmount = parseAmount(invoice.amount);
+    const quickPayTransaction = await db.collection("quickPayTransactions").findOne({
+      paymentReference: eventData.paymentReference,
+    });
+
+    if (!quickPayTransaction) {
+      return Response.json({ success: true });
+    }
+
+    const expectedAmount = parseAmount(quickPayTransaction.amount);
 
     if (eventData.paymentStatus !== "PAID" || amountPaid !== expectedAmount) {
       return Response.json({ success: true });
     }
 
-    await db.collection("invoices").updateOne(
-      { _id: invoice._id },
-      {
-        $set: {
-          status: "Paid",
-          paidAt: new Date(),
-          paidAmount: amountPaid,
-          paymentReference: eventData.paymentReference,
-          paymentProvider: "Monnify",
-          paymentVerificationMethod: "webhook",
-        },
-        $unset: {
-          pendingPaymentReference: "",
-          pendingPaymentAmount: "",
-          pendingPaymentProvider: "",
-          pendingPaymentCreatedAt: "",
-        },
-      }
-    );
+    await ensureQuickPayPaidInvoice(db, quickPayTransaction, {
+      paymentReference: eventData.paymentReference,
+      paidAmount: amountPaid,
+      paidAt: new Date(),
+    });
 
     return Response.json({ success: true });
   } catch (error) {

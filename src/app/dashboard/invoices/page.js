@@ -1,7 +1,54 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  EmptyState,
+  PageHeader,
+  PageShell,
+  StatCard,
+  StatGrid,
+  StatusBadge,
+  SurfaceCard,
+} from "../../../components/DashboardUI";
 import { authFetch } from "../../../lib/authFetch";
+
+function formatDateTime(value) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
+}
+
+function getOutstandingAmount(invoice) {
+  const amount = Number(invoice.amount || 0);
+  const paidAmount = Number(invoice.paidAmount || 0);
+  const balanceDue = Number(invoice.balanceDue || 0);
+
+  if (balanceDue > 0) {
+    return balanceDue;
+  }
+
+  if (paidAmount > 0) {
+    return Math.max(amount - paidAmount, 0);
+  }
+
+  return amount;
+}
+
+function normalizeNotificationStatus(status) {
+  return status === "pending-whatsapp" ? "prepared" : status || "draft";
+}
+
+function getNotificationTone(status) {
+  const normalized = normalizeNotificationStatus(status);
+
+  if (normalized === "prepared") return "green";
+  if (normalized === "draft") return "blue";
+  return "slate";
+}
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
@@ -20,21 +67,21 @@ export default function Invoices() {
   };
 
   useEffect(() => {
-    const initialLoad = setTimeout(() => {
-      loadData();
-    }, 0);
+    const initialLoad = setTimeout(loadData, 0);
     return () => clearTimeout(initialLoad);
   }, []);
 
   const markPaid = async (id) => {
     setInvoices((prev) =>
-      prev.map((inv) =>
-        inv._id === id ? { ...inv, status: "Paid" } : inv
-      )
+      prev.map((inv) => (String(inv._id) === String(id) ? { ...inv, status: "Paid" } : inv))
     );
 
     try {
-      await authFetch(`/api/invoices/${id}`, { method: "PUT" });
+      const res = await authFetch(`/api/invoices/${id}`, { method: "PUT" });
+      if (!res.ok) {
+        throw new Error("Update failed");
+      }
+      loadData();
     } catch {
       loadData();
     }
@@ -53,193 +100,259 @@ export default function Invoices() {
         return;
       }
 
-      loadData();
+      setInvoices((prev) => prev.filter((invoice) => String(invoice._id) !== String(id)));
     } catch {
       alert("Error deleting invoice");
     }
   };
 
-  const toWhatsAppNumber = (rawPhone) => {
-    if (!rawPhone) return "";
+  const shareWhatsApp = async (invoice) => {
+    if (!invoice.phone) {
+      alert("No phone number");
+      return;
+    }
 
-    let digits = rawPhone.replace(/\D/g, "");
+    if (!invoice.token) {
+      alert("This invoice does not have a payment link yet");
+      return;
+    }
 
-    if (digits.startsWith("234")) return digits;
-    if (digits.startsWith("0")) return "234" + digits.slice(1);
+    try {
+      const res = await authFetch("/api/notifications/whatsapp/invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoiceId: String(invoice._id),
+          origin: window.location.origin,
+        }),
+      });
+      const data = await res.json();
 
-    return "234" + digits;
+      if (!res.ok) {
+        throw new Error(data.error || "Unable to prepare WhatsApp message");
+      }
+
+      if (data?.delivery?.fallbackUrl) {
+        window.open(data.delivery.fallbackUrl, "_blank");
+      } else {
+        alert("Invoice message sent automatically.");
+      }
+    } catch (error) {
+      alert(error.message || "Unable to share invoice");
+    }
   };
 
-  const shareWhatsApp = (inv) => {
-    if (!inv.phone) return alert("No phone number");
-    if (!inv.token) return alert("This invoice does not have a payment link yet");
-
-    const whatsappPhone = toWhatsAppNumber(inv.phone);
-    const invoiceDate = inv.date ? new Date(inv.date) : new Date();
-    const formattedDate =
-      invoiceDate.toLocaleDateString() +
-      " " +
-      invoiceDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-    const customerName = inv.customer || inv.customerName || inv.student || "Customer";
-    const invoiceCategory = inv.category || inv.class || "this invoice";
-
-    const message = `Hello ${customerName},
-
-Please make payment for ${invoiceCategory}
-
-Amount: ₦${Number(inv.amount).toLocaleString()}
-Date: ${formattedDate}
-
-Payment Link:
-${window.location.origin}/pay/${inv.token}`;
-
-    window.open(
-      `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`,
-      "_blank"
-    );
-  };
-
-  const totalAmount = invoices.reduce(
-    (sum, inv) => sum + Number(inv.amount || 0),
+  const actionableInvoices = invoices.filter((invoice) => getOutstandingAmount(invoice) > 0);
+  const totalAmount = actionableInvoices.reduce(
+    (sum, invoice) => sum + Number(getOutstandingAmount(invoice) || 0),
     0
   );
-
-  const unpaidCount = invoices.filter(
-    (inv) => inv.status !== "Paid"
+  const unpaidCount = actionableInvoices.length;
+  const preparedNotifications = actionableInvoices.filter(
+    (invoice) =>
+      normalizeNotificationStatus(invoice.customerNotificationStatus) === "prepared"
   ).length;
 
   if (loading) {
     return (
-      <div className="min-h-screen flex justify-center items-center bg-gray-50">
-        <div className="animate-spin h-12 w-12 border-4 border-blue-600 rounded-full"></div>
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-r-transparent"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-6 space-y-8">
-        <div>
-          <h1 className="text-4xl font-semibold text-gray-900">Invoices</h1>
-          <p className="text-gray-600 mt-2">
-            Manage customer invoices and payment status
-          </p>
-        </div>
+    <PageShell>
+      <PageHeader
+        title="Invoices"
+        description="Manage invoices, payment readiness, and customer sharing from one compact view."
+      />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-            <p className="text-gray-500 text-sm">Total Invoices</p>
-            <p className="text-5xl font-semibold text-gray-900 mt-3">
-              {invoices.length}
-            </p>
-          </div>
+      <StatGrid>
+        <StatCard label="Total invoices" value={actionableInvoices.length} tone="slate" />
+        <StatCard label="Total amount" value={`N${totalAmount.toLocaleString()}`} tone="blue" />
+        <StatCard label="Unpaid" value={unpaidCount} tone="orange" />
+        <StatCard label="Prepared receipts" value={preparedNotifications} tone="emerald" />
+      </StatGrid>
 
-          <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-            <p className="text-gray-500 text-sm">Total Amount</p>
-            <p className="text-5xl font-semibold text-gray-900 mt-3">
-              ₦{totalAmount.toLocaleString()}
-            </p>
-          </div>
+      <SurfaceCard className="overflow-hidden">
+        {actionableInvoices.length === 0 ? (
+          <EmptyState
+            title="No open invoices found"
+            description="Only unpaid or partially paid invoices are shown here."
+          />
+        ) : (
+          <>
+            <div className="divide-y divide-slate-200 lg:hidden">
+              {actionableInvoices.map((invoice) => {
+                const customerName =
+                  invoice.customer || invoice.customerName || invoice.student || "Customer";
 
-          <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-            <p className="text-gray-500 text-sm">Unpaid</p>
-            <p className="text-5xl font-semibold text-orange-600 mt-3">
-              {unpaidCount}
-            </p>
-          </div>
-        </div>
+                return (
+                  <div key={invoice._id} className="space-y-4 p-4 sm:p-5">
+                    <div className="space-y-1">
+                      <p className="text-base font-semibold text-slate-900 dark:text-slate-100">{customerName}</p>
+                      <p className="font-mono text-xs text-slate-500 dark:text-slate-400">
+                        {invoice.invoiceNumber || "-"}
+                      </p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">{formatDateTime(invoice.date)}</p>
+                    </div>
 
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                          Details
+                        </p>
+                        <p className="text-sm text-slate-700 dark:text-slate-300">
+                          {invoice.description || invoice.category || invoice.class || "-"}
+                        </p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Phone: {invoice.phone || "-"}</p>
+                        <p className="break-all font-mono text-xs text-slate-400 dark:text-slate-500">
+                          {invoice.token ? `${invoice.token.substring(0, 14)}...` : "-"}
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                          Payment
+                        </p>
+                        <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                          N{Number(getOutstandingAmount(invoice) || 0).toLocaleString()}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <StatusBadge tone={invoice.status === "Paid" ? "green" : "orange"}>
+                            {invoice.status || "Unpaid"}
+                          </StatusBadge>
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
+                            {invoice.paymentProvider ||
+                              invoice.pendingPaymentProvider ||
+                              "Not started"}
+                          </span>
+                        </div>
+                        <StatusBadge tone={getNotificationTone(invoice.customerNotificationStatus)}>
+                          {normalizeNotificationStatus(invoice.customerNotificationStatus)}
+                        </StatusBadge>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                      {invoice.status !== "Paid" ? (
+                        <button
+                          onClick={() => markPaid(invoice._id)}
+                          className="rounded-xl bg-green-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-green-700"
+                        >
+                          Mark paid
+                        </button>
+                      ) : null}
+                      <button
+                        onClick={() => shareWhatsApp(invoice)}
+                        className="rounded-xl bg-[#25D366] px-3 py-2 text-sm font-medium text-white transition hover:bg-[#20BA5C]"
+                      >
+                        Share on WhatsApp
+                      </button>
+                      <button
+                        onClick={() => deleteInvoice(invoice._id)}
+                        className="rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-8 py-5 text-left text-sm font-medium text-gray-500">Customer</th>
-                  <th className="px-8 py-5 text-left text-sm font-medium text-gray-500">Category</th>
-                  <th className="px-8 py-5 text-left text-sm font-medium text-gray-500">Amount</th>
-                  <th className="px-8 py-5 text-left text-sm font-medium text-gray-500">Status</th>
-                  <th className="px-8 py-5 text-left text-sm font-medium text-gray-500">Phone</th>
-                  <th className="px-8 py-5 text-left text-sm font-medium text-gray-500">Token</th>
-                  <th className="px-8 py-5 text-left text-sm font-medium text-gray-500">Date</th>
-                  <th className="px-8 py-5 text-right text-sm font-medium text-gray-500">Actions</th>
+                <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
+                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Invoice
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Details
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Payment
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Notification
+                  </th>
+                  <th className="px-6 py-4 text-right text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Actions
+                  </th>
                 </tr>
               </thead>
-
-              <tbody className="divide-y divide-gray-100">
-                {invoices.map((inv) => {
-                  const customerName = inv.customer || inv.customerName || inv.student;
-                  const invoiceCategory = inv.category || inv.class;
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {actionableInvoices.map((invoice) => {
+                  const customerName =
+                    invoice.customer || invoice.customerName || invoice.student || "Customer";
 
                   return (
-                    <tr key={inv._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-8 py-6 font-medium text-gray-900">
-                        {customerName}
+                    <tr key={invoice._id} className="hover:bg-slate-50 dark:hover:bg-slate-950/60">
+                      <td className="px-6 py-5 align-top">
+                        <div className="space-y-1">
+                          <p className="font-semibold text-slate-900 dark:text-slate-100">{customerName}</p>
+                          <p className="font-mono text-xs text-slate-500 dark:text-slate-400">
+                            {invoice.invoiceNumber || "-"}
+                          </p>
+                          <p className="text-sm text-slate-500 dark:text-slate-400">{formatDateTime(invoice.date)}</p>
+                        </div>
                       </td>
-
-                      <td className="px-8 py-6 text-gray-600">
-                        {invoiceCategory || "—"}
+                      <td className="px-6 py-5 align-top">
+                        <div className="space-y-2">
+                          <p className="text-sm text-slate-700 dark:text-slate-300">
+                            {invoice.description || invoice.category || invoice.class || "-"}
+                          </p>
+                          <p className="text-sm text-slate-500 dark:text-slate-400">Phone: {invoice.phone || "-"}</p>
+                          <p className="font-mono text-xs text-slate-400 dark:text-slate-500">
+                            {invoice.token ? `${invoice.token.substring(0, 14)}...` : "-"}
+                          </p>
+                        </div>
                       </td>
-
-                      <td className="px-8 py-6 font-semibold text-gray-900">
-                        ₦{Number(inv.amount).toLocaleString()}
+                      <td className="px-6 py-5 align-top">
+                        <div className="space-y-2">
+                          <p className="font-semibold text-slate-900 dark:text-slate-100">
+                            N{Number(getOutstandingAmount(invoice) || 0).toLocaleString()}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <StatusBadge tone={invoice.status === "Paid" ? "green" : "orange"}>
+                              {invoice.status || "Unpaid"}
+                            </StatusBadge>
+                            <span className="text-xs text-slate-500 dark:text-slate-400">
+                              {invoice.paymentProvider ||
+                                invoice.pendingPaymentProvider ||
+                                "Not started"}
+                            </span>
+                          </div>
+                        </div>
                       </td>
-
-                      <td className="px-8 py-6">
-                        <span className={`px-4 py-1.5 rounded-full text-sm font-medium ${
-                          inv.status === "Paid"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-orange-100 text-orange-700"
-                        }`}>
-                          {inv.status || "Unpaid"}
-                        </span>
+                      <td className="px-6 py-5 align-top">
+                        <StatusBadge tone={getNotificationTone(invoice.customerNotificationStatus)}>
+                          {normalizeNotificationStatus(invoice.customerNotificationStatus)}
+                        </StatusBadge>
                       </td>
-
-                      <td className="px-8 py-6 text-gray-600">
-                        {inv.phone || "—"}
-                      </td>
-
-                      <td className="px-8 py-6 text-xs font-mono text-gray-500">
-                        {inv.token ? inv.token.substring(0, 12) + "..." : "—"}
-                      </td>
-
-                      <td className="px-8 py-6 text-sm text-gray-500">
-                        {inv.date
-                          ? new Date(inv.date).toLocaleDateString() +
-                            " " +
-                            new Date(inv.date).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          : "—"}
-                      </td>
-
-                      <td className="px-8 py-6">
-                        <div className="flex items-center justify-end gap-2">
-                          {inv.status !== "Paid" && (
+                      <td className="px-6 py-5 align-top">
+                        <div className="ml-auto flex max-w-[22rem] flex-wrap items-center justify-end gap-2">
+                          {invoice.status !== "Paid" && (
                             <button
-                              onClick={() => markPaid(inv._id)}
-                              title="Mark as Paid"
-                              className="bg-green-600 hover:bg-green-700 text-white w-9 h-9 rounded-xl text-sm font-medium transition flex items-center justify-center"
+                              onClick={() => markPaid(invoice._id)}
+                              className="whitespace-nowrap rounded-xl bg-green-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-green-700"
                             >
-                              ✓
+                              Mark paid
                             </button>
                           )}
-
                           <button
-                            onClick={() => shareWhatsApp(inv)}
-                            title="Share on WhatsApp"
-                            className="bg-[#25D366] hover:bg-[#20BA5C] text-white w-9 h-9 rounded-xl text-sm font-medium transition flex items-center justify-center"
+                            onClick={() => shareWhatsApp(invoice)}
+                            className="whitespace-nowrap rounded-xl bg-[#25D366] px-3 py-2 text-sm font-medium text-white transition hover:bg-[#20BA5C]"
                           >
-                            W
+                            Share on WhatsApp
                           </button>
-
                           <button
-                            onClick={() => deleteInvoice(inv._id)}
-                            title="Delete"
-                            className="bg-red-600 hover:bg-red-700 text-white w-9 h-9 rounded-xl text-sm font-medium transition flex items-center justify-center"
+                            onClick={() => deleteInvoice(invoice._id)}
+                            className="whitespace-nowrap rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700"
                           >
-                            ×
+                            Delete
                           </button>
                         </div>
                       </td>
@@ -247,16 +360,11 @@ ${window.location.origin}/pay/${inv.token}`;
                   );
                 })}
               </tbody>
-            </table>
-
-            {invoices.length === 0 && (
-              <div className="text-center py-20 text-gray-500">
-                No invoices found
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+              </table>
+            </div>
+          </>
+        )}
+      </SurfaceCard>
+    </PageShell>
   );
 }

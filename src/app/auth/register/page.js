@@ -86,6 +86,7 @@ export default function Register() {
         localStorage.setItem("userName", `${formData.firstName} ${formData.lastName}`);
         localStorage.setItem("businessName", formData.businessName);
         localStorage.setItem("businessType", formData.businessType);
+        localStorage.setItem("businessLogo", data.user?.businessLogo || "");
         emitSessionChange();
 
         router.push("/dashboard");

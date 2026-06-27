@@ -66,6 +66,58 @@ export async function verifyMonnifyTransaction({
   return data.responseBody;
 }
 
+export async function initializeMonnifyTransaction({
+  apiKey,
+  secretKey,
+  amount,
+  customerName,
+  customerEmail,
+  paymentReference,
+  paymentDescription,
+  contractCode,
+  redirectUrl,
+}) {
+  const baseUrl = getMonnifyBaseUrl(apiKey);
+  const accessToken = await getMonnifyAccessToken({
+    apiKey,
+    secretKey,
+    baseUrl,
+  });
+
+  const response = await fetch(`${baseUrl}/api/v1/merchant/transactions/init-transaction`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      amount,
+      customerEmail,
+      paymentReference,
+      paymentDescription,
+      currencyCode: "NGN",
+      contractCode,
+      redirectUrl,
+      paymentMethods: ["ACCOUNT_TRANSFER"],
+      metadata: {
+        customerName,
+      },
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data?.requestSuccessful) {
+    throw new Error(
+      data?.responseMessage ||
+        data?.responseBody?.message ||
+        "Monnify transaction initialization failed"
+    );
+  }
+
+  return data.responseBody;
+}
+
 export function parseAmount(value) {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : 0;

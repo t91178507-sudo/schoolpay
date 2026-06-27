@@ -46,8 +46,7 @@ export default function SuccessPage() {
       });
   }, [invoiceId, paymentReference, token]);
 
-  const displayStatus =
-    !paymentReference || !invoiceId ? "error" : status;
+  const displayStatus = !paymentReference || !invoiceId ? "error" : status;
   const displayMessage =
     !paymentReference || !invoiceId
       ? "Missing payment confirmation details."
@@ -81,7 +80,7 @@ export default function SuccessPage() {
         </h1>
         <p className="mt-4 text-slate-500">{displayMessage}</p>
 
-        <div className="mt-8">
+        <div className="mt-8 space-y-3">
           <Link
             href={`/pay/${token}`}
             className="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-6 py-3 font-medium text-white hover:bg-slate-800"

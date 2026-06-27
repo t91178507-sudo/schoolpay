@@ -43,6 +43,7 @@ export default function Login() {
         localStorage.setItem("userName", data.user?.fullName || "");
         localStorage.setItem("businessName", data.user?.businessName || "");
         localStorage.setItem("businessType", data.user?.businessType || "");
+        localStorage.setItem("businessLogo", data.user?.businessLogo || "");
         emitSessionChange();
 
         setTimeout(() => router.replace("/dashboard"), 200);

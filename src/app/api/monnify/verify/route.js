@@ -1,19 +1,22 @@
 import { ObjectId } from "mongodb";
 import { connectDB } from "../../../../lib/mongodb";
 import { parseAmount, verifyMonnifyTransaction } from "../../../../lib/monnify";
-
-const MONNIFY_API_KEY = process.env.MONNIFY_API_KEY || "";
-const MONNIFY_SECRET_KEY = process.env.MONNIFY_SECRET_KEY || "";
+import {
+  buildPaymentConfirmationMessage,
+  toWhatsAppNumber,
+} from "../../../../lib/invoiceUtils";
+import {
+  findUserById,
+  resolveMonnifyConfig,
+} from "../../../../lib/paymentGatewaySettings";
+import {
+  markInvoiceNotificationPrepared,
+  markInvoicePaid,
+} from "../../../../lib/paymentLifecycle";
+import { deliverPaymentConfirmation } from "../../../../lib/whatsappNotifications";
 
 export async function POST(req) {
   try {
-    if (!MONNIFY_API_KEY || !MONNIFY_SECRET_KEY) {
-      return Response.json(
-        { error: "Monnify verification is not configured" },
-        { status: 500 }
-      );
-    }
-
     const db = await connectDB();
     const body = await req.json();
     const token = body.token;
@@ -42,14 +45,28 @@ export async function POST(req) {
       );
     }
 
+    const owner = invoice.ownerId
+      ? await findUserById(db, invoice.ownerId)
+      : null;
+    const monnifyConfig = resolveMonnifyConfig(owner || {});
+
+    if (!monnifyConfig.apiKey || !monnifyConfig.secretKey) {
+      return Response.json(
+        { error: "Monnify verification is not configured for this business" },
+        { status: 500 }
+      );
+    }
+
     const verification = await verifyMonnifyTransaction({
-      apiKey: MONNIFY_API_KEY,
-      secretKey: MONNIFY_SECRET_KEY,
+      apiKey: monnifyConfig.apiKey,
+      secretKey: monnifyConfig.secretKey,
       paymentReference,
     });
 
     const amountPaid = parseAmount(verification.amountPaid);
-    const expectedAmount = parseAmount(invoice.amount);
+    const expectedAmount = parseAmount(
+      invoice.pendingPaymentAmount ?? invoice.amount
+    );
 
     if (verification.paymentStatus !== "PAID") {
       return Response.json(
@@ -67,30 +84,53 @@ export async function POST(req) {
       );
     }
 
-    await db.collection("invoices").updateOne(
-      { _id: invoice._id },
-      {
-        $set: {
-          status: "Paid",
-          paidAt: verification.paidOn ? new Date(verification.paidOn) : new Date(),
-          paidAmount: amountPaid,
-          paymentReference,
-          paymentProvider: "Monnify",
-          paymentVerificationMethod: "verify-api",
-        },
-        $unset: {
-          pendingPaymentReference: "",
-          pendingPaymentAmount: "",
-          pendingPaymentProvider: "",
-          pendingPaymentCreatedAt: "",
-        },
-      }
-    );
+    const paidInvoice = await markInvoicePaid(db, invoice, {
+      paidAt: verification.paidOn ? new Date(verification.paidOn) : new Date(),
+      paidAmount: amountPaid,
+      paymentReference,
+      paymentProvider: "Monnify",
+      verificationMethod: "verify-api",
+    });
+
+    const customerName =
+      paidInvoice.customer || paidInvoice.customerName || paidInvoice.student || "Customer";
+    const customerPhone = paidInvoice.phone ? toWhatsAppNumber(paidInvoice.phone) : "";
+
+    if (customerPhone) {
+      await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
+      await deliverPaymentConfirmation({
+        db,
+        invoice: paidInvoice,
+        owner,
+        amount: amountPaid,
+      });
+    }
 
     return Response.json({
       success: true,
       paymentStatus: verification.paymentStatus,
       paymentReference,
+      invoice: {
+        invoiceId: String(invoice._id),
+        customerName,
+        customerPhone,
+        businessName: paidInvoice.businessName || owner?.businessName || "",
+        invoiceNumber: paidInvoice.invoiceNumber || "",
+        description:
+          paidInvoice.description || paidInvoice.category || paidInvoice.class || "Invoice payment",
+        amount: amountPaid,
+      },
+      paymentConfirmationMessage: buildPaymentConfirmationMessage({
+        businessName: paidInvoice.businessName || owner?.businessName || "",
+        invoiceNumber: paidInvoice.invoiceNumber || "",
+        customerName,
+        amount: amountPaid,
+        description:
+          paidInvoice.description ||
+          paidInvoice.category ||
+          paidInvoice.class ||
+          "Invoice payment",
+      }),
     });
   } catch (error) {
     console.error("MONNIFY VERIFY ERROR:", error);

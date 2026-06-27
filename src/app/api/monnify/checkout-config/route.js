@@ -1,19 +1,13 @@
 import { ObjectId } from "mongodb";
 import { connectDB } from "../../../../lib/mongodb";
 import { parseAmount } from "../../../../lib/monnify";
-
-const MONNIFY_API_KEY = process.env.MONNIFY_API_KEY || "";
-const MONNIFY_CONTRACT_CODE = process.env.MONNIFY_CONTRACT_CODE || "";
+import {
+  findUserById,
+  resolveMonnifyConfig,
+} from "../../../../lib/paymentGatewaySettings";
 
 export async function POST(req) {
   try {
-    if (!MONNIFY_API_KEY || !MONNIFY_CONTRACT_CODE) {
-      return Response.json(
-        { error: "Monnify is not configured" },
-        { status: 500 }
-      );
-    }
-
     const db = await connectDB();
     const body = await req.json();
     const token = body.token;
@@ -51,12 +45,31 @@ export async function POST(req) {
 
     const invoiceAmount = parseAmount(invoice.amount);
 
-    if (requestedAmount !== invoiceAmount) {
+    if (requestedAmount <= 0) {
+      return Response.json(
+        { error: "Enter a valid payment amount" },
+        { status: 400 }
+      );
+    }
+
+    if (requestedAmount > invoiceAmount) {
       return Response.json(
         {
-          error: `This payment page only accepts full invoice payment. Requested: ${requestedAmount}. Invoice: ${invoiceAmount}.`,
+          error: `Amount cannot be more than the invoice amount. Requested: ${requestedAmount}. Invoice: ${invoiceAmount}.`,
         },
         { status: 400 }
+      );
+    }
+
+    const owner = invoice.ownerId
+      ? await findUserById(db, invoice.ownerId)
+      : null;
+    const monnifyConfig = resolveMonnifyConfig(owner || {});
+
+    if (!monnifyConfig.apiKey || !monnifyConfig.contractCode) {
+      return Response.json(
+        { error: "Monnify is not configured for this business" },
+        { status: 500 }
       );
     }
 
@@ -82,8 +95,8 @@ export async function POST(req) {
         customerFullName:
           invoice.customer || invoice.customerName || invoice.student || "Customer",
         customerEmail: invoice.email || "billing@invoicehub.app",
-        apiKey: MONNIFY_API_KEY,
-        contractCode: MONNIFY_CONTRACT_CODE,
+        apiKey: monnifyConfig.apiKey,
+        contractCode: monnifyConfig.contractCode,
         paymentDescription:
           invoice.category || invoice.class || "Invoice payment",
       },

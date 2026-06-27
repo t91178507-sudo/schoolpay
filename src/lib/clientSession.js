@@ -8,6 +8,7 @@ const EMPTY_BUSINESS_SESSION = Object.freeze({
   userName: "",
   businessName: "",
   businessType: "",
+  businessLogo: "",
 });
 
 const EMPTY_ADMIN_SESSION = Object.freeze({
@@ -44,6 +45,7 @@ function getBusinessSnapshot() {
     userName: localStorage.getItem("userName") || "",
     businessName: localStorage.getItem("businessName") || "",
     businessType: localStorage.getItem("businessType") || "",
+    businessLogo: localStorage.getItem("businessLogo") || "",
   };
 
   if (
@@ -51,7 +53,8 @@ function getBusinessSnapshot() {
     businessSnapshotCache.authToken === nextSnapshot.authToken &&
     businessSnapshotCache.userName === nextSnapshot.userName &&
     businessSnapshotCache.businessName === nextSnapshot.businessName &&
-    businessSnapshotCache.businessType === nextSnapshot.businessType
+    businessSnapshotCache.businessType === nextSnapshot.businessType &&
+    businessSnapshotCache.businessLogo === nextSnapshot.businessLogo
   ) {
     return businessSnapshotCache;
   }
@@ -89,6 +92,15 @@ export function emitSessionChange() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("session-change"));
   }
+}
+
+export function setDarkModePreference(enabled) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  localStorage.setItem("darkMode", String(enabled));
+  emitSessionChange();
 }
 
 export function useBusinessSession() {

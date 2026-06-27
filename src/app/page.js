@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import PublicLegalFooter from "../components/PublicLegalFooter";
 
 const proofPoints = [
   { label: "Invoices sent faster", value: "3x" },
@@ -10,15 +11,15 @@ const proofPoints = [
 const workflow = [
   {
     title: "Create polished invoices",
-    text: "Prepare customer-ready invoices with clear line items, due dates, and secure payment links.",
+    text: "Create professional invoices with clear line items, due dates, and payment options customers can act on quickly.",
   },
   {
-    title: "Stay on top of every customer",
-    text: "Keep customer categories, billing history, and payment status in one organized workspace.",
+    title: "Keep every account in view",
+    text: "Track customers, invoice history, and payment progress from one workspace built for daily billing operations.",
   },
   {
-    title: "Collect with less chasing",
-    text: "Share invoices instantly and track which payments are pending, confirmed, or overdue.",
+    title: "Collect with less follow-up",
+    text: "Share invoice links in seconds and stay on top of unpaid, partial, and confirmed payments without the usual back-and-forth.",
   },
 ];
 
@@ -31,7 +32,7 @@ const features = [
 
 export default function Home() {
   return (
-    <div className="bg-white text-slate-950">
+    <div className="bg-white text-slate-950 dark:bg-slate-950 dark:text-slate-100">
       <header className="absolute inset-x-0 top-0 z-20">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-10">
           <Link href="/" className="flex items-center gap-3 text-white">
@@ -40,7 +41,7 @@ export default function Home() {
             </div>
             <div>
               <p className="text-xl font-semibold">InvoiceHub</p>
-              <p className="text-xs text-white/70">Invoicing and collections</p>
+              <p className="text-xs text-white/70">Billing and payment workspace</p>
             </div>
           </Link>
 
@@ -90,11 +91,11 @@ export default function Home() {
               InvoiceHub
             </p>
             <h1 className="mt-5 text-5xl font-semibold leading-tight sm:text-6xl lg:text-7xl">
-              The invoicing system that keeps revenue moving.
+              Invoice management that helps you bill clearly and get paid faster.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200">
-              Run customer billing, send payment links, track collections, and
-              keep every invoice status visible from one focused workspace.
+              Create invoices, share payment links, track collections, and keep
+              every customer payment status visible from one focused workspace.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-4">
@@ -127,14 +128,14 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="workflow" className="bg-white py-20 lg:py-24">
+      <section id="workflow" className="bg-white py-20 dark:bg-slate-950 lg:py-24">
         <div className="mx-auto grid max-w-7xl gap-14 px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-10">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-600">
               Workflow
             </p>
-            <h2 className="mt-4 max-w-2xl text-4xl font-semibold text-slate-950">
-              Built for teams that invoice often and need cleaner follow-through.
+            <h2 className="mt-4 max-w-2xl text-4xl font-semibold text-slate-950 dark:text-slate-100">
+              Built for businesses that invoice often and need sharper payment follow-through.
             </h2>
             <div className="mt-10 space-y-8">
               {workflow.map((item, index) => (
@@ -143,10 +144,10 @@ export default function Home() {
                     0{index + 1}
                   </div>
                   <div>
-                    <h3 className="text-xl font-semibold text-slate-950">
+                    <h3 className="text-xl font-semibold text-slate-950 dark:text-slate-100">
                       {item.title}
                     </h3>
-                    <p className="mt-2 max-w-xl text-base leading-7 text-slate-600">
+                    <p className="mt-2 max-w-xl text-base leading-7 text-slate-600 dark:text-slate-400">
                       {item.text}
                     </p>
                   </div>
@@ -216,16 +217,16 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="platform" className="bg-slate-50 py-20 lg:py-24">
+      <section id="platform" className="bg-slate-50 py-20 dark:bg-slate-900 lg:py-24">
         <div className="mx-auto max-w-7xl px-6 lg:px-10">
           <div className="max-w-3xl">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-600">
               Platform
             </p>
-            <h2 className="mt-4 text-4xl font-semibold text-slate-950">
-              A cleaner front door for customer billing.
+            <h2 className="mt-4 text-4xl font-semibold text-slate-950 dark:text-slate-100">
+              A cleaner billing workspace for teams that need less friction.
             </h2>
-            <p className="mt-4 text-lg leading-8 text-slate-600">
+            <p className="mt-4 text-lg leading-8 text-slate-600 dark:text-slate-400">
               InvoiceHub keeps the essentials close: customer lists, invoice
               generation, payment visibility, and admin oversight without the
               clutter that usually slows teams down.
@@ -236,11 +237,18 @@ export default function Home() {
             {features.map((feature) => (
               <div
                 key={feature}
-                className="rounded-2xl border border-slate-200 bg-white px-6 py-6"
+                className="rounded-2xl border border-slate-200 bg-white px-6 py-6 dark:border-slate-800 dark:bg-slate-950"
               >
-                <p className="text-base font-medium text-slate-900">{feature}</p>
+                <p className="text-base font-medium text-slate-900 dark:text-slate-100">{feature}</p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-10 rounded-2xl border border-slate-200 bg-white px-6 py-5 text-sm leading-7 text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
+            InvoiceHub operates as software for invoice generation, payment-link presentation,
+            and collection tracking. Customer payments are processed by the merchant&apos;s chosen
+            payment provider, and the platform is not presented as a bank or fund-holding
+            service.
           </div>
         </div>
       </section>
@@ -252,7 +260,7 @@ export default function Home() {
               Results
             </p>
             <h2 className="mt-4 text-4xl font-semibold">
-              Give your invoicing process the kind of clarity customers actually respond to.
+              Give your invoicing process the clarity customers actually respond to.
             </h2>
             <p className="mt-4 text-lg leading-8 text-slate-300">
               When invoices are easy to send, easy to understand, and easy to
@@ -276,6 +284,15 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <footer className="border-t border-slate-200 bg-white px-6 py-6 dark:border-slate-800 dark:bg-slate-950 lg:px-10">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            InvoiceHub helps businesses manage invoices, payment visibility, and collections follow-through.
+          </p>
+          <PublicLegalFooter />
+        </div>
+      </footer>
     </div>
   );
 }

@@ -2,31 +2,31 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  emitSessionChange,
   useBusinessSession,
   useDarkModePreference,
   useHydrated,
 } from "../../lib/clientSession";
 
 const navItems = [
-  { name: "Dashboard", href: "/dashboard", icon: "📊" },
-  { name: "Categories", href: "/dashboard/categories", icon: "🗂️" },
-  { name: "Customer Overview", href: "/dashboard/customers", icon: "👥" },
-  { name: "Invoices", href: "/dashboard/invoices", icon: "📄" },
-  { name: "Payments", href: "/dashboard/payments", icon: "💰" },
-  { name: "Settings", href: "/dashboard/settings", icon: "⚙️" },
+  { name: "Dashboard", href: "/dashboard", badge: "D" },
+  { name: "Customer groups", href: "/dashboard/categories", badge: "G" },
+  { name: "Customer overview", href: "/dashboard/customers", badge: "C" },
+  { name: "Invoices", href: "/dashboard/invoices", badge: "I" },
+  { name: "Payment history", href: "/dashboard/payments", badge: "P" },
+  { name: "Settings", href: "/dashboard/settings", badge: "S" },
 ];
 
 export default function DashboardLayout({ children }) {
   const [currentTime, setCurrentTime] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const session = useBusinessSession();
   const darkMode = useDarkModePreference();
   const isHydrated = useHydrated();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     if (!isHydrated) {
@@ -50,27 +50,37 @@ export default function DashboardLayout({ children }) {
     return () => clearInterval(interval);
   }, [isHydrated]);
 
-  const formattedDate = currentTime?.toLocaleDateString(undefined, {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  }) || "";
-
-  const formattedTime = currentTime?.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  }) || "";
-
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);
 
-  const toggleDarkMode = () => {
-    const newMode = !darkMode;
-    localStorage.setItem("darkMode", newMode);
-    emitSessionChange();
-  };
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const syncSidebar = () => {
+      setSidebarOpen(window.innerWidth >= 1024);
+    };
+
+    syncSidebar();
+    window.addEventListener("resize", syncSidebar);
+    return () => window.removeEventListener("resize", syncSidebar);
+  }, []);
+
+  const formattedDate =
+    currentTime?.toLocaleDateString(undefined, {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }) || "";
+
+  const formattedTime =
+    currentTime?.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    }) || "";
 
   const handleLogout = () => {
     localStorage.removeItem("isLoggedIn");
@@ -78,106 +88,153 @@ export default function DashboardLayout({ children }) {
     localStorage.removeItem("userName");
     localStorage.removeItem("businessName");
     localStorage.removeItem("businessType");
+    localStorage.removeItem("businessLogo");
     emitSessionChange();
     router.replace("/auth/login");
   };
 
+  const handleNavClick = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
+  };
+
   if (!isHydrated || !session.isLoggedIn) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-600"></div>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-4 border-t-4 border-blue-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
-      {/* Sidebar */}
-      <div className={`bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-all duration-300 ${sidebarOpen ? "w-72" : "w-20"} flex flex-col`}>
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950 lg:h-screen">
+      {sidebarOpen ? (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-slate-950/40 lg:hidden"
+        />
+      ) : null}
 
-        <div className="p-6 flex items-center gap-3 border-b border-gray-200 dark:border-gray-800">
-          <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl">
-            📄
-          </div>
-          {sidebarOpen && (
-            <div>
-              <h1 className="font-bold text-4xl text-gray-900 dark:text-white">InvoiceHub</h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">Simplify billing,collections and payment reconciliation in one place</p>
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-gray-200 bg-white transition-transform duration-300 dark:border-gray-800 dark:bg-gray-900 lg:static lg:z-auto lg:w-72 lg:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center gap-3 border-b border-gray-200 p-6 dark:border-gray-800">
+          {session.businessLogo ? (
+            <Image
+              src={session.businessLogo}
+              alt={session.businessName || "Business logo"}
+              width={40}
+              height={40}
+              unoptimized
+              className="h-10 w-10 rounded-2xl border border-gray-200 object-cover dark:border-gray-700"
+            />
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 font-semibold text-white">
+              {(session.businessName || session.userName || "I").charAt(0).toUpperCase()}
             </div>
           )}
+
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-bold text-gray-900 dark:text-white">
+              {session.businessName || "InvoiceHub"}
+            </h1>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Billing and collections workspace
+            </p>
+          </div>
         </div>
 
-        <nav className="p-4 flex-1">
+        <nav className="flex-1 p-4">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-2xl mb-1 transition-all ${isActive
+                onClick={handleNavClick}
+                className={`mb-1 flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
+                  isActive
                     ? "bg-blue-600 text-white"
-                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                  }`}
+                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                }`}
               >
-                <span className="text-xl">{item.icon}</span>
-                {sidebarOpen && <span className="font-medium">{item.name}</span>}
+                <span
+                  className={`flex h-8 w-8 items-center justify-center rounded-xl text-xs font-semibold ${
+                    isActive
+                      ? "bg-white/15 text-white"
+                      : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                  }`}
+                >
+                  {item.badge}
+                </span>
+                <span className="font-medium">{item.name}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Logout */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-800 mt-auto">
+        <div className="mt-auto border-t border-gray-200 p-4 dark:border-gray-800">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-4 py-3 w-full rounded-2xl text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 transition-all"
+            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-red-600 transition-all hover:bg-red-50 dark:hover:bg-red-950/50"
           >
-            <span className="text-xl">🚪</span>
-            {sidebarOpen && <span className="font-medium">Logout</span>}
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-red-50 text-xs font-semibold dark:bg-red-950/50">
+              Q
+            </span>
+            <span className="font-medium">Logout</span>
           </button>
         </div>
-      </div>
+      </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 h-16 flex items-center px-8 justify-between">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900 sm:px-6">
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            onClick={() => setSidebarOpen((open) => !open)}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-slate-50 hover:text-gray-900 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
           >
-            {sidebarOpen ? "←" : "→"}
+            {sidebarOpen ? "Close menu" : "Open menu"}
           </button>
 
-          <div className="flex items-center gap-6">
-            <button
-              onClick={toggleDarkMode}
-              className="w-9 h-9 flex items-center justify-center text-xl hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition"
-            >
-              {darkMode ? "☀️" : "🌙"}
-            </button>
-
-
-            <div className="text-sm text-gray-500 dark:text-gray-400 min-w-[220px] text-right">
-              {currentTime ? `${formattedDate} • ${formattedTime}` : ""}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3 sm:gap-4">
+            <div className="hidden text-right text-sm text-gray-500 dark:text-gray-400 xl:block">
+              {currentTime ? `${formattedDate} | ${formattedTime}` : ""}
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="text-right">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="min-w-0 text-right">
                 <p className="text-sm font-medium text-gray-900 dark:text-white">
                   {session.userName || "User"}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="truncate text-xs text-gray-500 dark:text-gray-400">
                   {session.businessType || "Business"}
                 </p>
               </div>
-              <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-medium">
-                {(session.userName || "U").charAt(0).toUpperCase()}
-              </div>
+
+              {session.businessLogo ? (
+                <Image
+                  src={session.businessLogo}
+                  alt={session.businessName || "Business logo"}
+                  width={36}
+                  height={36}
+                  unoptimized
+                  className="h-9 w-9 rounded-full border border-gray-200 object-cover dark:border-gray-700"
+                />
+              ) : (
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 font-medium text-white">
+                  {(session.userName || "U").charAt(0).toUpperCase()}
+                </div>
+              )}
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto p-8 bg-gray-50 dark:bg-gray-950">
+        <main className="flex-1 overflow-auto bg-gray-50 p-4 dark:bg-gray-950 sm:p-6 lg:p-8">
           {children}
         </main>
       </div>

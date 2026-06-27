@@ -1,5 +1,6 @@
 import { connectDB } from "../../../../../../lib/mongodb";
 import { ObjectId } from "mongodb";
+import { markInvoicePaid } from "../../../../../../lib/paymentLifecycle";
 
 export async function POST(req, context) {
   try {
@@ -32,27 +33,13 @@ export async function POST(req, context) {
       return Response.json({ message: "Invoice already marked as paid" });
     }
 
-    await db.collection("invoices").updateOne(
-      { _id: invoice._id },
-      {
-        $set: {
-          status: "Paid",
-          paidAt: new Date(),
-          paidAmount: paidAmount > 0 ? paidAmount : Number(invoice.amount || 0),
-          paymentReference:
-            paymentReference || invoice.pendingPaymentReference || null,
-          paymentProvider:
-            body.paymentProvider || invoice.pendingPaymentProvider || "Monnify",
-          paymentVerificationMethod: body.verificationMethod || "redirect",
-        },
-        $unset: {
-          pendingPaymentReference: "",
-          pendingPaymentAmount: "",
-          pendingPaymentProvider: "",
-          pendingPaymentCreatedAt: "",
-        },
-      }
-    );
+    await markInvoicePaid(db, invoice, {
+      paidAt: new Date(),
+      paidAmount: paidAmount > 0 ? paidAmount : Number(invoice.amount || 0),
+      paymentReference,
+      paymentProvider: body.paymentProvider || invoice.pendingPaymentProvider || "Monnify",
+      verificationMethod: body.verificationMethod || "redirect",
+    });
 
     return Response.json({ message: "Invoice marked as paid" });
   } catch (error) {

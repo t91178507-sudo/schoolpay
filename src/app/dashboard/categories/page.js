@@ -4,10 +4,20 @@ import { useEffect, useState } from "react";
 import AddCustomerModal from "../../../components/AddCustomerModal";
 import { authFetch } from "../../../lib/authFetch";
 import {
-  buildInvoiceMessage,
+  calculateInvoiceTotal,
+  generateInvoiceNumber,
   generateInvoiceToken,
-  toWhatsAppNumber,
+  sanitizeInvoiceItems,
 } from "../../../lib/invoiceUtils";
+
+function createEmptyInvoiceItem() {
+  return {
+    id: `item_${Math.random().toString(36).slice(2, 8)}`,
+    description: "",
+    quantity: 1,
+    unitPrice: "",
+  };
+}
 
 export default function CategoriesPage() {
   const [customers, setCustomers] = useState([]);
@@ -15,11 +25,13 @@ export default function CategoriesPage() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [invoiceCustomer, setInvoiceCustomer] = useState(null);
-  const [invoiceAmount, setInvoiceAmount] = useState("");
+  const [invoiceDescription, setInvoiceDescription] = useState("");
+  const [invoiceItems, setInvoiceItems] = useState([createEmptyInvoiceItem()]);
   const [invoiceError, setInvoiceError] = useState("");
   const [generating, setGenerating] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
-  const [bulkAmount, setBulkAmount] = useState("");
+  const [bulkDescription, setBulkDescription] = useState("");
+  const [bulkItems, setBulkItems] = useState([createEmptyInvoiceItem()]);
   const [bulkError, setBulkError] = useState("");
   const [bulkGenerating, setBulkGenerating] = useState(false);
 
@@ -52,15 +64,28 @@ export default function CategoriesPage() {
 
   const categoryList = Object.keys(grouped).sort();
   const selectedCustomers = selectedCategory ? grouped[selectedCategory] || [] : [];
+  const invoiceTotal = calculateInvoiceTotal(invoiceItems);
 
-  const createInvoicePayload = (customer, amount, businessName) => {
+  const createInvoicePayload = (
+    customer,
+    items,
+    description,
+    businessName,
+    businessLogo
+  ) => {
     const token = generateInvoiceToken("inv");
     const customerToken = customer.token || generateInvoiceToken("cust");
+    const sanitizedItems = sanitizeInvoiceItems(items);
+    const amount = calculateInvoiceTotal(sanitizedItems);
 
     return {
+      invoiceNumber: generateInvoiceNumber(),
       customer: customer.name,
       customerName: customer.name,
       category: customer.category,
+      description,
+      items: sanitizedItems,
+      subtotal: amount,
       email: customer.email || "",
       amount,
       status: "Unpaid",
@@ -68,6 +93,7 @@ export default function CategoriesPage() {
       customerToken,
       phone: customer.phone || customer.customerPhone || customer.parentPhone || "",
       businessName,
+      businessLogo: businessLogo || "",
       date: new Date().toISOString(),
     };
   };
@@ -84,31 +110,107 @@ export default function CategoriesPage() {
 
   const openInvoiceModal = (customer) => {
     setInvoiceCustomer(customer);
-    setInvoiceAmount("");
+    setInvoiceDescription(
+      customer.category ? `${customer.category} invoice` : "Invoice payment"
+    );
+    setInvoiceItems([createEmptyInvoiceItem()]);
     setInvoiceError("");
   };
 
   const closeInvoiceModal = () => {
     setInvoiceCustomer(null);
-    setInvoiceAmount("");
+    setInvoiceDescription("");
+    setInvoiceItems([createEmptyInvoiceItem()]);
     setInvoiceError("");
+  };
+
+  const updateInvoiceItem = (itemId, field, value) => {
+    setInvoiceItems((current) =>
+      current.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              [field]:
+                field === "quantity" && (value === "" || Number(value) < 1)
+                  ? 1
+                  : value,
+            }
+          : item
+      )
+    );
+    setInvoiceError("");
+  };
+
+  const addInvoiceItem = () => {
+    setInvoiceItems((current) => [...current, createEmptyInvoiceItem()]);
+  };
+
+  const removeInvoiceItem = (itemId) => {
+    setInvoiceItems((current) => {
+      if (current.length === 1) {
+        return current;
+      }
+
+      return current.filter((item) => item.id !== itemId);
+    });
+    setInvoiceError("");
+  };
+
+  const updateBulkItem = (itemId, field, value) => {
+    setBulkItems((current) =>
+      current.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              [field]:
+                field === "quantity" && (value === "" || Number(value) < 1)
+                  ? 1
+                  : value,
+            }
+          : item
+      )
+    );
+    setBulkError("");
+  };
+
+  const addBulkItem = () => {
+    setBulkItems((current) => [...current, createEmptyInvoiceItem()]);
+  };
+
+  const removeBulkItem = (itemId) => {
+    setBulkItems((current) => {
+      if (current.length === 1) {
+        return current;
+      }
+
+      return current.filter((item) => item.id !== itemId);
+    });
+    setBulkError("");
   };
 
   const confirmGenerateInvoice = async () => {
     const customer = invoiceCustomer;
     if (!customer) return;
 
-    const amount = Number(invoiceAmount);
-
-    if (!invoiceAmount || Number.isNaN(amount) || amount <= 0) {
-      setInvoiceError("Enter a valid amount greater than 0");
-      return;
-    }
-
     setGenerating(true);
     setInvoiceError("");
 
     try {
+      const sanitizedItems = sanitizeInvoiceItems(invoiceItems);
+      const amount = calculateInvoiceTotal(sanitizedItems);
+
+      if (!invoiceDescription.trim()) {
+        setInvoiceError("Add an invoice description");
+        setGenerating(false);
+        return;
+      }
+
+      if (sanitizedItems.length === 0 || amount <= 0) {
+        setInvoiceError("Add at least one valid item with quantity and unit price");
+        setGenerating(false);
+        return;
+      }
+
       const phone =
         customer.phone ||
         customer.customerPhone ||
@@ -125,8 +227,18 @@ export default function CategoriesPage() {
         typeof window !== "undefined"
           ? localStorage.getItem("businessName") || ""
           : "";
+      const businessLogo =
+        typeof window !== "undefined"
+          ? localStorage.getItem("businessLogo") || ""
+          : "";
 
-      const payload = createInvoicePayload(customer, amount, businessName);
+      const payload = createInvoicePayload(
+        customer,
+        sanitizedItems,
+        invoiceDescription.trim(),
+        businessName,
+        businessLogo
+      );
 
       const res = await authFetch("/api/invoices", {
         method: "POST",
@@ -135,20 +247,22 @@ export default function CategoriesPage() {
       });
 
       if (!res.ok) throw new Error("Invoice failed");
-
-      const whatsappPhone = toWhatsAppNumber(phone);
-      const paymentLink = `${window.location.origin}/pay/${payload.token}`;
-      const message = buildInvoiceMessage({
-        customerName: customer.name,
-        category: customer.category,
-        amount,
-        paymentLink,
+      const invoiceData = await res.json();
+      const notificationRes = await authFetch("/api/notifications/whatsapp/invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoiceId: String(invoiceData.insertedId || ""),
+          origin: window.location.origin,
+        }),
       });
+      const notificationData = notificationRes.ok
+        ? await notificationRes.json()
+        : await notificationRes.json().catch(() => ({}));
 
-      window.open(
-        `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`,
-        "_blank"
-      );
+      if (notificationData?.delivery?.fallbackUrl) {
+        window.open(notificationData.delivery.fallbackUrl, "_blank");
+      }
 
       closeInvoiceModal();
     } catch (error) {
@@ -160,10 +274,16 @@ export default function CategoriesPage() {
   };
 
   const confirmBulkGenerate = async () => {
-    const amount = Number(bulkAmount);
+    const sanitizedBulkItems = sanitizeInvoiceItems(bulkItems);
+    const amount = calculateInvoiceTotal(sanitizedBulkItems);
 
-    if (!bulkAmount || Number.isNaN(amount) || amount <= 0) {
-      setBulkError("Enter a valid amount greater than 0");
+    if (!bulkDescription.trim()) {
+      setBulkError("Add an invoice description");
+      return;
+    }
+
+    if (sanitizedBulkItems.length === 0 || amount <= 0) {
+      setBulkError("Add at least one valid item with quantity and unit price");
       return;
     }
 
@@ -174,8 +294,13 @@ export default function CategoriesPage() {
       typeof window !== "undefined"
         ? localStorage.getItem("businessName") || ""
         : "";
+    const businessLogo =
+      typeof window !== "undefined"
+        ? localStorage.getItem("businessLogo") || ""
+        : "";
 
     let savedCount = 0;
+    let notificationCount = 0;
     let whatsappOpenedCount = 0;
     let skippedNoPhone = 0;
 
@@ -192,7 +317,14 @@ export default function CategoriesPage() {
       }
 
       try {
-        const payload = createInvoicePayload(customer, amount, businessName);
+        const payload = createInvoicePayload(
+          customer,
+          sanitizedBulkItems,
+          bulkDescription.trim(),
+          businessName,
+          businessLogo
+        );
+
         const res = await authFetch("/api/invoices", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -200,23 +332,28 @@ export default function CategoriesPage() {
         });
 
         if (!res.ok) continue;
+        const invoiceData = await res.json();
         savedCount++;
-
-        const whatsappPhone = toWhatsAppNumber(phone);
-        const paymentLink = `${window.location.origin}/pay/${payload.token}`;
-        const message = buildInvoiceMessage({
-          customerName: customer.name,
-          category: customer.category,
-          amount,
-          paymentLink,
+        const notificationRes = await authFetch("/api/notifications/whatsapp/invoice", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            invoiceId: String(invoiceData.insertedId || ""),
+            origin: window.location.origin,
+          }),
         });
+        const notificationData = notificationRes.ok
+          ? await notificationRes.json()
+          : await notificationRes.json().catch(() => ({}));
 
-        const opened = window.open(
-          `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`,
-          "_blank"
-        );
+        if (notificationData?.delivery) {
+          notificationCount++;
+        }
 
-        if (opened) whatsappOpenedCount++;
+        if (notificationData?.delivery?.fallbackUrl) {
+          const opened = window.open(notificationData.delivery.fallbackUrl, "_blank");
+          if (opened) whatsappOpenedCount++;
+        }
       } catch (error) {
         console.error("Bulk invoice failed for", customer.name, error);
       }
@@ -224,12 +361,16 @@ export default function CategoriesPage() {
 
     setBulkGenerating(false);
     setShowBulkModal(false);
-    setBulkAmount("");
+    setBulkDescription("");
+    setBulkItems([createEmptyInvoiceItem()]);
     setBulkError("");
 
     alert(
       `Created ${savedCount} invoice${savedCount !== 1 ? "s" : ""}.\n` +
-        `${whatsappOpenedCount} WhatsApp tab${whatsappOpenedCount !== 1 ? "s" : ""} opened` +
+        `${notificationCount} notification${notificationCount !== 1 ? "s" : ""} prepared` +
+        (whatsappOpenedCount > 0
+          ? `\n${whatsappOpenedCount} WhatsApp tab${whatsappOpenedCount !== 1 ? "s" : ""} opened`
+          : "") +
         (whatsappOpenedCount < savedCount
           ? " (some may have been blocked by your browser)."
           : ".") +
@@ -269,25 +410,29 @@ export default function CategoriesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="flex items-center justify-between mb-10">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 py-6 sm:py-8">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <div className="mb-8 flex flex-col gap-4 lg:mb-10 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-gray-900">Categories</h1>
-            <p className="text-gray-600 mt-1">Organize customers and generate invoices by category</p>
+            <h1 className="text-3xl font-semibold text-gray-900 dark:text-slate-100">Customer categories</h1>
+            <p className="text-gray-600 dark:text-slate-400 mt-1">
+              Organize customer groups and generate invoices from one shared billing view.
+            </p>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm text-gray-500">Total Customers</p>
-              <p className="text-4xl font-semibold text-gray-900">{customers.length}</p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between lg:justify-end">
+            <div className="text-left sm:text-right">
+              <p className="text-sm text-gray-500 dark:text-slate-400">Total customers</p>
+              <p className="text-3xl font-semibold text-gray-900 dark:text-slate-100 sm:text-4xl">
+                {customers.length}
+              </p>
             </div>
 
             <button
@@ -310,37 +455,42 @@ export default function CategoriesPage() {
 
         {!selectedCategory ? (
           <div>
-            <h2 className="text-xl font-medium text-gray-700 mb-6">
-              All Categories ({categoryList.length})
+            <h2 className="text-xl font-medium text-gray-700 dark:text-slate-300 mb-6">
+              All categories ({categoryList.length})
             </h2>
 
             {categoryList.length === 0 ? (
-              <div className="text-center py-20 text-gray-500">
+              <div className="text-center py-20 text-gray-500 dark:text-slate-400">
                 No customers yet. Add your first customer to create a category.
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {categoryList.map((category) => {
                   const count = grouped[category]?.length || 0;
+
                   return (
                     <div
                       key={category}
                       onClick={() => setSelectedCategory(category)}
-                      className="bg-white border border-slate-200 rounded-3xl p-8 hover:shadow-md hover:border-slate-300 transition-all duration-300 cursor-pointer group"
+                      className="group cursor-pointer rounded-3xl border border-slate-200 bg-white p-6 transition-all duration-300 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 sm:p-8"
                     >
                       <div className="flex items-center gap-4 mb-6">
-                        <div className="w-14 h-14 bg-slate-100 text-slate-600 rounded-2xl flex items-center justify-center text-3xl">
-                          👤
+                        <div className="w-14 h-14 bg-slate-100 text-slate-600 rounded-2xl flex items-center justify-center text-3xl dark:bg-slate-800 dark:text-slate-300">
+                          C
                         </div>
                         <div>
-                          <h3 className="text-2xl font-semibold text-slate-800">{category}</h3>
+                          <h3 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">
+                            {category}
+                          </h3>
                         </div>
                       </div>
 
                       <div className="flex justify-between items-end">
                         <div>
-                          <p className="text-sm text-slate-500">Customers</p>
-                          <p className="text-5xl font-bold text-slate-800 mt-1">{count}</p>
+                          <p className="text-sm text-slate-500 dark:text-slate-400">Customers</p>
+                          <p className="mt-1 text-4xl font-bold text-slate-800 dark:text-slate-100 sm:text-5xl">
+                            {count}
+                          </p>
                         </div>
                         <div className="text-slate-500 text-sm font-medium group-hover:translate-x-1 transition-transform">
                           View Customers →
@@ -353,25 +503,28 @@ export default function CategoriesPage() {
             )}
           </div>
         ) : (
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="bg-slate-800 px-10 py-8 text-white">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-4xl">
-                    👥
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+              <div className="bg-slate-800 dark:bg-slate-900 px-5 py-6 text-white sm:px-8 lg:px-10">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-2xl font-semibold">
+                    C
                   </div>
                   <div>
-                    <h2 className="text-4xl font-semibold">{selectedCategory}</h2>
+                      <h2 className="text-3xl font-semibold sm:text-4xl">{selectedCategory}</h2>
                     <p className="text-slate-300 mt-1 text-lg">
                       {selectedCustomers.length} Customers
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <button
                     onClick={() => {
-                      setBulkAmount("");
+                      setBulkDescription(
+                        selectedCategory ? `${selectedCategory} invoice` : "Category invoice"
+                      );
+                      setBulkItems([createEmptyInvoiceItem()]);
                       setBulkError("");
                       setShowBulkModal(true);
                     }}
@@ -389,26 +542,72 @@ export default function CategoriesPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="divide-y divide-gray-100 dark:divide-slate-800 lg:hidden">
+              {selectedCustomers.map((customer) => (
+                <div key={customer._id} className="space-y-4 p-5">
+                  <div className="space-y-1">
+                    <p className="font-medium text-gray-900 dark:text-slate-100">{customer.name}</p>
+                    <p className="text-sm text-gray-600 dark:text-slate-400">{customer.phone || "-"}</p>
+                    <p className="text-sm text-gray-600 dark:text-slate-400">{customer.email || "-"}</p>
+                    <p className="break-all font-mono text-xs text-gray-500 dark:text-slate-500">
+                      {customer.token ? `${customer.token.substring(0, 15)}...` : "-"}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <button
+                      onClick={() => openInvoiceModal(customer)}
+                      className="rounded-xl bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700"
+                    >
+                      Generate Invoice
+                    </button>
+                    <button
+                      onClick={() => deleteCustomer(customer._id)}
+                      className="rounded-xl bg-red-50 px-4 py-2 text-sm font-medium text-red-600"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto lg:block">
               <table className="w-full">
                 <thead>
                   <tr className="border-b bg-slate-50">
-                    <th className="px-10 py-5 text-left text-sm font-medium text-gray-500">Customer Name</th>
-                    <th className="px-10 py-5 text-left text-sm font-medium text-gray-500">Phone Number</th>
-                    <th className="px-10 py-5 text-left text-sm font-medium text-gray-500">Email</th>
-                    <th className="px-10 py-5 text-left text-sm font-medium text-gray-500">Token</th>
-                    <th className="px-10 py-5 text-right text-sm font-medium text-gray-500">Actions</th>
+                    <th className="px-10 py-5 text-left text-sm font-medium text-gray-500">
+                      Customer Name
+                    </th>
+                    <th className="px-10 py-5 text-left text-sm font-medium text-gray-500">
+                      Phone Number
+                    </th>
+                    <th className="px-10 py-5 text-left text-sm font-medium text-gray-500">
+                      Email
+                    </th>
+                    <th className="px-10 py-5 text-left text-sm font-medium text-gray-500">
+                      Token
+                    </th>
+                    <th className="px-10 py-5 text-right text-sm font-medium text-gray-500">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                   {selectedCustomers.map((customer) => (
-                    <tr key={customer._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-10 py-6 font-medium text-gray-900">{customer.name}</td>
-                      <td className="px-10 py-6 text-gray-600">{customer.phone || "—"}</td>
-                      <td className="px-10 py-6 text-gray-600">{customer.email || "—"}</td>
+                    <tr key={customer._id} className="hover:bg-gray-50 dark:hover:bg-slate-950/60 transition-colors">
+                      <td className="px-10 py-6 font-medium text-gray-900 dark:text-slate-100">
+                        {customer.name}
+                      </td>
+                      <td className="px-10 py-6 text-gray-600 dark:text-slate-400">
+                        {customer.phone || "—"}
+                      </td>
+                      <td className="px-10 py-6 text-gray-600 dark:text-slate-400">
+                        {customer.email || "—"}
+                      </td>
                       <td className="px-10 py-6">
-                        <span className="font-mono text-xs bg-gray-100 px-3 py-1 rounded-full">
-                          {customer.token ? customer.token.substring(0, 15) + "..." : "—"}
+                        <span className="font-mono text-xs bg-gray-100 dark:bg-slate-800 dark:text-slate-300 px-3 py-1 rounded-full">
+                          {customer.token ? `${customer.token.substring(0, 15)}...` : "—"}
                         </span>
                       </td>
                       <td className="px-10 py-6 text-right space-x-4">
@@ -436,40 +635,149 @@ export default function CategoriesPage() {
 
       {invoiceCustomer && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden">
-            <div className="px-8 py-6 border-b">
-              <h2 className="text-2xl font-semibold text-gray-900">Generate Invoice</h2>
-              <p className="text-gray-500 mt-1">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-3xl w-full overflow-hidden">
+            <div className="px-8 py-6 border-b dark:border-slate-800">
+              <h2 className="text-2xl font-semibold text-gray-900 dark:text-slate-100">Generate Invoice</h2>
+              <p className="text-gray-500 dark:text-slate-400 mt-1">
                 For {invoiceCustomer.name} · {invoiceCustomer.category}
               </p>
             </div>
 
-            <div className="p-8 space-y-4">
+            <div className="p-8 space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Invoice Amount (₦)
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+                  Description
                 </label>
-                <input
-                  type="number"
-                  value={invoiceAmount}
+                <textarea
+                  value={invoiceDescription}
                   onChange={(e) => {
-                    setInvoiceAmount(e.target.value);
+                    setInvoiceDescription(e.target.value);
                     setInvoiceError("");
                   }}
                   autoFocus
-                  className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g. 45000"
+                  rows={3}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="What is this invoice for?"
                 />
-                {invoiceError && (
-                  <p className="text-red-600 text-sm mt-2">{invoiceError}</p>
-                )}
               </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Items</h3>
+                    <p className="text-sm text-gray-500 dark:text-slate-400">
+                      The invoice total is calculated from the line items below.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addInvoiceItem}
+                    className="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-medium"
+                  >
+                    Add item
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {invoiceItems.map((item, index) => {
+                    const quantity = Number(item.quantity || 0);
+                    const unitPrice = Number(item.unitPrice || 0);
+                    const lineTotal =
+                      Number.isFinite(quantity) && Number.isFinite(unitPrice)
+                        ? quantity * unitPrice
+                        : 0;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="grid grid-cols-1 md:grid-cols-[1.8fr_0.7fr_0.8fr_auto] gap-3 items-end border border-gray-200 dark:border-slate-800 rounded-2xl p-4"
+                      >
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-2">
+                            Item {index + 1}
+                          </label>
+                          <input
+                            type="text"
+                            value={item.description}
+                            onChange={(e) =>
+                              updateInvoiceItem(item.id, "description", e.target.value)
+                            }
+                            className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Description"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-2">
+                            Qty
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) =>
+                              updateInvoiceItem(item.id, "quantity", e.target.value)
+                            }
+                            className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-2">
+                            Unit price
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={item.unitPrice}
+                            onChange={(e) =>
+                              updateInvoiceItem(item.id, "unitPrice", e.target.value)
+                            }
+                            className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="0"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-3 md:pb-3">
+                          <div className="text-sm font-semibold text-gray-900 dark:text-slate-100 min-w-[90px] text-right">
+                            N{lineTotal.toLocaleString()}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeInvoiceItem(item.id)}
+                            disabled={invoiceItems.length === 1}
+                            className="text-red-600 text-sm font-medium disabled:text-gray-300 dark:disabled:text-slate-600"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">Invoice total</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Calculated from valid line items only
+                  </p>
+                </div>
+                <p className="text-2xl font-semibold text-slate-900">
+                  N{invoiceTotal.toLocaleString()}
+                </p>
+              </div>
+
+              {invoiceError && (
+                <p className="text-red-600 text-sm">{invoiceError}</p>
+              )}
 
               <div className="flex gap-4 pt-2">
                 <button
                   type="button"
                   onClick={closeInvoiceModal}
-                  className="flex-1 py-3.5 text-gray-700 font-medium border border-gray-300 rounded-2xl hover:bg-gray-50 transition"
+                  className="flex-1 py-3.5 text-gray-700 dark:text-slate-300 font-medium border border-gray-300 dark:border-slate-700 rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-800 transition"
                 >
                   Cancel
                 </button>
@@ -489,37 +797,150 @@ export default function CategoriesPage() {
 
       {showBulkModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full overflow-hidden">
             <div className="px-8 py-6 border-b">
-              <h2 className="text-2xl font-semibold text-slate-900">Generate Invoice for All</h2>
+              <h2 className="text-2xl font-semibold text-slate-900">
+                Generate Invoice for All
+              </h2>
               <p className="text-slate-500 mt-1">
-                {selectedCustomers.length} customer{selectedCustomers.length !== 1 ? "s" : ""} in {selectedCategory}
+                {selectedCustomers.length} customer
+                {selectedCustomers.length !== 1 ? "s" : ""} in {selectedCategory}
               </p>
             </div>
 
-            <div className="p-8 space-y-4">
+            <div className="p-8 space-y-6">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Amount per customer (₦)
+                  Description
                 </label>
-                <input
-                  type="number"
-                  value={bulkAmount}
+                <textarea
+                  value={bulkDescription}
                   onChange={(e) => {
-                    setBulkAmount(e.target.value);
+                    setBulkDescription(e.target.value);
                     setBulkError("");
                   }}
                   autoFocus
+                  rows={3}
                   className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-400"
-                  placeholder="e.g. 45000"
+                  placeholder="What is this invoice for?"
                 />
-                {bulkError && (
-                  <p className="text-red-600 text-sm mt-2">{bulkError}</p>
-                )}
-                <p className="text-xs text-slate-400 mt-2">
-                  This amount will be applied to every customer in this category, and a WhatsApp message will be prepared for each.
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Items</h3>
+                    <p className="text-sm text-slate-500">
+                      Every customer in this category will receive the same item list.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addBulkItem}
+                    className="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-medium"
+                  >
+                    Add item
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {bulkItems.map((item, index) => {
+                    const quantity = Number(item.quantity || 0);
+                    const unitPrice = Number(item.unitPrice || 0);
+                    const lineTotal =
+                      Number.isFinite(quantity) && Number.isFinite(unitPrice)
+                        ? quantity * unitPrice
+                        : 0;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="grid grid-cols-1 md:grid-cols-[1.8fr_0.7fr_0.8fr_auto] gap-3 items-end border border-slate-200 rounded-2xl p-4"
+                      >
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-2">
+                            Item {index + 1}
+                          </label>
+                          <input
+                            type="text"
+                            value={item.description}
+                            onChange={(e) =>
+                              updateBulkItem(item.id, "description", e.target.value)
+                            }
+                            className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-400"
+                            placeholder="Description"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-2">
+                            Qty
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) =>
+                              updateBulkItem(item.id, "quantity", e.target.value)
+                            }
+                            className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-400"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-2">
+                            Unit price
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={item.unitPrice}
+                            onChange={(e) =>
+                              updateBulkItem(item.id, "unitPrice", e.target.value)
+                            }
+                            className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-400"
+                            placeholder="0"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-3 md:pb-3">
+                          <div className="text-sm font-semibold text-slate-900 min-w-[90px] text-right">
+                            N{lineTotal.toLocaleString()}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeBulkItem(item.id)}
+                            disabled={bulkItems.length === 1}
+                            className="text-red-600 text-sm font-medium disabled:text-gray-300"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">Amount per customer</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Calculated from the shared line items
+                  </p>
+                </div>
+                <p className="text-2xl font-semibold text-slate-900">
+                  N{calculateInvoiceTotal(bulkItems).toLocaleString()}
                 </p>
               </div>
+
+              {bulkError && (
+                <p className="text-red-600 text-sm">{bulkError}</p>
+              )}
+
+              <p className="text-xs text-slate-400">
+                Every customer in this category will get a WhatsApp message with the same description and items, but their own invoice number and payment link.
+              </p>
 
               <div className="flex gap-4 pt-2">
                 <button

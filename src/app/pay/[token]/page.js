@@ -29,6 +29,22 @@ function parseAmount(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function getOutstandingAmount(invoice) {
+  const totalAmount = parseAmount(invoice?.amount);
+  const recordedBalance = parseAmount(invoice?.balanceDue);
+  const paidAmount = parseAmount(invoice?.paidAmount);
+
+  if (recordedBalance > 0) {
+    return recordedBalance;
+  }
+
+  if (paidAmount > 0) {
+    return Math.max(totalAmount - paidAmount, 0);
+  }
+
+  return totalAmount;
+}
+
 export default function PaymentPage() {
   const { token } = useParams();
   const [customerData, setCustomerData] = useState(null);
@@ -44,7 +60,7 @@ export default function PaymentPage() {
 
   const openInvoice = (invoice) => {
     setActiveInvoice(invoice);
-    setPayAmount(parseAmount(invoice.amount));
+    setPayAmount(getOutstandingAmount(invoice));
   };
 
   useEffect(() => {
@@ -79,7 +95,7 @@ export default function PaymentPage() {
 
         setCustomerData(data);
 
-        const pending = data.invoices.filter((inv) => inv.status !== "Paid");
+        const pending = data.invoices.filter((inv) => getOutstandingAmount(inv) > 0);
         if (pending.length === 1) openInvoice(pending[0]);
       } catch (err) {
         console.error(err);
@@ -94,10 +110,18 @@ export default function PaymentPage() {
 
   const payWithMonnify = async () => {
     if (!activeInvoice) return;
-    const invoiceAmount = parseAmount(activeInvoice.amount);
+    const invoiceAmount = getOutstandingAmount(activeInvoice);
+    const requestedAmount = parseAmount(payAmount);
 
-    if (invoiceAmount <= 0) {
+    if (requestedAmount <= 0) {
       alert("Enter a valid amount");
+      return;
+    }
+
+    if (requestedAmount > invoiceAmount) {
+      alert(
+        `Amount cannot be more than the outstanding invoice balance. Maximum: N${invoiceAmount.toLocaleString()}.`
+      );
       return;
     }
 
@@ -110,7 +134,7 @@ export default function PaymentPage() {
         body: JSON.stringify({
           token: activeInvoice.token,
           invoiceId: activeInvoice._id,
-          amount: invoiceAmount,
+          amount: requestedAmount,
           origin: window.location.origin,
         }),
       });
@@ -160,6 +184,25 @@ export default function PaymentPage() {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const handlePayAmountChange = (event) => {
+    const rawValue = event.target.value;
+
+    if (rawValue === "") {
+      setPayAmount("");
+      return;
+    }
+
+    const invoiceAmount = getOutstandingAmount(activeInvoice);
+    const nextAmount = parseAmount(rawValue);
+
+    if (!nextAmount) {
+      setPayAmount("");
+      return;
+    }
+
+    setPayAmount(Math.min(nextAmount, invoiceAmount));
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
@@ -187,7 +230,10 @@ export default function PaymentPage() {
   }
 
   const { customer, invoices } = customerData;
-  const hasInvoices = Array.isArray(invoices) && invoices.length > 0;
+  const unpaidInvoices = Array.isArray(invoices)
+    ? invoices.filter((inv) => getOutstandingAmount(inv) > 0)
+    : [];
+  const hasInvoices = unpaidInvoices.length > 0;
 
   if (!hasInvoices) {
     return (
@@ -197,11 +243,11 @@ export default function PaymentPage() {
             <span className="text-slate-500 text-xl">i</span>
           </div>
           <h1 className="text-lg font-semibold text-slate-900">
-            No invoices available yet
+            No unpaid invoices available
           </h1>
           <p className="text-sm text-slate-500 mt-2">
-            {customer?.businessName || "This account"} has not shared any invoice on
-            this payment link yet.
+            {customer?.businessName || "This account"} does not have any unpaid invoice on
+            this payment link right now.
           </p>
         </div>
       </div>
@@ -210,41 +256,37 @@ export default function PaymentPage() {
 
   if (!activeInvoice) {
     return (
-      <div className="min-h-screen bg-[#FAFAFA] py-16 px-4">
+      <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 py-16 px-4">
         <div className="max-w-md mx-auto">
           <div className="mb-6 px-1">
-            <span className="text-[13px] font-semibold tracking-wide text-slate-900 uppercase">
+            <span className="text-[13px] font-semibold tracking-wide text-slate-900 uppercase dark:text-slate-100">
               {customer.businessName || "Invoice Payment"}
             </span>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
-            <div className="px-8 py-6 border-b border-slate-100">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
+            <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800">
               <p className="text-[12px] font-medium text-slate-500 uppercase tracking-wide">
                 Select an invoice to pay
               </p>
-              <p className="text-lg font-semibold text-slate-900 mt-1">
+              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100 mt-1">
                 {customer.name}
               </p>
             </div>
 
-            <div className="divide-y divide-slate-100">
-              {invoices.map((inv) => {
-                const isPaid = inv.status === "Paid";
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {unpaidInvoices.map((inv) => {
                 return (
                   <button
                     key={inv._id}
-                    onClick={() => !isPaid && openInvoice(inv)}
-                    disabled={isPaid}
-                    className={`w-full text-left px-8 py-5 flex items-center justify-between transition-colors ${
-                      isPaid ? "cursor-not-allowed opacity-60" : "hover:bg-slate-50"
-                    }`}
+                    onClick={() => openInvoice(inv)}
+                    className="w-full text-left px-8 py-5 flex items-center justify-between transition-colors hover:bg-slate-50 dark:hover:bg-slate-950/50"
                   >
                     <div>
-                      <p className="font-semibold text-slate-900 tabular-nums">
-                        N{Number(inv.amount).toLocaleString()}
+                      <p className="font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
+                        N{Number(getOutstandingAmount(inv)).toLocaleString()}
                       </p>
-                      <p className="text-[12px] text-slate-400 mt-1">
+                      <p className="text-[12px] text-slate-400 dark:text-slate-500 mt-1">
                         {inv.date
                           ? new Date(inv.date).toLocaleDateString() +
                             " " +
@@ -256,13 +298,9 @@ export default function PaymentPage() {
                       </p>
                     </div>
                     <span
-                      className={`text-[11px] font-medium px-2.5 py-1 rounded-full border ${
-                        isPaid
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : "bg-amber-50 text-amber-700 border-amber-200"
-                      }`}
+                      className="text-[11px] font-medium px-2.5 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200"
                     >
-                      {isPaid ? "Paid" : "Pay now"}
+                      Pay now
                     </span>
                   </button>
                 );
@@ -270,34 +308,33 @@ export default function PaymentPage() {
             </div>
           </div>
 
-          <p className="text-center text-[12px] text-slate-400 mt-6">
-            Powered by InvoiceHub
-          </p>
         </div>
       </div>
     );
   }
 
   const isPaid = activeInvoice.status === "Paid";
-  const showBackButton = invoices.length > 1;
+  const showBackButton = unpaidInvoices.length > 1;
   const customerName =
     activeInvoice.customer || activeInvoice.customerName || activeInvoice.student;
   const invoiceCategory = activeInvoice.category || activeInvoice.class || "-";
-  const invoiceAmount = parseAmount(activeInvoice.amount);
+  const invoiceDescription =
+    activeInvoice.description || activeInvoice.category || activeInvoice.class || "-";
+  const outstandingAmount = getOutstandingAmount(activeInvoice);
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] py-16 px-4">
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 py-16 px-4">
       <div className="max-w-md mx-auto">
         <div className="flex items-center justify-between mb-6 px-1">
           {showBackButton ? (
             <button
               onClick={() => setActiveInvoice(null)}
-              className="text-[13px] font-medium text-slate-500 hover:text-slate-700"
+              className="text-[13px] font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
             >
               Back to all invoices
             </button>
           ) : (
-            <span className="text-[13px] font-semibold tracking-wide text-slate-900 uppercase">
+            <span className="text-[13px] font-semibold tracking-wide text-slate-900 uppercase dark:text-slate-100">
               {customer.businessName || "Invoice Payment"}
             </span>
           )}
@@ -312,19 +349,27 @@ export default function PaymentPage() {
           </span>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
-          <div className="px-8 pt-8 pb-7 border-b border-slate-100">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
+          <div className="px-8 pt-8 pb-7 border-b border-slate-100 dark:border-slate-800">
             <p className="text-[12px] font-medium text-slate-500 uppercase tracking-wide">
               Invoice amount
             </p>
-            <p className="text-[34px] font-semibold text-slate-900 mt-1 tabular-nums">
+            <p className="text-[34px] font-semibold text-slate-900 dark:text-slate-100 mt-1 tabular-nums">
               N{Number(activeInvoice.amount).toLocaleString()}
+            </p>
+            <p className="mt-2 text-[13px] text-slate-500 dark:text-slate-400">
+              Outstanding balance: N{outstandingAmount.toLocaleString()}
             </p>
           </div>
 
           <div className="px-8 py-6 space-y-4">
             <DetailRow label="Customer name" value={customerName} />
+            <DetailRow
+              label="Invoice number"
+              value={activeInvoice.invoiceNumber || "-"}
+            />
             <DetailRow label="Category" value={invoiceCategory} />
+            <DetailRow label="Description" value={invoiceDescription} />
             <DetailRow
               label="Invoice token"
               value={
@@ -343,7 +388,7 @@ export default function PaymentPage() {
             />
           </div>
 
-          <div className="px-8 py-6 border-t border-slate-100 bg-slate-50/50">
+          <div className="px-8 py-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/60">
             <label className="text-[12px] font-medium text-slate-500 uppercase tracking-wide block mb-2">
               Amount to pay
             </label>
@@ -354,20 +399,22 @@ export default function PaymentPage() {
               </span>
               <input
                 type="number"
+                min="1"
+                max={outstandingAmount}
                 value={payAmount}
-                readOnly
-                className="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-[15px] font-medium text-slate-900 tabular-nums focus:outline-none"
+                onChange={handlePayAmountChange}
+                className="w-full pl-9 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-[15px] font-medium text-slate-900 dark:text-slate-100 tabular-nums focus:outline-none focus:border-slate-400"
               />
             </div>
             <p className="mt-2 text-[12px] text-slate-400">
-              Each payment settles one selected invoice in full.
+              You can enter any amount up to N{outstandingAmount.toLocaleString()}.
             </p>
           </div>
 
           <div className="px-8 pb-8 pt-2">
             <button
               onClick={payWithMonnify}
-              disabled={isPaid || launchingPayment || !sdkReady}
+              disabled={isPaid || launchingPayment || !sdkReady || parseAmount(payAmount) <= 0}
               className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-medium text-[15px] transition-colors"
             >
               {isPaid
@@ -376,7 +423,7 @@ export default function PaymentPage() {
                   ? "Opening Monnify..."
                   : !sdkReady
                     ? "Loading Monnify..."
-                    : `Pay N${invoiceAmount.toLocaleString()}`}
+                    : `Pay N${parseAmount(payAmount).toLocaleString()}`}
             </button>
             <p className="text-center text-[12px] text-slate-400 mt-3">
               Secured by Monnify
@@ -384,9 +431,7 @@ export default function PaymentPage() {
           </div>
         </div>
 
-        <p className="text-center text-[12px] text-slate-400 mt-6">
-          Powered by InvoiceHub
-        </p>
+        <p className="mt-6 text-center text-[12px] text-slate-400">Powered by InvoiceHub</p>
       </div>
     </div>
   );
@@ -399,8 +444,8 @@ function DetailRow({ label, value, align = "center" }) {
         align === "top" ? "items-start" : "items-center"
       }`}
     >
-      <span className="text-[13px] text-slate-500">{label}</span>
-      <span className="text-[14px] font-medium text-slate-900 text-right">
+      <span className="text-[13px] text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="text-[14px] font-medium text-slate-900 dark:text-slate-100 text-right">
         {value}
       </span>
     </div>

@@ -1,9 +1,21 @@
 import mongoose from "mongoose";
 
 const InvoiceSchema = new mongoose.Schema({
+  invoiceNumber: String,
   customer: String,
   customerName: String,
   category: String,
+  description: String,
+  items: [
+    {
+      id: String,
+      description: String,
+      quantity: Number,
+      unitPrice: Number,
+      lineTotal: Number,
+    },
+  ],
+  subtotal: Number,
   phone: String,
   email: String,
   token: String,
@@ -15,8 +27,14 @@ const InvoiceSchema = new mongoose.Schema({
   paymentReference: String,
   paymentProvider: String,
   paymentVerificationMethod: String,
+  paymentStatus: String,
+  paymentConfirmedAt: Date,
   paidAt: Date,
   paidAmount: Number,
+  balanceDue: Number,
+  customerNotificationStatus: String,
+  customerNotificationQueuedAt: Date,
+  customerNotificationPreparedAt: Date,
   pendingPaymentReference: String,
   pendingPaymentAmount: Number,
   pendingPaymentProvider: String,
