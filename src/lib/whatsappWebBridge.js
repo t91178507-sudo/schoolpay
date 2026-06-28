@@ -12,6 +12,34 @@ export function hasWhatsAppWebBridgeConfig(config = {}) {
   return Boolean(config.bridgeBaseUrl && config.sessionName);
 }
 
+export function isLocalWhatsAppBridgeUrl(rawUrl = "") {
+  try {
+    const url = new URL(rawUrl);
+    return ["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+export function assertReachableWhatsAppBridgeConfig(config = {}) {
+  if (!config.bridgeBaseUrl) {
+    const error = new Error("WhatsApp Web bridge URL is not configured");
+    error.status = 400;
+    throw error;
+  }
+
+  if (
+    process.env.VERCEL &&
+    isLocalWhatsAppBridgeUrl(config.bridgeBaseUrl)
+  ) {
+    const error = new Error(
+      "WhatsApp Web bridge must use a public URL in production. Localhost cannot be reached from Vercel."
+    );
+    error.status = 400;
+    throw error;
+  }
+}
+
 export function buildWhatsAppWebSendPayload(config = {}, { phone, text }) {
   return {
     sessionName: config.sessionName,
@@ -120,9 +148,7 @@ function buildBridgeHeaders(config = {}) {
 }
 
 export async function fetchWhatsAppWebStatus(config = {}) {
-  if (!config.bridgeBaseUrl) {
-    throw new Error("WhatsApp Web bridge URL is not configured");
-  }
+  assertReachableWhatsAppBridgeConfig(config);
 
   const url = new URL(`${config.bridgeBaseUrl}/api/session/status`);
   url.searchParams.set("sessionName", config.sessionName);
@@ -139,9 +165,7 @@ export async function fetchWhatsAppWebStatus(config = {}) {
 }
 
 export async function fetchWhatsAppWebLogs(config = {}) {
-  if (!config.bridgeBaseUrl) {
-    throw new Error("WhatsApp Web bridge URL is not configured");
-  }
+  assertReachableWhatsAppBridgeConfig(config);
 
   const url = new URL(`${config.bridgeBaseUrl}/api/messages/logs`);
   url.searchParams.set("sessionName", config.sessionName);
@@ -158,9 +182,7 @@ export async function fetchWhatsAppWebLogs(config = {}) {
 }
 
 export async function requestWhatsAppWebPairingCode(config = {}, phoneNumber) {
-  if (!config.bridgeBaseUrl) {
-    throw new Error("WhatsApp Web bridge URL is not configured");
-  }
+  assertReachableWhatsAppBridgeConfig(config);
 
   const response = await fetch(`${config.bridgeBaseUrl}/api/session/pairing-code`, {
     method: "POST",
@@ -176,9 +198,7 @@ export async function requestWhatsAppWebPairingCode(config = {}, phoneNumber) {
 }
 
 export async function disconnectWhatsAppWebSession(config = {}) {
-  if (!config.bridgeBaseUrl) {
-    throw new Error("WhatsApp Web bridge URL is not configured");
-  }
+  assertReachableWhatsAppBridgeConfig(config);
 
   const response = await fetch(`${config.bridgeBaseUrl}/api/session/logout`, {
     method: "POST",
@@ -193,9 +213,7 @@ export async function disconnectWhatsAppWebSession(config = {}) {
 }
 
 export async function deleteWhatsAppWebSession(config = {}) {
-  if (!config.bridgeBaseUrl) {
-    throw new Error("WhatsApp Web bridge URL is not configured");
-  }
+  assertReachableWhatsAppBridgeConfig(config);
 
   const response = await fetch(`${config.bridgeBaseUrl}/api/session`, {
     method: "DELETE",
