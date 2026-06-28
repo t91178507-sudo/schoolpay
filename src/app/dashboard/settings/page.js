@@ -1184,6 +1184,9 @@ export default function SettingsPage() {
                           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                             Connected number: {whatsAppWebStatus.connectedNumber}
                           </p>
+                          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                            Delete the current session before generating a code for another number.
+                          </p>
                         </div>
                       ) : whatsAppWebStatus?.pairingCode ? (
                         <div>
