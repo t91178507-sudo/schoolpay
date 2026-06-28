@@ -16,7 +16,9 @@ const DEFAULT_SESSION_NAME =
 const BASE_URL = process.env.WHATSAPP_BRIDGE_BASE_URL || `http://localhost:${PORT}`;
 const BROWSER_PATH =
   process.env.WHATSAPP_BRIDGE_BROWSER_PATH ||
-  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
+  (process.platform === "win32"
+    ? "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+    : "/usr/bin/chromium");
 
 const app = express();
 app.use(cors());
