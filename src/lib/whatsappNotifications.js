@@ -30,11 +30,19 @@ function buildFallbackUrl(phone, message) {
 
 function shouldFallbackToBrowser(error) {
   const normalizedMessage = String(error?.message || "").toLowerCase();
-  const normalizedCode = String(error?.code || "").trim();
+  const normalizedCode = String(error?.code || error?.cause?.code || "").trim();
 
   return (
     normalizedCode === "63015" ||
+    normalizedCode === "ECONNREFUSED" ||
+    normalizedCode === "ECONNRESET" ||
+    normalizedCode === "ETIMEDOUT" ||
+    normalizedCode === "ENOTFOUND" ||
     normalizedMessage.includes("63015") ||
+    normalizedMessage.includes("fetch failed") ||
+    normalizedMessage.includes("connect econnrefused") ||
+    normalizedMessage.includes("connection refused") ||
+    normalizedMessage.includes("timed out") ||
     normalizedMessage.includes("sandbox") ||
     normalizedMessage.includes("join") ||
     normalizedMessage.includes("whatsapp")
