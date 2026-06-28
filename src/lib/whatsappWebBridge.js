@@ -1,0 +1,210 @@
+import { toWhatsAppNumber } from "./invoiceUtils";
+
+export function isWhatsAppWebConfigured(config = {}) {
+  return Boolean(
+    config.enabled &&
+      config.bridgeBaseUrl &&
+      config.sessionName
+  );
+}
+
+export function hasWhatsAppWebBridgeConfig(config = {}) {
+  return Boolean(config.bridgeBaseUrl && config.sessionName);
+}
+
+export function buildWhatsAppWebSendPayload(config = {}, { phone, text }) {
+  return {
+    sessionName: config.sessionName,
+    from: toWhatsAppNumber(config.senderPhoneNumber),
+    to: toWhatsAppNumber(phone),
+    text,
+    statusWebhookUrl: config.statusWebhookUrl || "",
+  };
+}
+
+export async function sendWhatsAppWebMessage(config = {}, { phone, text }) {
+  if (!isWhatsAppWebConfigured(config)) {
+    throw new Error("WhatsApp Web is not configured");
+  }
+
+  const to = toWhatsAppNumber(phone);
+
+  if (!to) {
+    throw new Error("A valid phone number is required");
+  }
+
+  const response = await fetch(`${config.bridgeBaseUrl}/api/messages/send-text`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
+    },
+    body: JSON.stringify(buildWhatsAppWebSendPayload(config, { phone, text })),
+    cache: "no-store",
+  });
+
+  const raw = await response.text();
+  let data = null;
+
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch {
+    data = raw || null;
+  }
+
+  if (!response.ok) {
+    const error = new Error(
+      data?.message ||
+        data?.error ||
+        `WhatsApp Web bridge request failed with status ${response.status}`
+    );
+    error.status = response.status;
+    throw error;
+  }
+
+  return data;
+}
+
+async function parseBridgeResponse(response) {
+  const raw = await response.text();
+  let data = null;
+
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch {
+    data = raw || null;
+  }
+
+  if (!response.ok) {
+    const error = new Error(
+      data?.message ||
+        data?.error ||
+        `WhatsApp Web bridge request failed with status ${response.status}`
+    );
+    error.status = response.status;
+    throw error;
+  }
+
+  return data;
+}
+
+async function fetchBridgeJson(url, options = {}, timeoutMs = 1500) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+
+    return await parseBridgeResponse(response);
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      const timeoutError = new Error("WhatsApp Web bridge request timed out");
+      timeoutError.status = 504;
+      throw timeoutError;
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function buildBridgeHeaders(config = {}) {
+  return {
+    "Content-Type": "application/json",
+    ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
+  };
+}
+
+export async function fetchWhatsAppWebStatus(config = {}) {
+  if (!config.bridgeBaseUrl) {
+    throw new Error("WhatsApp Web bridge URL is not configured");
+  }
+
+  const url = new URL(`${config.bridgeBaseUrl}/api/session/status`);
+  url.searchParams.set("sessionName", config.sessionName);
+
+  return fetchBridgeJson(
+    url,
+    {
+      method: "GET",
+      headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
+      cache: "no-store",
+    },
+    1500
+  );
+}
+
+export async function fetchWhatsAppWebLogs(config = {}) {
+  if (!config.bridgeBaseUrl) {
+    throw new Error("WhatsApp Web bridge URL is not configured");
+  }
+
+  const url = new URL(`${config.bridgeBaseUrl}/api/messages/logs`);
+  url.searchParams.set("sessionName", config.sessionName);
+
+  return fetchBridgeJson(
+    url,
+    {
+      method: "GET",
+      headers: buildBridgeHeaders(config),
+      cache: "no-store",
+    },
+    1200
+  );
+}
+
+export async function requestWhatsAppWebPairingCode(config = {}, phoneNumber) {
+  if (!config.bridgeBaseUrl) {
+    throw new Error("WhatsApp Web bridge URL is not configured");
+  }
+
+  const response = await fetch(`${config.bridgeBaseUrl}/api/session/pairing-code`, {
+    method: "POST",
+    headers: buildBridgeHeaders(config),
+    body: JSON.stringify({
+      sessionName: config.sessionName,
+      phoneNumber,
+    }),
+    cache: "no-store",
+  });
+
+  return parseBridgeResponse(response);
+}
+
+export async function disconnectWhatsAppWebSession(config = {}) {
+  if (!config.bridgeBaseUrl) {
+    throw new Error("WhatsApp Web bridge URL is not configured");
+  }
+
+  const response = await fetch(`${config.bridgeBaseUrl}/api/session/logout`, {
+    method: "POST",
+    headers: buildBridgeHeaders(config),
+    body: JSON.stringify({
+      sessionName: config.sessionName,
+    }),
+    cache: "no-store",
+  });
+
+  return parseBridgeResponse(response);
+}
+
+export async function deleteWhatsAppWebSession(config = {}) {
+  if (!config.bridgeBaseUrl) {
+    throw new Error("WhatsApp Web bridge URL is not configured");
+  }
+
+  const response = await fetch(`${config.bridgeBaseUrl}/api/session`, {
+    method: "DELETE",
+    headers: buildBridgeHeaders(config),
+    body: JSON.stringify({
+      sessionName: config.sessionName,
+    }),
+    cache: "no-store",
+  });
+
+  return parseBridgeResponse(response);
+}

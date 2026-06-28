@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  emitSessionChange,
   useBusinessSession,
   useDarkModePreference,
   useHydrated,
@@ -18,6 +19,8 @@ const navItems = [
   { name: "Payment history", href: "/dashboard/payments", badge: "P" },
   { name: "Settings", href: "/dashboard/settings", badge: "S" },
 ];
+
+const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
 
 export default function DashboardLayout({ children }) {
   const [currentTime, setCurrentTime] = useState(null);
@@ -82,7 +85,7 @@ export default function DashboardLayout({ children }) {
       minute: "2-digit",
     }) || "";
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("authToken");
     localStorage.removeItem("userName");
@@ -91,7 +94,53 @@ export default function DashboardLayout({ children }) {
     localStorage.removeItem("businessLogo");
     emitSessionChange();
     router.replace("/auth/login");
-  };
+  }, [router]);
+
+  useEffect(() => {
+    if (!isHydrated || !session.isLoggedIn || typeof window === "undefined") {
+      return undefined;
+    }
+
+    let timeoutId = null;
+
+    const logoutForInactivity = () => {
+      localStorage.setItem("logoutReason", "inactive");
+      handleLogout();
+    };
+
+    const resetTimer = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      timeoutId = setTimeout(logoutForInactivity, INACTIVITY_TIMEOUT_MS);
+    };
+
+    const activityEvents = [
+      "mousedown",
+      "mousemove",
+      "keydown",
+      "scroll",
+      "touchstart",
+      "click",
+    ];
+
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, resetTimer, { passive: true });
+    });
+
+    resetTimer();
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, resetTimer);
+      });
+    };
+  }, [handleLogout, isHydrated, pathname, session.isLoggedIn]);
 
   const handleNavClick = () => {
     if (typeof window !== "undefined" && window.innerWidth < 1024) {

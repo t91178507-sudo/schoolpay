@@ -98,12 +98,16 @@ export async function POST(req) {
 
     if (customerPhone) {
       await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
-      await deliverPaymentConfirmation({
-        db,
-        invoice: paidInvoice,
-        owner,
-        amount: amountPaid,
-      });
+      try {
+        await deliverPaymentConfirmation({
+          db,
+          invoice: paidInvoice,
+          owner,
+          amount: amountPaid,
+        });
+      } catch (notificationError) {
+        console.error("MONNIFY PAYMENT CONFIRMATION SEND ERROR:", notificationError);
+      }
     }
 
     return Response.json({

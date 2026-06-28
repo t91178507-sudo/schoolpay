@@ -2,6 +2,12 @@ import { ObjectId } from "mongodb";
 import { requireAuth } from "../../../../../lib/auth";
 import { connectDB } from "../../../../../lib/mongodb";
 import { findUserById } from "../../../../../lib/paymentGatewaySettings";
+import {
+  evaluateReminderEligibility,
+  getOutstandingAmount,
+  recordReminderAttempt,
+} from "../../../../../lib/reminderSafety";
+import { queueInvoiceReminder } from "../../../../../lib/reminderQueue";
 import { deliverInvoiceMessage } from "../../../../../lib/whatsappNotifications";
 
 export async function POST(req) {
@@ -29,12 +35,41 @@ export async function POST(req) {
       return Response.json({ error: "Invoice not found" }, { status: 404 });
     }
 
+    if (getOutstandingAmount(invoice) <= 0) {
+      return Response.json({ error: "This invoice is already settled" }, { status: 400 });
+    }
+
+    const eligibility = evaluateReminderEligibility(invoice, { mode: "single" });
+    if (!eligibility.allowed) {
+      return Response.json(
+        {
+          success: true,
+          delivery: {
+            provider: "queued",
+            sent: false,
+            queued: true,
+            retryAfterMs: queueInvoiceReminder({
+              invoiceId: String(invoice._id),
+              ownerId: userId,
+              origin,
+              delayMs: eligibility.retryAfterMs,
+            }).retryAfterMs,
+          },
+        }
+      );
+    }
+
     const owner = await findUserById(db, userId);
     const result = await deliverInvoiceMessage({
       db,
       invoice,
       owner,
       origin,
+    });
+
+    await recordReminderAttempt(db, invoice._id, {
+      provider: result.provider,
+      outcome: result.sent ? "sent" : result.fallbackUrl ? "fallback" : "prepared",
     });
 
     return Response.json({

@@ -33,47 +33,6 @@ const features = [
 export default function Home() {
   return (
     <div className="bg-white text-slate-950 dark:bg-slate-950 dark:text-slate-100">
-      <header className="absolute inset-x-0 top-0 z-20">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-10">
-          <Link href="/" className="flex items-center gap-3 text-white">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-lg font-bold">
-              N
-            </div>
-            <div>
-              <p className="text-xl font-semibold">InvoiceHub</p>
-              <p className="text-xs text-white/70">Billing and payment workspace</p>
-            </div>
-          </Link>
-
-          <nav className="hidden items-center gap-8 text-sm text-white/80 md:flex">
-            <a href="#workflow" className="hover:text-white">
-              Workflow
-            </a>
-            <a href="#platform" className="hover:text-white">
-              Platform
-            </a>
-            <a href="#results" className="hover:text-white">
-              Results
-            </a>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href="/auth/login"
-              className="rounded-full border border-white/20 px-4 py-2 text-sm font-medium text-white backdrop-blur hover:bg-white/10"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/auth/register"
-              className="rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-400"
-            >
-              Start free
-            </Link>
-          </div>
-        </div>
-      </header>
-
       <section className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
         <Image
           src="https://images.unsplash.com/photo-1554224154-26032ffc0d07?auto=format&fit=crop&w=1600&q=80"
@@ -85,8 +44,54 @@ export default function Home() {
         <div className="absolute inset-0 bg-slate-950/70" />
         <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(15,23,42,0.94)_0%,rgba(15,23,42,0.78)_45%,rgba(16,185,129,0.18)_100%)]" />
 
-        <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col justify-end px-6 pb-14 pt-32 lg:px-10 lg:pb-20">
-          <div className="max-w-3xl">
+        <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-6 pb-14 pt-6 lg:px-10 lg:pb-20">
+          <header className="rounded-2xl border border-white/10 bg-slate-950/55 px-5 py-4 backdrop-blur md:px-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <Link href="/" className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500 text-lg font-bold text-white">
+                    I
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-lg font-semibold text-white">InvoiceHub</p>
+                    <p className="text-xs text-slate-300">Invoicing and payment collection software</p>
+                  </div>
+                </Link>
+              </div>
+
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-8">
+                <nav className="flex flex-wrap items-center gap-5 text-sm text-slate-200">
+                  <a href="#workflow" className="transition hover:text-white">
+                    Workflow
+                  </a>
+                  <a href="#platform" className="transition hover:text-white">
+                    Platform
+                  </a>
+                  <a href="#results" className="transition hover:text-white">
+                    Results
+                  </a>
+                </nav>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <Link
+                    href="/auth/login"
+                    className="rounded-xl border border-white/15 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+                  >
+                    Log in
+                  </Link>
+                  <Link
+                    href="/auth/register"
+                    className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-400"
+                  >
+                    Start free
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div className="flex flex-1 flex-col justify-end pt-16 lg:pt-20">
+            <div className="max-w-3xl">
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-300">
               InvoiceHub
             </p>
@@ -112,18 +117,19 @@ export default function Home() {
                 Sign in
               </Link>
             </div>
-          </div>
+            </div>
 
-          <div className="mt-14 grid gap-4 md:grid-cols-3">
-            {proofPoints.map((item) => (
-              <div
-                key={item.label}
-                className="rounded-2xl border border-white/10 bg-white/8 px-5 py-5 backdrop-blur"
-              >
-                <p className="text-3xl font-semibold text-white">{item.value}</p>
-                <p className="mt-2 text-sm text-slate-300">{item.label}</p>
-              </div>
-            ))}
+            <div className="mt-14 grid gap-4 md:grid-cols-3">
+              {proofPoints.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-2xl border border-white/10 bg-white/8 px-5 py-5 backdrop-blur"
+                >
+                  <p className="text-3xl font-semibold text-white">{item.value}</p>
+                  <p className="mt-2 text-sm text-slate-300">{item.label}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>

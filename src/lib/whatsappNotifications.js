@@ -3,12 +3,20 @@ import {
   buildPaymentConfirmationMessage,
   toWhatsAppNumber,
 } from "./invoiceUtils";
-import { resolveTwilioSandboxConfig } from "./paymentGatewaySettings";
+import {
+  resolveBrowserWhatsAppConfig,
+  resolveTwilioSandboxConfig,
+  resolveWhatsAppWebConfig,
+} from "./paymentGatewaySettings";
 import { markInvoiceNotificationPrepared } from "./paymentLifecycle";
 import {
   isTwilioSandboxConfigured,
   sendTwilioWhatsAppMessage,
 } from "./twilioWhatsApp";
+import {
+  isWhatsAppWebConfigured,
+  sendWhatsAppWebMessage,
+} from "./whatsappWebBridge";
 
 function buildFallbackUrl(phone, message) {
   const normalizedPhone = toWhatsAppNumber(phone);
@@ -61,6 +69,21 @@ export async function deliverInvoiceMessage({
   });
 
   const twilioConfig = resolveTwilioSandboxConfig(owner || {});
+  const browserConfig = resolveBrowserWhatsAppConfig(owner || {});
+  const whatsAppWebConfig = resolveWhatsAppWebConfig(owner || {});
+
+  if (isWhatsAppWebConfigured(whatsAppWebConfig)) {
+    try {
+      await sendWhatsAppWebMessage(whatsAppWebConfig, { phone, text: message });
+      await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
+
+      return { sent: true, provider: "whatsappWeb" };
+    } catch (error) {
+      if (!shouldFallbackToBrowser(error)) {
+        throw error;
+      }
+    }
+  }
 
   if (isTwilioSandboxConfigured(twilioConfig)) {
     try {
@@ -73,6 +96,10 @@ export async function deliverInvoiceMessage({
         throw error;
       }
     }
+  }
+
+  if (!browserConfig.enabled) {
+    throw new Error("Browser WhatsApp is disabled in settings");
   }
 
   await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
@@ -109,6 +136,21 @@ export async function deliverPaymentConfirmation({
   });
 
   const twilioConfig = resolveTwilioSandboxConfig(owner || {});
+  const browserConfig = resolveBrowserWhatsAppConfig(owner || {});
+  const whatsAppWebConfig = resolveWhatsAppWebConfig(owner || {});
+
+  if (isWhatsAppWebConfigured(whatsAppWebConfig)) {
+    try {
+      await sendWhatsAppWebMessage(whatsAppWebConfig, { phone, text: message });
+      await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
+
+      return { sent: true, provider: "whatsappWeb" };
+    } catch (error) {
+      if (!shouldFallbackToBrowser(error)) {
+        throw error;
+      }
+    }
+  }
 
   if (isTwilioSandboxConfigured(twilioConfig)) {
     try {
@@ -121,6 +163,10 @@ export async function deliverPaymentConfirmation({
         throw error;
       }
     }
+  }
+
+  if (!browserConfig.enabled) {
+    throw new Error("Browser WhatsApp is disabled in settings");
   }
 
   await markInvoiceNotificationPrepared(db, invoice._id, "prepared");

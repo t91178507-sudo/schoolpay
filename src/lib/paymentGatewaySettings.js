@@ -31,6 +31,9 @@ export const DEFAULT_PAYMENT_GATEWAYS = Object.freeze({
 });
 
 export const DEFAULT_WHATSAPP_PROVIDERS = Object.freeze({
+  browser: {
+    enabled: true,
+  },
   twilioSandbox: {
     enabled: false,
     accountSid: "",
@@ -38,6 +41,15 @@ export const DEFAULT_WHATSAPP_PROVIDERS = Object.freeze({
     fromNumber: "+14155238886",
     contentSid: "",
     statusCallbackUrl: "",
+  },
+  whatsappWeb: {
+    enabled: false,
+    senderPhoneNumber: "",
+    bridgeBaseUrl: "http://localhost:8787",
+    sessionName: "invoicehub-scan",
+    apiKey: "invoicehub-bridge-local",
+    qrConnectUrl: "http://localhost:8787/qr",
+    statusWebhookUrl: "",
   },
 });
 
@@ -49,6 +61,7 @@ const SECRET_FIELDS = Object.freeze({
 
 const WHATSAPP_SECRET_FIELDS = Object.freeze({
   twilioSandbox: ["accountSid", "authToken"],
+  whatsappWeb: ["apiKey"],
 });
 
 const ENCRYPTED_PREFIX = "enc::";
@@ -66,6 +79,58 @@ function normalizeText(value) {
 
 function normalizeGatewayBoolean(value) {
   return value === true;
+}
+
+function resolveUserIdString(user = {}) {
+  const raw = user?._id;
+
+  if (!raw) {
+    return "";
+  }
+
+  if (typeof raw === "string") {
+    return raw;
+  }
+
+  if (typeof raw.toString === "function") {
+    return raw.toString();
+  }
+
+  return "";
+}
+
+function buildDefaultWhatsAppWebProvider(user = {}) {
+  const userId = resolveUserIdString(user);
+  const sessionName = userId ? `invoicehub-${userId}` : "invoicehub-scan";
+
+  return {
+    ...DEFAULT_WHATSAPP_PROVIDERS.whatsappWeb,
+    sessionName,
+    qrConnectUrl: `http://localhost:8787/qr?sessionName=${encodeURIComponent(sessionName)}`,
+  };
+}
+
+function shouldUseDefaultWhatsAppWebSession(savedSessionName, defaultProvider) {
+  return (
+    !savedSessionName ||
+    savedSessionName === DEFAULT_WHATSAPP_PROVIDERS.whatsappWeb.sessionName ||
+    savedSessionName === defaultProvider.sessionName
+  );
+}
+
+function shouldUseDefaultWhatsAppWebQrUrl(savedQrUrl, defaultProvider) {
+  if (!savedQrUrl) {
+    return true;
+  }
+
+  if (
+    savedQrUrl === DEFAULT_WHATSAPP_PROVIDERS.whatsappWeb.qrConnectUrl ||
+    savedQrUrl === defaultProvider.qrConnectUrl
+  ) {
+    return true;
+  }
+
+  return savedQrUrl.includes("sessionName=invoicehub-scan");
 }
 
 function getEncryptionSecret() {
@@ -158,10 +223,32 @@ function isWhatsAppSecretField(providerKey, fieldKey) {
   return WHATSAPP_SECRET_FIELDS[providerKey]?.includes(fieldKey) || false;
 }
 
-function buildWhatsAppPayload(providerKey, savedProvider = {}) {
+function buildWhatsAppPayload(providerKey, savedProvider = {}, user = {}) {
+  const defaultProvider =
+    providerKey === "whatsappWeb"
+      ? buildDefaultWhatsAppWebProvider(user)
+      : DEFAULT_WHATSAPP_PROVIDERS[providerKey];
+  const normalizedSavedProvider =
+    providerKey === "whatsappWeb"
+      ? {
+          ...savedProvider,
+          sessionName: shouldUseDefaultWhatsAppWebSession(
+            normalizeText(savedProvider.sessionName),
+            defaultProvider
+          )
+            ? defaultProvider.sessionName
+            : normalizeText(savedProvider.sessionName),
+          qrConnectUrl: shouldUseDefaultWhatsAppWebQrUrl(
+            normalizeText(savedProvider.qrConnectUrl),
+            defaultProvider
+          )
+            ? defaultProvider.qrConnectUrl
+            : normalizeText(savedProvider.qrConnectUrl),
+        }
+      : savedProvider;
   const merged = {
-    ...DEFAULT_WHATSAPP_PROVIDERS[providerKey],
-    ...savedProvider,
+    ...defaultProvider,
+    ...normalizedSavedProvider,
   };
   const nextProvider = { ...merged };
 
@@ -200,9 +287,20 @@ export function buildSettingsPayload(user = {}) {
       touchpay: buildGatewayPayload("touchpay", paymentGateways.touchpay),
     },
     whatsappProviders: {
+      browser: buildWhatsAppPayload(
+        "browser",
+        whatsappProviders.browser,
+        user
+      ),
       twilioSandbox: buildWhatsAppPayload(
         "twilioSandbox",
-        whatsappProviders.twilioSandbox
+        whatsappProviders.twilioSandbox,
+        user
+      ),
+      whatsappWeb: buildWhatsAppPayload(
+        "whatsappWeb",
+        whatsappProviders.whatsappWeb,
+        user
       ),
     },
   };
@@ -255,8 +353,12 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
   const normalizeWhatsAppProvider = (providerKey) => {
     const currentProvider = whatsappProviders[providerKey] || {};
     const existingProvider = existingWhatsAppProviders[providerKey] || {};
+    const defaultProvider =
+      providerKey === "whatsappWeb"
+        ? buildDefaultWhatsAppWebProvider(existingUser)
+        : DEFAULT_WHATSAPP_PROVIDERS[providerKey];
     const merged = {
-      ...DEFAULT_WHATSAPP_PROVIDERS[providerKey],
+      ...defaultProvider,
       ...existingProvider,
     };
     const nextProvider = {
@@ -300,7 +402,7 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
     defaultPaymentGateway: ["monnify", "payaza", "touchpay"].includes(body.defaultPaymentGateway)
       ? body.defaultPaymentGateway
       : "monnify",
-    defaultWhatsAppProvider: ["browser", "twilioSandbox"].includes(body.defaultWhatsAppProvider)
+    defaultWhatsAppProvider: ["browser", "twilioSandbox", "whatsappWeb"].includes(body.defaultWhatsAppProvider)
       ? body.defaultWhatsAppProvider
       : "browser",
     paymentGateways: {
@@ -309,7 +411,9 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
       touchpay: normalizeGateway("touchpay", "test"),
     },
     whatsappProviders: {
+      browser: normalizeWhatsAppProvider("browser"),
       twilioSandbox: normalizeWhatsAppProvider("twilioSandbox"),
+      whatsappWeb: normalizeWhatsAppProvider("whatsappWeb"),
     },
   };
 }
@@ -349,5 +453,38 @@ export function resolveTwilioSandboxConfig(user = {}) {
     fromNumber: normalizeText(provider.fromNumber) || "whatsapp:+14155238886",
     contentSid: normalizeText(provider.contentSid),
     statusCallbackUrl: normalizeText(provider.statusCallbackUrl),
+  };
+}
+
+export function resolveBrowserWhatsAppConfig(user = {}) {
+  const provider = user.whatsappProviders?.browser || {};
+
+  return {
+    enabled: provider.enabled === true,
+  };
+}
+
+export function resolveWhatsAppWebConfig(user = {}) {
+  const provider = user.whatsappProviders?.whatsappWeb || {};
+  const defaultProvider = buildDefaultWhatsAppWebProvider(user);
+  const savedSessionName = normalizeText(provider.sessionName);
+  const sessionName =
+    shouldUseDefaultWhatsAppWebSession(savedSessionName, defaultProvider)
+      ? defaultProvider.sessionName
+      : savedSessionName;
+  const savedQrUrl = normalizeText(provider.qrConnectUrl);
+
+  return {
+    enabled: provider.enabled === true,
+    senderPhoneNumber: normalizeText(provider.senderPhoneNumber),
+    bridgeBaseUrl:
+      (normalizeText(provider.bridgeBaseUrl) || "http://localhost:8787").replace(/\/+$/, ""),
+    sessionName,
+    apiKey: decryptGatewayValue(provider, "apiKey") || "invoicehub-bridge-local",
+    qrConnectUrl:
+      (shouldUseDefaultWhatsAppWebQrUrl(savedQrUrl, defaultProvider)
+        ? defaultProvider.qrConnectUrl
+        : savedQrUrl),
+    statusWebhookUrl: normalizeText(provider.statusWebhookUrl),
   };
 }

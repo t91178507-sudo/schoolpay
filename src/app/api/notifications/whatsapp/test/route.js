@@ -2,12 +2,17 @@ import { requireAuth } from "../../../../../lib/auth";
 import { connectDB } from "../../../../../lib/mongodb";
 import {
   findUserById,
+  resolveWhatsAppWebConfig,
   resolveTwilioSandboxConfig,
 } from "../../../../../lib/paymentGatewaySettings";
 import {
   isTwilioSandboxConfigured,
   sendTwilioWhatsAppMessage,
 } from "../../../../../lib/twilioWhatsApp";
+import {
+  isWhatsAppWebConfigured,
+  sendWhatsAppWebMessage,
+} from "../../../../../lib/whatsappWebBridge";
 
 export async function POST(req) {
   try {
@@ -26,6 +31,20 @@ export async function POST(req) {
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
+    const whatsAppWebConfig = resolveWhatsAppWebConfig(user);
+    if (isWhatsAppWebConfigured(whatsAppWebConfig)) {
+      const result = await sendWhatsAppWebMessage(whatsAppWebConfig, {
+        phone,
+        text: "InvoiceHub test message\n\nYour WhatsApp Web bridge connection is working.",
+      });
+
+      return Response.json({
+        success: true,
+        provider: "whatsappWeb",
+        result,
+      });
+    }
+
     const twilioConfig = resolveTwilioSandboxConfig(user);
 
     if (isTwilioSandboxConfigured(twilioConfig)) {
@@ -42,7 +61,7 @@ export async function POST(req) {
     }
 
     return Response.json(
-      { error: "Twilio Sandbox is not selected and enabled in settings" },
+      { error: "No active WhatsApp provider is selected and fully configured in settings" },
       { status: 400 }
     );
   } catch (error) {

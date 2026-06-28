@@ -53,6 +53,7 @@ function getNotificationTone(status) {
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sendingReminders, setSendingReminders] = useState(false);
 
   const loadData = async () => {
     try {
@@ -135,10 +136,52 @@ export default function Invoices() {
       if (data?.delivery?.fallbackUrl) {
         window.open(data.delivery.fallbackUrl, "_blank");
       } else {
-        alert("Invoice message sent automatically.");
+        alert("Sent.");
       }
     } catch (error) {
       alert(error.message || "Unable to share invoice");
+    }
+  };
+
+  const sendBulkReminders = async () => {
+    if (actionableInvoices.length === 0) {
+      alert("There are no unpaid invoices to remind.");
+      return;
+    }
+
+    setSendingReminders(true);
+
+    try {
+      const res = await authFetch("/api/notifications/whatsapp/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          origin: window.location.origin,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Unable to send reminders");
+      }
+
+      if (Array.isArray(data.fallbackDeliveries)) {
+        data.fallbackDeliveries.forEach((delivery) => {
+          if (delivery.fallbackUrl) {
+            window.open(delivery.fallbackUrl, "_blank");
+          }
+        });
+      }
+
+      alert(
+        `Reminders processed: ${data.processedCount}\nSent automatically: ${data.sentCount}\nOpened in WhatsApp: ${data.fallbackCount}\nSkipped: ${data.skippedCount}\nCooldown skipped: ${data.cooldownSkippedCount || 0}\nDaily cap skipped: ${data.cappedSkippedCount || 0}`
+      );
+
+      loadData();
+    } catch (error) {
+      alert(error.message || "Unable to send reminders");
+    } finally {
+      setSendingReminders(false);
     }
   };
 
@@ -166,6 +209,16 @@ export default function Invoices() {
       <PageHeader
         title="Invoices"
         description="Manage invoices, payment readiness, and customer sharing from one compact view."
+        actions={
+          <button
+            type="button"
+            onClick={sendBulkReminders}
+            disabled={sendingReminders || actionableInvoices.length === 0}
+            className="rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#20BA5C] disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {sendingReminders ? "Sending reminders..." : "Remind all unpaid"}
+          </button>
+        }
       />
 
       <StatGrid>

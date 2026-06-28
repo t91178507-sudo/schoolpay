@@ -34,12 +34,16 @@ export async function PUT(request, { params }) {
     const owner = await findUserById(db, userId);
 
     if (paidInvoice.phone) {
-      await deliverPaymentConfirmation({
-        db,
-        invoice: paidInvoice,
-        owner,
-        amount: Number(paidInvoice.amount || 0),
-      });
+      try {
+        await deliverPaymentConfirmation({
+          db,
+          invoice: paidInvoice,
+          owner,
+          amount: Number(paidInvoice.amount || 0),
+        });
+      } catch (notificationError) {
+        console.error("MANUAL PAYMENT CONFIRMATION SEND ERROR:", notificationError);
+      }
     }
 
     return Response.json({ success: true, message: "Invoice marked as paid" });

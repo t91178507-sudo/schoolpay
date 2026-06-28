@@ -2,6 +2,8 @@ import { connectDB } from "../../../../lib/mongodb";
 import { parseAmount } from "../../../../lib/monnify";
 import { markInvoicePaid } from "../../../../lib/paymentLifecycle";
 import { ensureQuickPayPaidInvoice } from "../../../../lib/quickPay";
+import { findUserById } from "../../../../lib/paymentGatewaySettings";
+import { deliverPaymentConfirmation } from "../../../../lib/whatsappNotifications";
 
 export async function POST(req) {
   try {
@@ -29,13 +31,27 @@ export async function POST(req) {
         return Response.json({ success: true });
       }
 
-      await markInvoicePaid(db, invoice, {
+      const paidInvoice = await markInvoicePaid(db, invoice, {
         paidAt: new Date(),
         paidAmount: amountPaid,
         paymentReference: eventData.paymentReference,
         paymentProvider: "Monnify",
         verificationMethod: "webhook",
       });
+
+      if (paidInvoice.phone) {
+        try {
+          const owner = paidInvoice.ownerId ? await findUserById(db, paidInvoice.ownerId) : null;
+          await deliverPaymentConfirmation({
+            db,
+            invoice: paidInvoice,
+            owner,
+            amount: amountPaid,
+          });
+        } catch (notificationError) {
+          console.error("WEBHOOK PAYMENT CONFIRMATION SEND ERROR:", notificationError);
+        }
+      }
 
       return Response.json({ success: true });
     }
@@ -54,11 +70,25 @@ export async function POST(req) {
       return Response.json({ success: true });
     }
 
-    await ensureQuickPayPaidInvoice(db, quickPayTransaction, {
+    const quickPayInvoice = await ensureQuickPayPaidInvoice(db, quickPayTransaction, {
       paymentReference: eventData.paymentReference,
       paidAmount: amountPaid,
       paidAt: new Date(),
     });
+
+    if (quickPayInvoice.phone) {
+      try {
+        const owner = quickPayInvoice.ownerId ? await findUserById(db, quickPayInvoice.ownerId) : null;
+        await deliverPaymentConfirmation({
+          db,
+          invoice: quickPayInvoice,
+          owner,
+          amount: amountPaid,
+        });
+      } catch (notificationError) {
+        console.error("QUICK PAY WEBHOOK CONFIRMATION SEND ERROR:", notificationError);
+      }
+    }
 
     return Response.json({ success: true });
   } catch (error) {

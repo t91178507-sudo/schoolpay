@@ -29,6 +29,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+whatsapp-bridge/*.log
+whatsapp-bridge/.sessions/
+whatsapp-bridge/.wwebjs_cache/
+whatsapp-bridge/.empty-clean/
+whatsapp-bridge/node_modules/
 
 # env files (can opt-in for committing if needed)
 .env*

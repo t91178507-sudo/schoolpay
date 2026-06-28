@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "whatsapp-bridge/.sessions/**",
+    "whatsapp-bridge/.wwebjs_cache/**",
+    "whatsapp-bridge/node_modules/**",
+    "whatsapp-bridge/*.log",
   ]),
 ]);
 

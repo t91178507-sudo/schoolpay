@@ -56,6 +56,19 @@ const WHATSAPP_PROVIDERS = [
     blurb: "Fallback option that opens a prepared WhatsApp message in the browser.",
   },
   {
+    key: "whatsappWeb",
+    name: "WhatsApp Web",
+    blurb: "Connect a scanned WhatsApp number through your own session bridge so invoice messages go out from that number.",
+    fields: [
+      { key: "senderPhoneNumber", label: "Scanned WhatsApp Number", type: "tel" },
+      { key: "bridgeBaseUrl", label: "Bridge Base URL", type: "url" },
+      { key: "sessionName", label: "Session Name", type: "text" },
+      { key: "apiKey", label: "Bridge API Key", type: "password" },
+      { key: "qrConnectUrl", label: "QR Connect URL", type: "url" },
+      { key: "statusWebhookUrl", label: "Status Webhook URL", type: "url" },
+    ],
+  },
+  {
     key: "twilioSandbox",
     name: "Twilio Sandbox",
     blurb: "Use Twilio's WhatsApp Sandbox to send working test messages while you validate the flow.",
@@ -109,6 +122,18 @@ const EMPTY_SETTINGS = {
     },
   },
   whatsappProviders: {
+    browser: {
+      enabled: true,
+    },
+    whatsappWeb: {
+      enabled: false,
+      senderPhoneNumber: "",
+      bridgeBaseUrl: "http://localhost:8787",
+      sessionName: "",
+      apiKey: "invoicehub-bridge-local",
+      qrConnectUrl: "",
+      statusWebhookUrl: "",
+    },
     twilioSandbox: {
       enabled: false,
       accountSid: "",
@@ -146,6 +171,13 @@ export default function SettingsPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [visibleSecrets, setVisibleSecrets] = useState({});
+  const [whatsAppWebStatus, setWhatsAppWebStatus] = useState(null);
+  const [whatsAppWebLogs, setWhatsAppWebLogs] = useState([]);
+  const [loadingWhatsAppWebStatus, setLoadingWhatsAppWebStatus] = useState(false);
+  const [disconnectingWhatsAppWeb, setDisconnectingWhatsAppWeb] = useState(false);
+  const [deletingWhatsAppWebSession, setDeletingWhatsAppWebSession] = useState(false);
+  const [pairingPhoneNumber, setPairingPhoneNumber] = useState("");
+  const [requestingPairingCode, setRequestingPairingCode] = useState(false);
   const selectedGateway =
     GATEWAYS.find((gateway) => gateway.key === settings.defaultPaymentGateway) ||
     GATEWAYS[0];
@@ -225,6 +257,88 @@ export default function SettingsPage() {
       cancelled = true;
     };
   }, [quickPayProfiles]);
+
+  useEffect(() => {
+    if (selectedWhatsAppProvider.key !== "whatsappWeb") {
+      return undefined;
+    }
+
+    const bridgeBaseUrl = settings.whatsappProviders?.whatsappWeb?.bridgeBaseUrl;
+
+    if (!bridgeBaseUrl) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const loadBridgeStatus = async ({ silent = false } = {}) => {
+      if (!silent) {
+        setLoadingWhatsAppWebStatus(true);
+      }
+
+      try {
+        const res = await authFetch("/api/notifications/whatsapp/bridge/status", {
+          cache: "no-store",
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Unable to load WhatsApp Web status");
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        setWhatsAppWebStatus(data.status || null);
+        setWhatsAppWebLogs(Array.isArray(data.logs) ? data.logs : []);
+
+        const connectedNumber = data.status?.connectedNumber || "";
+        if (
+          connectedNumber &&
+          connectedNumber !== settings.whatsappProviders.whatsappWeb.senderPhoneNumber
+        ) {
+          setSettings((current) => ({
+            ...current,
+            whatsappProviders: {
+              ...current.whatsappProviders,
+              whatsappWeb: {
+                ...current.whatsappProviders.whatsappWeb,
+                senderPhoneNumber: connectedNumber,
+              },
+            },
+          }));
+        }
+
+        if (!pairingPhoneNumber && (connectedNumber || data.status?.pairingPhoneNumber)) {
+          setPairingPhoneNumber(connectedNumber || data.status.pairingPhoneNumber);
+        }
+      } catch (statusError) {
+        if (!cancelled) {
+          setWhatsAppWebStatus(null);
+          setWhatsAppWebLogs([]);
+          setError(statusError.message || "Unable to load WhatsApp Web status");
+        }
+      } finally {
+        if (!cancelled && !silent) {
+          setLoadingWhatsAppWebStatus(false);
+        }
+      }
+    };
+
+    loadBridgeStatus();
+    const interval = setInterval(() => loadBridgeStatus({ silent: true }), 10000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [
+    selectedWhatsAppProvider.key,
+    settings.whatsappProviders?.whatsappWeb?.bridgeBaseUrl,
+    settings.whatsappProviders?.whatsappWeb?.senderPhoneNumber,
+    pairingPhoneNumber,
+  ]);
 
   const suggestedWebhookUrls = useMemo(() => {
     if (typeof window === "undefined") {
@@ -429,11 +543,140 @@ export default function SettingsPage() {
         throw new Error(data.error || "Unable to send test message");
       }
 
-      setMessage("Test message sent successfully through Twilio Sandbox.");
+      setMessage(`Test message sent successfully through ${data.provider === "whatsappWeb" ? "WhatsApp Web" : "Twilio Sandbox"}.`);
     } catch (testError) {
       setError(testError.message || "Unable to send test message");
     } finally {
       setTestingWhatsApp(false);
+    }
+  };
+
+  const refreshWhatsAppWebStatus = async () => {
+    setLoadingWhatsAppWebStatus(true);
+    setError("");
+
+    try {
+      const res = await authFetch("/api/notifications/whatsapp/bridge/status", {
+        cache: "no-store",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Unable to refresh WhatsApp Web status");
+      }
+
+      setWhatsAppWebStatus(data.status || null);
+      setWhatsAppWebLogs(Array.isArray(data.logs) ? data.logs : []);
+
+      const connectedNumber = data.status?.connectedNumber || "";
+      if (connectedNumber) {
+        updateWhatsAppProviderField("whatsappWeb", "senderPhoneNumber", connectedNumber);
+      }
+    } catch (statusError) {
+      setError(statusError.message || "Unable to refresh WhatsApp Web status");
+    } finally {
+      setLoadingWhatsAppWebStatus(false);
+    }
+  };
+
+  const requestWhatsAppPairingCode = async () => {
+    const phoneNumber = pairingPhoneNumber.trim();
+
+    if (!phoneNumber) {
+      setError("Enter the WhatsApp phone number to connect.");
+      return;
+    }
+
+    setRequestingPairingCode(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const res = await authFetch("/api/notifications/whatsapp/bridge/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Unable to request WhatsApp pairing code");
+      }
+
+      setWhatsAppWebStatus(data || null);
+      setMessage("Pairing code generated. Enter it in WhatsApp linked devices.");
+    } catch (pairingError) {
+      setError(pairingError.message || "Unable to request WhatsApp pairing code");
+    } finally {
+      setRequestingPairingCode(false);
+    }
+  };
+
+  const disconnectWhatsAppWeb = async () => {
+    setDisconnectingWhatsAppWeb(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const res = await authFetch("/api/notifications/whatsapp/bridge/disconnect", {
+        method: "POST",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Unable to disconnect WhatsApp Web");
+      }
+
+      setWhatsAppWebStatus((current) =>
+        current
+          ? { ...current, status: "logged_out", connectedNumber: "", qrAvailable: false }
+          : null
+      );
+      updateWhatsAppProviderField("whatsappWeb", "senderPhoneNumber", "");
+      setMessage("WhatsApp Web session disconnected.");
+    } catch (disconnectError) {
+      setError(disconnectError.message || "Unable to disconnect WhatsApp Web");
+    } finally {
+      setDisconnectingWhatsAppWeb(false);
+    }
+  };
+
+  const deleteWhatsAppWebSession = async () => {
+    if (!confirm("Delete this WhatsApp Web session? You will need to connect the phone again.")) {
+      return;
+    }
+
+    setDeletingWhatsAppWebSession(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const res = await authFetch("/api/notifications/whatsapp/bridge/disconnect", {
+        method: "DELETE",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Unable to delete WhatsApp Web session");
+      }
+
+      setWhatsAppWebStatus((current) => ({
+        ...(current || {}),
+        status: "deleted",
+        connectedNumber: "",
+        pairingCode: "",
+        pairingPhoneNumber: "",
+        qrAvailable: false,
+        lastError: "",
+        lastUpdatedAt: new Date().toISOString(),
+      }));
+      updateWhatsAppProviderField("whatsappWeb", "senderPhoneNumber", "");
+      setPairingPhoneNumber("");
+      setMessage("WhatsApp Web session deleted. Generate a new pairing code to connect again.");
+    } catch (deleteError) {
+      setError(deleteError.message || "Unable to delete WhatsApp Web session");
+    } finally {
+      setDeletingWhatsAppWebSession(false);
     }
   };
 
@@ -785,10 +1028,9 @@ export default function SettingsPage() {
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           {WHATSAPP_PROVIDERS.map((provider) => {
             const isSelected = settings.defaultWhatsAppProvider === provider.key;
-            const providerConfig =
-              provider.key === "browser"
-                ? { enabled: true }
-                : settings.whatsappProviders?.[provider.key] || { enabled: false };
+            const providerConfig = settings.whatsappProviders?.[provider.key] || {
+              enabled: false,
+            };
 
             return (
               <button
@@ -806,26 +1048,323 @@ export default function SettingsPage() {
                     <p className="font-semibold text-gray-900 dark:text-white">{provider.name}</p>
                     <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">{provider.blurb}</p>
                   </div>
-                  {provider.key === "twilioSandbox" ? (
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                        providerConfig.enabled
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {providerConfig.enabled ? "Enabled" : "Saved only"}
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                      Always available
-                    </span>
-                  )}
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                      providerConfig.enabled
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {providerConfig.enabled ? "Enabled" : "Disabled"}
+                  </span>
                 </div>
               </button>
             );
           })}
         </div>
+
+        {selectedWhatsAppProvider.key === "browser" && (
+          <div className="mt-8 overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-800">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 bg-slate-50 px-6 py-5 dark:border-slate-800 dark:bg-slate-950/60">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Browser WhatsApp</h3>
+                <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+                  Open a prepared WhatsApp message in the browser when you want manual sending as your delivery method.
+                </p>
+              </div>
+
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={settings.whatsappProviders.browser.enabled}
+                  onChange={(event) =>
+                    updateWhatsAppProviderField("browser", "enabled", event.target.checked)
+                  }
+                  className="h-4 w-4 accent-blue-600"
+                />
+                Enabled
+              </label>
+            </div>
+
+            <div className="p-6">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+                <p className="text-sm font-medium text-slate-900 dark:text-white">How this behaves</p>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  When enabled, InvoiceHub can open a ready-made WhatsApp message in the browser. When disabled, Browser WhatsApp will no longer be used as the selected delivery method.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selectedWhatsAppProvider.key === "whatsappWeb" && (
+          <div className="mt-8 overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-800">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 bg-slate-50 px-6 py-5 dark:border-slate-800 dark:bg-slate-950/60">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">WhatsApp Web</h3>
+                <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+                  Connect your own scanned WhatsApp number through a session bridge so InvoiceHub can send from that number.
+                </p>
+              </div>
+
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={settings.whatsappProviders.whatsappWeb.enabled}
+                  onChange={(event) =>
+                    updateWhatsAppProviderField("whatsappWeb", "enabled", event.target.checked)
+                  }
+                  className="h-4 w-4 accent-blue-600"
+                />
+                Enabled
+              </label>
+            </div>
+
+            <div className="p-6">
+              <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="rounded-2xl border border-slate-200 bg-[#f7f2e8] p-6 dark:border-slate-800 dark:bg-slate-950">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">WhatsApp connection</p>
+                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                        Enter your WhatsApp number and use the pairing code in linked devices.
+                      </p>
+                    </div>
+
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-medium ${
+                        whatsAppWebStatus?.status === "ready"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : whatsAppWebStatus?.status === "qr" ||
+                              whatsAppWebStatus?.status === "authenticated" ||
+                              whatsAppWebStatus?.status === "loading" ||
+                              whatsAppWebStatus?.status === "retrying"
+                            ? "bg-amber-100 text-amber-700"
+                          : "bg-amber-100 text-amber-700"
+                      }`}
+                    >
+                      {whatsAppWebStatus?.status === "ready"
+                        ? "Ready to send"
+                        : whatsAppWebStatus?.status === "pairing_code"
+                          ? "Pairing code ready"
+                        : whatsAppWebStatus?.status === "qr"
+                          ? "Waiting for scan"
+                          : whatsAppWebStatus?.status || "Bridge idle"}
+                    </span>
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border border-slate-300 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                      WhatsApp phone number
+                    </label>
+                    <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+                      <input
+                        type="tel"
+                        value={pairingPhoneNumber}
+                        onChange={(event) => setPairingPhoneNumber(event.target.value)}
+                        placeholder="2348012345678"
+                        className="min-h-11 flex-1 rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={requestWhatsAppPairingCode}
+                        disabled={requestingPairingCode || whatsAppWebStatus?.status === "ready"}
+                        className="min-h-11 rounded-xl bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {requestingPairingCode ? "Generating..." : "Get pairing code"}
+                      </button>
+                    </div>
+
+                    <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/70">
+                      {whatsAppWebStatus?.status === "ready" ? (
+                        <div>
+                          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                            WhatsApp is connected.
+                          </p>
+                          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                            Connected number: {whatsAppWebStatus.connectedNumber}
+                          </p>
+                        </div>
+                      ) : whatsAppWebStatus?.pairingCode ? (
+                        <div>
+                          <p className="text-sm text-slate-600 dark:text-slate-300">
+                            In WhatsApp, open Linked devices, choose Link with phone number instead, then enter:
+                          </p>
+                          <div className="mt-4 rounded-xl border border-slate-300 bg-white px-5 py-4 text-center text-3xl font-semibold tracking-[0.3em] text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                            {whatsAppWebStatus.pairingCode}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-600 dark:text-slate-300">
+                          Use the international format without + or spaces, then generate a pairing code.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={refreshWhatsAppWebStatus}
+                      disabled={loadingWhatsAppWebStatus}
+                      className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      {loadingWhatsAppWebStatus ? "Checking..." : "Check status"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={disconnectWhatsAppWeb}
+                      disabled={disconnectingWhatsAppWeb || deletingWhatsAppWebSession}
+                      className="rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
+                    >
+                      {disconnectingWhatsAppWeb ? "Disconnecting..." : "Disconnect"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={deleteWhatsAppWebSession}
+                      disabled={deletingWhatsAppWebSession || disconnectingWhatsAppWeb}
+                      className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {deletingWhatsAppWebSession ? "Deleting..." : "Delete session"}
+                    </button>
+                    {settings.whatsappProviders.whatsappWeb.qrConnectUrl ? (
+                      <a
+                        href={settings.whatsappProviders.whatsappWeb.qrConnectUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                      >
+                        Open QR fallback
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/60">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">Connection details</p>
+                    <dl className="mt-4 space-y-3 text-sm">
+                      <div className="flex items-start justify-between gap-4">
+                        <dt className="text-slate-500 dark:text-slate-400">Ongoing session</dt>
+                        <dd className="text-right font-medium text-slate-900 dark:text-white">
+                          {whatsAppWebStatus?.sessionName ||
+                            settings.whatsappProviders.whatsappWeb.sessionName ||
+                            "invoicehub-scan"}
+                        </dd>
+                      </div>
+                      <div className="flex items-start justify-between gap-4">
+                        <dt className="text-slate-500 dark:text-slate-400">Current status</dt>
+                        <dd className="text-right font-medium text-slate-900 dark:text-white">
+                          {whatsAppWebStatus?.status || "Unknown"}
+                        </dd>
+                      </div>
+                      <div className="flex items-start justify-between gap-4">
+                        <dt className="text-slate-500 dark:text-slate-400">Connected number</dt>
+                        <dd className="text-right font-medium text-slate-900 dark:text-white">
+                          {whatsAppWebStatus?.connectedNumber ||
+                            settings.whatsappProviders.whatsappWeb.senderPhoneNumber ||
+                            "Not connected yet"}
+                        </dd>
+                      </div>
+                      <div className="flex items-start justify-between gap-4">
+                        <dt className="text-slate-500 dark:text-slate-400">Configured session</dt>
+                        <dd className="text-right font-medium text-slate-900 dark:text-white">
+                          {settings.whatsappProviders.whatsappWeb.sessionName || "invoicehub-scan"}
+                        </dd>
+                      </div>
+                      <div className="flex items-start justify-between gap-4">
+                        <dt className="text-slate-500 dark:text-slate-400">Bridge URL</dt>
+                        <dd className="max-w-[16rem] break-all text-right font-medium text-slate-900 dark:text-white">
+                          {settings.whatsappProviders.whatsappWeb.bridgeBaseUrl || "Not set"}
+                        </dd>
+                      </div>
+                      <div className="flex items-start justify-between gap-4">
+                        <dt className="text-slate-500 dark:text-slate-400">Last update</dt>
+                        <dd className="text-right font-medium text-slate-900 dark:text-white">
+                          {whatsAppWebStatus?.lastUpdatedAt
+                            ? new Date(whatsAppWebStatus.lastUpdatedAt).toLocaleString()
+                            : "-"}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/60">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">Recent bridge activity</p>
+                    {whatsAppWebLogs.length === 0 ? (
+                      <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                        No recent message activity yet.
+                      </p>
+                    ) : (
+                      <div className="mt-4 space-y-3">
+                        {whatsAppWebLogs.slice(0, 5).map((log) => (
+                          <div
+                            key={log.id}
+                            className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="font-medium text-slate-900 dark:text-white">
+                                {log.status === "sent" ? "Sent" : "Failed"} to {log.to || "-"}
+                              </p>
+                              <span className="text-xs text-slate-500 dark:text-slate-400">
+                                {log.createdAt ? new Date(log.createdAt).toLocaleTimeString() : ""}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                              {log.preview || log.error || "No preview"}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/60">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">How to use</p>
+                    <ol className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
+                      <li>1. Start your WhatsApp Web bridge and keep the bridge URL saved below.</li>
+                      <li>2. Enter the WhatsApp number in international format and generate a pairing code.</li>
+                      <li>3. In WhatsApp, open Linked devices and choose Link with phone number instead.</li>
+                      <li>4. Use the test button before sending live customer messages.</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+                <p className="text-sm font-medium text-slate-900 dark:text-white">How this behaves</p>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  This option is designed for a WhatsApp Web bridge that keeps a scanned session alive outside InvoiceHub. Once that bridge is connected, invoice messages and paid confirmations can be sent from the scanned WhatsApp number.
+                </p>
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <p className="text-sm font-medium text-slate-900 dark:text-white">Send test message</p>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  This checks whether InvoiceHub can reach your WhatsApp Web bridge and dispatch a message through the connected session.
+                </p>
+
+                <div className="mt-4 flex flex-col gap-3 md:flex-row">
+                  <input
+                    type="tel"
+                    value={whatsAppTestPhone}
+                    onChange={(event) => setWhatsAppTestPhone(event.target.value)}
+                    placeholder="08103902471"
+                    className="flex-1 rounded-2xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendWhatsAppTest}
+                    disabled={testingWhatsApp}
+                    className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-300"
+                  >
+                    {testingWhatsApp ? "Sending..." : "Send test message"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {selectedWhatsAppProvider.key === "twilioSandbox" && (
           <div className="mt-8 overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-800">
