@@ -59,6 +59,7 @@ export async function deliverInvoiceMessage({
   invoice,
   owner,
   origin,
+  isReminder = false,
 }) {
   const phone = invoice?.phone || "";
 
@@ -79,6 +80,7 @@ export async function deliverInvoiceMessage({
     items: invoice.items || [],
     paymentLink: `${origin}/pay/${invoice.token}`,
     date: invoice.date ? new Date(invoice.date) : new Date(),
+    isReminder,
   });
 
   const twilioConfig = resolveTwilioSandboxConfig(owner || {});

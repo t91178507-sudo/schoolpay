@@ -66,6 +66,7 @@ async function processQueuedReminder({
       invoice,
       owner,
       origin,
+      isReminder: true,
     });
 
     await recordReminderAttempt(db, invoice._id, {

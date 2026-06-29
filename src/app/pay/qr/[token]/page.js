@@ -16,7 +16,6 @@ export default function QuickPayPage() {
     customerPhone: "",
     amount: "",
   });
-  const [acceptedNotice, setAcceptedNotice] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -163,39 +162,15 @@ export default function QuickPayPage() {
             </div>
           )}
 
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 px-4 py-4 text-sm text-slate-600 dark:text-slate-400">
-            <p className="font-medium text-slate-900 dark:text-slate-100">Payment and data notice</p>
-            <p className="mt-2 leading-6">
-              InvoiceHub is providing the billing page and status tracking only. Payment is
-              processed by the merchant&apos;s configured gateway, and InvoiceHub does not hold
-              customer funds.
-            </p>
-            <label className="mt-3 flex items-start gap-3">
-              <input
-                type="checkbox"
-                checked={acceptedNotice}
-                onChange={(event) => setAcceptedNotice(event.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-slate-300 accent-slate-900"
-              />
-              <span className="text-[13px] leading-6 text-slate-600">
-                I consent to the phone number, amount, and payment reference being used for
-                payment verification and receipt preparation.
-              </span>
-            </label>
-          </div>
         </div>
 
         <div className="px-8 pb-8 pt-2">
           <button
             onClick={startPayment}
-            disabled={launching || !acceptedNotice}
+            disabled={launching}
             className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white rounded-xl font-medium text-[15px] transition-colors"
           >
-            {launching
-              ? "Opening gateway..."
-              : !acceptedNotice
-                ? "Accept notice to continue"
-                : "Continue to payment gateway"}
+            {launching ? "Opening gateway..." : "Continue to payment gateway"}
           </button>
           <p className="text-center text-[12px] text-slate-400 mt-3">
             Monnify will provide the transfer account after you continue.

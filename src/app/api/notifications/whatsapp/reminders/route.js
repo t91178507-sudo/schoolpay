@@ -59,6 +59,7 @@ export async function POST(req) {
         invoice,
         owner,
         origin,
+        isReminder: true,
       });
 
       if (delivery.sent) {

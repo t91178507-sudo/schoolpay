@@ -100,10 +100,12 @@ export function buildInvoiceMessage({
   items = [],
   paymentLink,
   date = new Date(),
+  isReminder = false,
 }) {
   const lines = formatLineItems(items);
+  const reminderLine = isReminder ? "\nPayment Reminder\n" : "";
 
-  return `${formatLogoLine(businessLogo)}${businessName || "InvoiceHub"}
+  return `${formatLogoLine(businessLogo)}${businessName || "InvoiceHub"}${reminderLine}
 
 Invoice Number: ${invoiceNumber || "Pending"}
 Customer Name: ${customerName}
