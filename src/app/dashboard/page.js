@@ -10,10 +10,12 @@ import {
   SurfaceCard,
 } from "../../components/DashboardUI";
 import { authFetch } from "../../lib/authFetch";
+import { getCustomerLabels } from "../../lib/businessLabels";
 import { useBusinessSession } from "../../lib/clientSession";
 
 export default function Dashboard() {
   const session = useBusinessSession();
+  const customerLabels = getCustomerLabels(session.businessType);
   const [stats, setStats] = useState({
     totalCustomers: 0,
     totalRevenue: 0,
@@ -113,7 +115,7 @@ export default function Dashboard() {
       />
 
       <StatGrid>
-        <StatCard label="Total Customers" value={stats.totalCustomers} tone="blue" />
+        <StatCard label={`Total ${customerLabels.pluralTitle}`} value={stats.totalCustomers} tone="blue" />
         <StatCard
           label="Collected Revenue"
           value={`N${stats.totalRevenue.toLocaleString()}`}

@@ -8,6 +8,7 @@ import { emitSessionChange } from "../../../lib/clientSession";
 const businessTypes = [
   "Retail",
   "Professional Service",
+  "School",
   "Healthcare",
   "Real Estate",
   "Distribution",

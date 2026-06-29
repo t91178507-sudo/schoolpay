@@ -122,7 +122,7 @@ export function buildPaymentConfirmationMessage({
   amount,
   description,
 }) {
-  return `${businessName || "InvoiceHub"}
+  return `*${businessName || "InvoiceHub"}*
 
 Payment received successfully.
 

@@ -2,6 +2,7 @@ import { requireAuth } from "../../../../../lib/auth";
 import { connectDB } from "../../../../../lib/mongodb";
 import {
   findUserById,
+  resolveGreenApiConfig,
   resolveWhatsAppWebConfig,
   resolveTwilioSandboxConfig,
 } from "../../../../../lib/paymentGatewaySettings";
@@ -13,6 +14,10 @@ import {
   isWhatsAppWebConfigured,
   sendWhatsAppWebMessage,
 } from "../../../../../lib/whatsappWebBridge";
+import {
+  isGreenApiConfigured,
+  sendGreenApiWhatsAppMessage,
+} from "../../../../../lib/greenApiWhatsApp";
 
 export async function POST(req) {
   try {
@@ -29,6 +34,20 @@ export async function POST(req) {
 
     if (!user) {
       return Response.json({ error: "User not found" }, { status: 404 });
+    }
+
+    const greenApiConfig = resolveGreenApiConfig(user);
+    if (isGreenApiConfigured(greenApiConfig)) {
+      const result = await sendGreenApiWhatsAppMessage(greenApiConfig, {
+        phone,
+        text: "InvoiceHub test message\n\nYour Green API WhatsApp connection is working.",
+      });
+
+      return Response.json({
+        success: true,
+        provider: "greenApi",
+        result,
+      });
     }
 
     const whatsAppWebConfig = resolveWhatsAppWebConfig(user);

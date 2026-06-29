@@ -51,6 +51,14 @@ export const DEFAULT_WHATSAPP_PROVIDERS = Object.freeze({
     qrConnectUrl: "http://localhost:8787/qr",
     statusWebhookUrl: "",
   },
+  greenApi: {
+    enabled: false,
+    apiUrl: "",
+    mediaUrl: "",
+    idInstance: "",
+    apiTokenInstance: "",
+    senderPhoneNumber: "",
+  },
 });
 
 const SECRET_FIELDS = Object.freeze({
@@ -62,6 +70,7 @@ const SECRET_FIELDS = Object.freeze({
 const WHATSAPP_SECRET_FIELDS = Object.freeze({
   twilioSandbox: ["accountSid", "authToken"],
   whatsappWeb: ["apiKey"],
+  greenApi: ["apiTokenInstance"],
 });
 
 const ENCRYPTED_PREFIX = "enc::";
@@ -302,6 +311,11 @@ export function buildSettingsPayload(user = {}) {
         whatsappProviders.whatsappWeb,
         user
       ),
+      greenApi: buildWhatsAppPayload(
+        "greenApi",
+        whatsappProviders.greenApi,
+        user
+      ),
     },
   };
 }
@@ -402,7 +416,7 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
     defaultPaymentGateway: ["monnify", "payaza", "touchpay"].includes(body.defaultPaymentGateway)
       ? body.defaultPaymentGateway
       : "monnify",
-    defaultWhatsAppProvider: ["browser", "twilioSandbox", "whatsappWeb"].includes(body.defaultWhatsAppProvider)
+    defaultWhatsAppProvider: ["browser", "twilioSandbox", "whatsappWeb", "greenApi"].includes(body.defaultWhatsAppProvider)
       ? body.defaultWhatsAppProvider
       : "browser",
     paymentGateways: {
@@ -414,6 +428,7 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
       browser: normalizeWhatsAppProvider("browser"),
       twilioSandbox: normalizeWhatsAppProvider("twilioSandbox"),
       whatsappWeb: normalizeWhatsAppProvider("whatsappWeb"),
+      greenApi: normalizeWhatsAppProvider("greenApi"),
     },
   };
 }
@@ -486,5 +501,18 @@ export function resolveWhatsAppWebConfig(user = {}) {
         ? defaultProvider.qrConnectUrl
         : savedQrUrl),
     statusWebhookUrl: normalizeText(provider.statusWebhookUrl),
+  };
+}
+
+export function resolveGreenApiConfig(user = {}) {
+  const provider = user.whatsappProviders?.greenApi || {};
+
+  return {
+    enabled: provider.enabled === true && user.defaultWhatsAppProvider === "greenApi",
+    apiUrl: normalizeText(provider.apiUrl).replace(/\/+$/, ""),
+    mediaUrl: normalizeText(provider.mediaUrl).replace(/\/+$/, ""),
+    idInstance: normalizeText(provider.idInstance),
+    apiTokenInstance: decryptGatewayValue(provider, "apiTokenInstance") || "",
+    senderPhoneNumber: normalizeText(provider.senderPhoneNumber),
   };
 }

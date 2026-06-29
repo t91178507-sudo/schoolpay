@@ -61,7 +61,7 @@ export default function AdminLogin() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                placeholder="admin@invoicehub.com"
+                placeholder="admin@schoolpay.com"
               />
             </div>
 

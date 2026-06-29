@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AddCustomerModal from "../../../components/AddCustomerModal";
 import { authFetch } from "../../../lib/authFetch";
+import { getCustomerLabels } from "../../../lib/businessLabels";
+import { useBusinessSession } from "../../../lib/clientSession";
 import {
   calculateInvoiceTotal,
   generateInvoiceNumber,
@@ -20,6 +22,8 @@ function createEmptyInvoiceItem() {
 }
 
 export default function CategoriesPage() {
+  const session = useBusinessSession();
+  const customerLabels = getCustomerLabels(session.businessType);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -35,25 +39,25 @@ export default function CategoriesPage() {
   const [bulkError, setBulkError] = useState("");
   const [bulkGenerating, setBulkGenerating] = useState(false);
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     try {
       const res = await authFetch("/api/customers");
       const data = await res.json();
       setCustomers(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error("Failed to fetch customers", error);
+      console.error(`Failed to fetch ${customerLabels.plural}`, error);
       setCustomers([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [customerLabels.plural]);
 
   useEffect(() => {
     const initialLoad = setTimeout(() => {
       fetchCustomers();
     }, 0);
     return () => clearTimeout(initialLoad);
-  }, []);
+  }, [fetchCustomers]);
 
   const grouped = customers.reduce((acc, customer) => {
     const category = customer.category || "Uncategorized";
@@ -99,12 +103,12 @@ export default function CategoriesPage() {
   };
 
   const deleteCustomer = async (id) => {
-    if (!confirm("Delete this customer?")) return;
+    if (!confirm(`Delete this ${customerLabels.singular}?`)) return;
     try {
       const res = await authFetch(`/api/customers/${id}`, { method: "DELETE" });
       if (res.ok) fetchCustomers();
     } catch {
-      alert("Failed to delete customer");
+      alert(`Failed to delete ${customerLabels.singular}`);
     }
   };
 
@@ -218,7 +222,7 @@ export default function CategoriesPage() {
         "";
 
       if (!phone) {
-        setInvoiceError("This customer has no phone number");
+        setInvoiceError(`This ${customerLabels.singular} has no phone number`);
         setGenerating(false);
         return;
       }
@@ -375,7 +379,7 @@ export default function CategoriesPage() {
           ? " (some may have been blocked by your browser)."
           : ".") +
         (skippedNoPhone > 0
-          ? `\n${skippedNoPhone} customer${skippedNoPhone !== 1 ? "s" : ""} skipped because no phone number was saved.`
+          ? `\n${skippedNoPhone} ${skippedNoPhone !== 1 ? customerLabels.plural : customerLabels.singular} skipped because no phone number was saved.`
           : "")
     );
   };
@@ -388,7 +392,7 @@ export default function CategoriesPage() {
     }
 
     const confirmed = confirm(
-      `Delete the "${category}" category? This will permanently delete all ${customersInCategory.length} customer${customersInCategory.length !== 1 ? "s" : ""} in it. Existing invoices will be kept.`
+      `Delete the "${category}" category? This will permanently delete all ${customersInCategory.length} ${customersInCategory.length !== 1 ? customerLabels.plural : customerLabels.singular} in it. Existing invoices will be kept.`
     );
 
     if (!confirmed) return;
@@ -421,15 +425,15 @@ export default function CategoriesPage() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="mb-8 flex flex-col gap-4 lg:mb-10 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-gray-900 dark:text-slate-100">Customer categories</h1>
+            <h1 className="text-3xl font-semibold text-gray-900 dark:text-slate-100">{customerLabels.singularTitle} categories</h1>
             <p className="text-gray-600 dark:text-slate-400 mt-1">
-              Organize customer groups and generate invoices from one shared billing view.
+              Organize {customerLabels.singular} groups and generate invoices from one shared billing view.
             </p>
           </div>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between lg:justify-end">
             <div className="text-left sm:text-right">
-              <p className="text-sm text-gray-500 dark:text-slate-400">Total customers</p>
+              <p className="text-sm text-gray-500 dark:text-slate-400">Total {customerLabels.plural}</p>
               <p className="text-3xl font-semibold text-gray-900 dark:text-slate-100 sm:text-4xl">
                 {customers.length}
               </p>
@@ -439,7 +443,7 @@ export default function CategoriesPage() {
               onClick={() => setShowAddModal(true)}
               className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-2xl font-medium flex items-center gap-2 transition"
             >
-              + Add New Customer
+              + Add New {customerLabels.singularTitle}
             </button>
           </div>
         </div>
@@ -461,7 +465,7 @@ export default function CategoriesPage() {
 
             {categoryList.length === 0 ? (
               <div className="text-center py-20 text-gray-500 dark:text-slate-400">
-                No customers yet. Add your first customer to create a category.
+                No {customerLabels.plural} yet. Add your first {customerLabels.singular} to create a category.
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -487,13 +491,13 @@ export default function CategoriesPage() {
 
                       <div className="flex justify-between items-end">
                         <div>
-                          <p className="text-sm text-slate-500 dark:text-slate-400">Customers</p>
+                          <p className="text-sm text-slate-500 dark:text-slate-400">{customerLabels.pluralTitle}</p>
                           <p className="mt-1 text-4xl font-bold text-slate-800 dark:text-slate-100 sm:text-5xl">
                             {count}
                           </p>
                         </div>
                         <div className="text-slate-500 text-sm font-medium group-hover:translate-x-1 transition-transform">
-                          View Customers →
+                          View {customerLabels.pluralTitle} →
                         </div>
                       </div>
                     </div>
@@ -513,7 +517,7 @@ export default function CategoriesPage() {
                   <div>
                       <h2 className="text-3xl font-semibold sm:text-4xl">{selectedCategory}</h2>
                     <p className="text-slate-300 mt-1 text-lg">
-                      {selectedCustomers.length} Customers
+                      {selectedCustomers.length} {selectedCustomers.length === 1 ? customerLabels.singularTitle : customerLabels.pluralTitle}
                     </p>
                   </div>
                 </div>
@@ -577,7 +581,7 @@ export default function CategoriesPage() {
                 <thead>
                   <tr className="border-b bg-slate-50">
                     <th className="px-10 py-5 text-left text-sm font-medium text-gray-500">
-                      Customer Name
+                      {customerLabels.singularTitle} Name
                     </th>
                     <th className="px-10 py-5 text-left text-sm font-medium text-gray-500">
                       Phone Number
@@ -803,8 +807,7 @@ export default function CategoriesPage() {
                 Generate Invoice for All
               </h2>
               <p className="text-slate-500 mt-1">
-                {selectedCustomers.length} customer
-                {selectedCustomers.length !== 1 ? "s" : ""} in {selectedCategory}
+                {selectedCustomers.length} {selectedCustomers.length === 1 ? customerLabels.singular : customerLabels.plural} in {selectedCategory}
               </p>
             </div>
 
@@ -831,7 +834,7 @@ export default function CategoriesPage() {
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900">Items</h3>
                     <p className="text-sm text-slate-500">
-                      Every customer in this category will receive the same item list.
+                      Every {customerLabels.singular} in this category will receive the same item list.
                     </p>
                   </div>
                   <button
@@ -924,7 +927,7 @@ export default function CategoriesPage() {
 
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-slate-500">Amount per customer</p>
+                  <p className="text-sm text-slate-500">Amount per {customerLabels.singular}</p>
                   <p className="text-xs text-slate-400 mt-1">
                     Calculated from the shared line items
                   </p>
@@ -939,7 +942,7 @@ export default function CategoriesPage() {
               )}
 
               <p className="text-xs text-slate-400">
-                Every customer in this category will get a WhatsApp message with the same description and items, but their own invoice number and payment link.
+                Every {customerLabels.singular} in this category will get a WhatsApp message with the same description and items, but their own invoice number and payment link.
               </p>
 
               <div className="flex gap-4 pt-2">

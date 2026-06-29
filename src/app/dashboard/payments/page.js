@@ -14,6 +14,8 @@ import {
   Toolbar,
 } from "../../../components/DashboardUI";
 import { authFetch } from "../../../lib/authFetch";
+import { getCustomerLabels } from "../../../lib/businessLabels";
+import { useBusinessSession } from "../../../lib/clientSession";
 
 function getSourceLabel(entry) {
   if (entry.type === "quick-pay-session") return "QR Session";
@@ -29,17 +31,30 @@ function getStatusTone(status) {
 }
 
 function getNotificationTone(status) {
-  const normalized = String(
-    status === "pending-whatsapp" ? "prepared" : status || ""
-  ).toLowerCase();
-  if (normalized === "prepared") return "green";
-  if (normalized === "draft") return "blue";
-  if (normalized === "unavailable") return "slate";
+  const normalized = normalizeNotificationStatus(status);
+  if (normalized === "sent") return "green";
+  if (normalized === "pending") return "orange";
+  if (normalized === "failed") return "red";
   return "slate";
 }
 
 function normalizeNotificationStatus(status) {
-  return status === "pending-whatsapp" ? "prepared" : status || "draft";
+  const normalized = String(status || "").toLowerCase();
+
+  if (["sent", "prepared", "delivered", "success"].includes(normalized)) {
+    return "sent";
+  }
+
+  if (["failed", "error", "unavailable"].includes(normalized)) {
+    return "failed";
+  }
+
+  return "pending";
+}
+
+function formatNotificationStatus(status) {
+  const normalized = normalizeNotificationStatus(status);
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 function formatDateTime(value) {
@@ -52,6 +67,8 @@ function formatDateTime(value) {
 }
 
 export default function Payments() {
+  const session = useBusinessSession();
+  const customerLabels = getCustomerLabels(session.businessType);
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -85,7 +102,7 @@ export default function Payments() {
       .map((invoice) => {
       const source = invoice.quickPayProfileId ? "qr" : "invoice";
       const customerName =
-        invoice.customer || invoice.customerName || invoice.student || "Customer";
+        invoice.customer || invoice.customerName || invoice.student || customerLabels.singularTitle;
 
       return {
         id: `invoice-${invoice._id}`,
@@ -118,7 +135,7 @@ export default function Payments() {
     return [...invoiceRows].sort(
       (a, b) => new Date(b.happenedAt || 0) - new Date(a.happenedAt || 0)
     );
-  }, [invoices]);
+  }, [customerLabels.singularTitle, invoices]);
 
   const filteredRows = historyRows.filter((row) => {
     const search = searchTerm.trim().toLowerCase();
@@ -151,8 +168,8 @@ export default function Payments() {
   const pendingCount = filteredRows.filter(
     (row) => String(row.status || "").toLowerCase() === "pending"
   ).length;
-  const preparedNotifications = filteredRows.filter(
-    (row) => String(row.notificationStatus || "").toLowerCase() === "prepared"
+  const sentNotifications = filteredRows.filter(
+    (row) => normalizeNotificationStatus(row.notificationStatus) === "sent"
   ).length;
 
   return (
@@ -171,8 +188,8 @@ export default function Payments() {
         <StatCard label="History rows" value={filteredRows.length} tone="slate" />
         <StatCard label="Pending items" value={pendingCount} tone="orange" />
         <StatCard
-          label="Prepared receipts"
-          value={preparedNotifications}
+          label="WhatsApp sent"
+          value={sentNotifications}
           tone="blue"
         />
       </StatGrid>
@@ -181,7 +198,7 @@ export default function Payments() {
         <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <InputField
             type="text"
-            placeholder="Search customer, phone, reference..."
+            placeholder={`Search ${customerLabels.singular}, phone, reference...`}
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
           />
@@ -208,9 +225,9 @@ export default function Payments() {
             onChange={(event) => setNotificationFilter(event.target.value)}
           >
             <option value="all">All notifications</option>
-            <option value="prepared">Prepared</option>
-            <option value="draft">Draft</option>
-            <option value="unavailable">Unavailable</option>
+            <option value="sent">Sent</option>
+            <option value="pending">Pending</option>
+            <option value="failed">Failed</option>
           </SelectField>
         </div>
       </Toolbar>
@@ -264,7 +281,7 @@ export default function Payments() {
 
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge tone={getNotificationTone(row.notificationStatus)}>
-                      {row.notificationStatus || "-"}
+                      {formatNotificationStatus(row.notificationStatus)}
                     </StatusBadge>
                     <p className="break-all font-mono text-xs text-slate-500 dark:text-slate-400">
                       {row.reference || "-"}
@@ -279,7 +296,7 @@ export default function Payments() {
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
                   <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Customer
+                    {customerLabels.singularTitle}
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     Description
@@ -288,7 +305,7 @@ export default function Payments() {
                     Payment
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Notification
+                    WhatsApp Notification
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     Reference
@@ -331,7 +348,7 @@ export default function Payments() {
                     </td>
                     <td className="px-6 py-5 align-top">
                       <StatusBadge tone={getNotificationTone(row.notificationStatus)}>
-                        {row.notificationStatus || "-"}
+                        {formatNotificationStatus(row.notificationStatus)}
                       </StatusBadge>
                     </td>
                     <td className="px-6 py-5 align-top">

@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { adminFetch } from "../../lib/adminFetch";
 
+function formatMoney(value) {
+  return `N${Number(value || 0).toLocaleString()}`;
+}
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -26,8 +30,8 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-slate-400"></div>
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-t-2 border-slate-400"></div>
       </div>
     );
   }
@@ -37,42 +41,38 @@ export default function AdminDashboard() {
   }
 
   const cards = [
-    { label: "Total Businesses", value: stats.totalBusinesses, icon: "🏢" },
-    { label: "Total Customers", value: stats.totalCustomers, icon: "👥" },
-    { label: "Total Invoices", value: stats.totalInvoices, icon: "📄" },
-    {
-      label: "Total Invoice Value",
-      value: `₦${stats.totalRevenue.toLocaleString()}`,
-      icon: "💰",
-    },
-    {
-      label: "Confirmed Revenue (Paid)",
-      value: `₦${stats.paidRevenue.toLocaleString()}`,
-      icon: "✅",
-    },
-    { label: "Unpaid Invoices", value: stats.unpaidCount, icon: "⏳" },
+    { label: "Businesses", value: stats.totalBusinesses, hint: `${stats.monnifyConfiguredBusinesses || 0} with Monnify configured` },
+    { label: "Customers", value: stats.totalCustomers, hint: "Across all businesses" },
+    { label: "Invoices", value: stats.totalInvoices, hint: `${stats.paidCount || 0} paid, ${stats.partialCount || 0} partial, ${stats.unpaidCount || 0} unpaid` },
+    { label: "Invoice value", value: formatMoney(stats.totalRevenue), hint: "Total issued value" },
+    { label: "Collected", value: formatMoney(stats.collectedRevenue ?? stats.paidRevenue), hint: `${formatMoney(stats.partialRevenue)} from partial payments` },
+    { label: "Outstanding", value: formatMoney(stats.outstandingRevenue), hint: "Remaining balance due" },
+    { label: "Prepared receipts", value: stats.preparedNotificationCount || 0, hint: `${stats.unavailableNotificationCount || 0} unavailable` },
+    { label: "WhatsApp Web", value: stats.whatsappWebBusinesses || 0, hint: "Businesses using bridge provider" },
   ];
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Platform Overview</h1>
-        <p className="text-slate-500 mt-1">Stats across every registered business</p>
+        <p className="mt-1 text-slate-500">
+          Payments, gateway readiness, WhatsApp bridge setup, and invoice health across every business
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (
           <div
             key={card.label}
-            className="bg-white rounded-2xl p-6 border border-slate-200"
+            className="rounded-2xl border border-slate-200 bg-white p-6"
           >
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500">{card.label}</p>
-              <span className="text-xl">{card.icon}</span>
-            </div>
-            <p className="text-3xl font-semibold text-slate-900 mt-3">
+            <p className="text-sm text-slate-500">{card.label}</p>
+            <p className="mt-3 text-3xl font-semibold text-slate-900">
               {card.value}
             </p>
+            {card.hint ? (
+              <p className="mt-2 text-xs text-slate-400">{card.hint}</p>
+            ) : null}
           </div>
         ))}
       </div>

@@ -11,6 +11,8 @@ import {
   SurfaceCard,
 } from "../../../components/DashboardUI";
 import { authFetch } from "../../../lib/authFetch";
+import { getCustomerLabels } from "../../../lib/businessLabels";
+import { useBusinessSession } from "../../../lib/clientSession";
 
 function formatCurrency(value) {
   return `N${Number(value || 0).toLocaleString()}`;
@@ -27,6 +29,8 @@ function formatDateTime(value) {
 }
 
 export default function CustomersOverview() {
+  const session = useBusinessSession();
+  const customerLabels = getCustomerLabels(session.businessType);
   const [customers, setCustomers] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +52,7 @@ export default function CustomersOverview() {
         setInvoices(Array.isArray(invoicesData) ? invoicesData : []);
       } catch (err) {
         console.error(err);
-        setError("Failed to load customers");
+        setError(`Failed to load ${customerLabels.plural}`);
       } finally {
         setLoading(false);
       }
@@ -56,7 +60,7 @@ export default function CustomersOverview() {
 
     const initialLoad = setTimeout(loadData, 0);
     return () => clearTimeout(initialLoad);
-  }, []);
+  }, [customerLabels.plural]);
 
   const customerRows = useMemo(() => {
     return customers
@@ -133,12 +137,12 @@ export default function CustomersOverview() {
   return (
     <PageShell>
       <PageHeader
-        title="Customer overview"
-        description="See each customer's invoice count, paid totals, and what is still outstanding."
+        title={`${customerLabels.singularTitle} overview`}
+        description={`See each ${customerLabels.singular}'s invoice count, paid totals, and what is still outstanding.`}
       />
 
       <StatGrid className="xl:grid-cols-3">
-        <StatCard label="Customers" value={customerRows.length} tone="blue" />
+        <StatCard label={customerLabels.pluralTitle} value={customerRows.length} tone="blue" />
         <StatCard
           label="Total invoiced"
           value={formatCurrency(totalReceivables)}
@@ -154,8 +158,8 @@ export default function CustomersOverview() {
       <SurfaceCard className="p-6">
         {customerRows.length === 0 ? (
           <EmptyState
-            title="No customers found"
-            description="Add a customer first, then invoice activity will appear here."
+            title={`No ${customerLabels.plural} found`}
+            description={`Add a ${customerLabels.singular} first, then invoice activity will appear here.`}
           />
         ) : (
           <div className="space-y-4">
@@ -248,7 +252,7 @@ export default function CustomersOverview() {
             <div className="flex-1 space-y-3 overflow-y-auto p-8">
               {historyCustomer.invoices.length === 0 ? (
                 <EmptyState
-                  title="No invoices yet for this customer"
+                  title={`No invoices yet for this ${customerLabels.singular}`}
                   description="Their payment history will show here once invoices are generated."
                 />
               ) : (

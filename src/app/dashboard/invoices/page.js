@@ -11,6 +11,8 @@ import {
   SurfaceCard,
 } from "../../../components/DashboardUI";
 import { authFetch } from "../../../lib/authFetch";
+import { getCustomerLabels } from "../../../lib/businessLabels";
+import { useBusinessSession } from "../../../lib/clientSession";
 
 function formatDateTime(value) {
   if (!value) return "-";
@@ -51,6 +53,8 @@ function getNotificationTone(status) {
 }
 
 export default function Invoices() {
+  const session = useBusinessSession();
+  const customerLabels = getCustomerLabels(session.businessType);
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sendingReminders, setSendingReminders] = useState(false);
@@ -208,7 +212,7 @@ export default function Invoices() {
     <PageShell>
       <PageHeader
         title="Invoices"
-        description="Manage invoices, payment readiness, and customer sharing from one compact view."
+        description={`Manage invoices, payment readiness, and ${customerLabels.singular} sharing from one compact view.`}
         actions={
           <button
             type="button"
@@ -239,7 +243,7 @@ export default function Invoices() {
             <div className="divide-y divide-slate-200 lg:hidden">
               {actionableInvoices.map((invoice) => {
                 const customerName =
-                  invoice.customer || invoice.customerName || invoice.student || "Customer";
+                  invoice.customer || invoice.customerName || invoice.student || customerLabels.singularTitle;
 
                 return (
                   <div key={invoice._id} className="space-y-4 p-4 sm:p-5">
@@ -339,7 +343,7 @@ export default function Invoices() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {actionableInvoices.map((invoice) => {
                   const customerName =
-                    invoice.customer || invoice.customerName || invoice.student || "Customer";
+                    invoice.customer || invoice.customerName || invoice.student || customerLabels.singularTitle;
 
                   return (
                     <tr key={invoice._id} className="hover:bg-slate-50 dark:hover:bg-slate-950/60">

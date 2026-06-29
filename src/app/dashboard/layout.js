@@ -10,15 +10,7 @@ import {
   useDarkModePreference,
   useHydrated,
 } from "../../lib/clientSession";
-
-const navItems = [
-  { name: "Dashboard", href: "/dashboard", badge: "D" },
-  { name: "Customer groups", href: "/dashboard/categories", badge: "G" },
-  { name: "Customer overview", href: "/dashboard/customers", badge: "C" },
-  { name: "Invoices", href: "/dashboard/invoices", badge: "I" },
-  { name: "Payment history", href: "/dashboard/payments", badge: "P" },
-  { name: "Settings", href: "/dashboard/settings", badge: "S" },
-];
+import { getCustomerLabels } from "../../lib/businessLabels";
 
 const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -30,6 +22,15 @@ export default function DashboardLayout({ children }) {
   const session = useBusinessSession();
   const darkMode = useDarkModePreference();
   const isHydrated = useHydrated();
+  const customerLabels = getCustomerLabels(session.businessType);
+  const navItems = [
+    { name: "Dashboard", href: "/dashboard", badge: "D" },
+    { name: `${customerLabels.singularTitle} groups`, href: "/dashboard/categories", badge: "G" },
+    { name: `${customerLabels.singularTitle} overview`, href: "/dashboard/customers", badge: "C" },
+    { name: "Invoices", href: "/dashboard/invoices", badge: "I" },
+    { name: "Payment history", href: "/dashboard/payments", badge: "P" },
+    { name: "Settings", href: "/dashboard/settings", badge: "S" },
+  ];
 
   useEffect(() => {
     if (!isHydrated) {
@@ -168,8 +169,10 @@ export default function DashboardLayout({ children }) {
       ) : null}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-gray-200 bg-white transition-transform duration-300 dark:border-gray-800 dark:bg-gray-900 lg:static lg:z-auto lg:w-72 lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col overflow-hidden border-r border-gray-200 bg-white transition-all duration-300 dark:border-gray-800 dark:bg-gray-900 lg:static lg:z-auto ${
+          sidebarOpen
+            ? "translate-x-0 lg:w-72"
+            : "-translate-x-full lg:w-0 lg:border-r-0"
         }`}
       >
         <div className="flex items-center gap-3 border-b border-gray-200 p-6 dark:border-gray-800">
@@ -245,7 +248,7 @@ export default function DashboardLayout({ children }) {
         <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900 sm:px-6">
           <button
             onClick={() => setSidebarOpen((open) => !open)}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-slate-50 hover:text-gray-900 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-slate-50 hover:text-gray-900 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white lg:hidden"
           >
             {sidebarOpen ? "Close menu" : "Open menu"}
           </button>
