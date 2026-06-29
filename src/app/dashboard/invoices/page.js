@@ -161,6 +161,7 @@ export default function Invoices() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           origin: window.location.origin,
+          force: true,
         }),
       });
       const data = await res.json();
@@ -178,7 +179,7 @@ export default function Invoices() {
       }
 
       alert(
-        `Reminders processed: ${data.processedCount}\nSent automatically: ${data.sentCount}\nOpened in WhatsApp: ${data.fallbackCount}\nSkipped: ${data.skippedCount}\nCooldown skipped: ${data.cooldownSkippedCount || 0}\nDaily cap skipped: ${data.cappedSkippedCount || 0}`
+        `Reminders processed: ${data.processedCount}\nSent through WhatsApp provider: ${data.sentCount}\nOpened in WhatsApp manually: ${data.fallbackCount}\nSkipped: ${data.skippedCount}\nCooldown skipped: ${data.cooldownSkippedCount || 0}\nDaily cap skipped: ${data.cappedSkippedCount || 0}`
       );
 
       loadData();

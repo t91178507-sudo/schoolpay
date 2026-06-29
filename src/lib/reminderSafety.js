@@ -28,7 +28,18 @@ function toTimestamp(value) {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
-export function evaluateReminderEligibility(invoice = {}, { mode = "single" } = {}) {
+export function evaluateReminderEligibility(
+  invoice = {},
+  { mode = "single", force = false } = {}
+) {
+  if (force) {
+    return {
+      allowed: true,
+      reason: null,
+      retryAfterMs: 0,
+    };
+  }
+
   const now = Date.now();
   const lastSentAt = toTimestamp(invoice.lastReminderSentAt);
   const minInterval =

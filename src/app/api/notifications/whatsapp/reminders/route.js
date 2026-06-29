@@ -16,6 +16,7 @@ export async function POST(req) {
     const db = await connectDB();
     const body = await req.json();
     const origin = String(body.origin || "").trim();
+    const force = body.force === true;
 
     if (!origin) {
       return Response.json({ error: "origin is required" }, { status: 400 });
@@ -41,7 +42,7 @@ export async function POST(req) {
     );
     const policy = getReminderPolicy();
     const eligibleInvoices = actionableInvoices.filter((invoice) =>
-      evaluateReminderEligibility(invoice, { mode: "bulk" }).allowed
+      evaluateReminderEligibility(invoice, { mode: "bulk", force }).allowed
     );
     const cappedInvoices = eligibleInvoices.slice(0, policy.maxBulkRemindersPerRun);
 
