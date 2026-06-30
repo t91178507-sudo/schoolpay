@@ -27,7 +27,7 @@ const GATEWAYS = [
   {
     key: "payaza",
     name: "PayAza",
-    blurb: "Store your credentials now and keep the account ready for a later checkout switch.",
+    blurb: "Configure PayAza test credentials, webhook URL, and callback URL.",
     fields: [
       { key: "publicKey", label: "Public Key", type: "text" },
       { key: "secretKey", label: "Secret Key", type: "password" },
@@ -994,7 +994,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="mt-6 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 text-sm text-amber-900">
-          Monnify is currently the only gateway already wired into the live checkout flow. PayAza and TouchPay settings are now saved at the business level so we can switch those flows in cleanly next.
+          Monnify is wired into checkout now. PayAza test webhooks and callbacks are ready to receive provider events; checkout initialization will need the PayAza API endpoint details from your developer docs/API keys page.
         </div>
       </section>
 
