@@ -1,6 +1,44 @@
 import { connectDB } from "../../../lib/mongodb";
 import { requireAuth } from "../../../lib/auth";
-import { generateInvoiceToken } from "../../../lib/invoiceUtils";
+import {
+  calculateInvoiceTotal,
+  generateInvoiceToken,
+  sanitizeInvoiceItems,
+} from "../../../lib/invoiceUtils";
+import { findUserById } from "../../../lib/paymentGatewaySettings";
+
+function isSchoolBusiness(user = {}) {
+  return String(user.businessType || "").trim().toLowerCase() === "school";
+}
+
+function normalizeInvoiceForBusiness(body = {}, user = {}) {
+  if (isSchoolBusiness(user)) {
+    return body;
+  }
+
+  const firstItem = Array.isArray(body.items) ? body.items[0] || {} : {};
+  const amount = Number(body.amount || body.subtotal || firstItem.unitPrice || 0);
+  const description =
+    String(body.description || firstItem.description || "Invoice payment").trim() ||
+    "Invoice payment";
+  const items = sanitizeInvoiceItems([
+    {
+      ...firstItem,
+      description,
+      quantity: 1,
+      unitPrice: amount,
+    },
+  ]);
+  const total = calculateInvoiceTotal(items);
+
+  return {
+    ...body,
+    description,
+    items,
+    subtotal: total,
+    amount: total,
+  };
+}
 
 export async function GET(req) {
   try {
@@ -30,21 +68,24 @@ export async function POST(req) {
     const userId = requireAuth(req);
     const db = await connectDB();
     const body = await req.json();
+    const owner = await findUserById(db, userId);
+    const normalizedBody = normalizeInvoiceForBusiness(body, owner || {});
     const invoiceToken = body.token || generateInvoiceToken("inv");
 
     const result = await db.collection("invoices").insertOne({
-      ...body,
+      ...normalizedBody,
       token: invoiceToken,
-      customerToken: body.customerToken || invoiceToken,
+      customerToken: normalizedBody.customerToken || invoiceToken,
       ownerId: userId,
-      paidAmount: Number(body.paidAmount || 0),
+      paidAmount: Number(normalizedBody.paidAmount || 0),
       balanceDue: Math.max(
-        Number(body.amount || 0) - Number(body.paidAmount || 0),
+        Number(normalizedBody.amount || 0) - Number(normalizedBody.paidAmount || 0),
         0
       ),
-      paymentStatus: body.paymentStatus || "unpaid",
+      paymentStatus: normalizedBody.paymentStatus || "unpaid",
       customerNotificationStatus:
-        body.customerNotificationStatus || (body.phone ? "draft" : "unavailable"),
+        normalizedBody.customerNotificationStatus ||
+        (normalizedBody.phone ? "draft" : "unavailable"),
       createdAt: new Date(),
     });
 

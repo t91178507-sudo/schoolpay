@@ -496,6 +496,29 @@ export function resolvePayazaConfig(user = {}) {
   };
 }
 
+export function resolveActivePaymentGateway(user = {}) {
+  const defaultGateway = normalizeText(user.defaultPaymentGateway) || "monnify";
+  const gateways = user.paymentGateways || {};
+
+  if (gateways[defaultGateway]?.enabled === true) {
+    return defaultGateway;
+  }
+
+  if (gateways.payaza?.enabled === true) {
+    return "payaza";
+  }
+
+  if (gateways.monnify?.enabled === true) {
+    return "monnify";
+  }
+
+  if (gateways.touchpay?.enabled === true) {
+    return "touchpay";
+  }
+
+  return defaultGateway;
+}
+
 export function resolveBrowserWhatsAppConfig(user = {}) {
   const provider = user.whatsappProviders?.browser || {};
 

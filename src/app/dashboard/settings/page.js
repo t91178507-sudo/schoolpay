@@ -821,46 +821,28 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
-          {GATEWAYS.map((gateway) => {
-            const isSelected = settings.defaultPaymentGateway === gateway.key;
-            const gatewayConfig = settings.paymentGateways[gateway.key];
+        <div className="mt-6 max-w-xl">
+          <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
+            Preferred payment gateway
+          </label>
+          <select
+            value={settings.defaultPaymentGateway}
+            onChange={(event) => updateField("defaultPaymentGateway", event.target.value)}
+            className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+          >
+            {GATEWAYS.map((gateway) => {
+              const gatewayConfig = settings.paymentGateways[gateway.key];
 
-            return (
-              <button
-                key={gateway.key}
-                type="button"
-                onClick={() => updateField("defaultPaymentGateway", gateway.key)}
-                className={`text-left border rounded-2xl p-5 transition ${
-                  isSelected
-                    ? "border-blue-600 bg-blue-50 dark:bg-blue-950/40"
-                    : "border-gray-200 bg-white hover:border-gray-300 dark:border-slate-700 dark:bg-slate-950"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">{gateway.name}</p>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">{gateway.blurb}</p>
-                  </div>
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                      gatewayConfig.enabled
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {gatewayConfig.enabled ? "Enabled" : "Saved only"}
-                  </span>
-                </div>
-
-                <div className="mt-4 text-sm text-gray-600">
-                  <span className="dark:text-slate-300">
-                  Preferred gateway: {isSelected ? "Yes" : "Select to make default"}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
+              return (
+                <option key={gateway.key} value={gateway.key}>
+                  {gateway.name} - {gatewayConfig.enabled ? "Enabled" : "Saved only"}
+                </option>
+              );
+            })}
+          </select>
+          <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
+            {selectedGateway.blurb}
+          </p>
         </div>
 
         <div className="space-y-6 mt-8">
@@ -994,7 +976,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="mt-6 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 text-sm text-amber-900">
-          Monnify is wired into checkout now. PayAza test webhooks and callbacks are ready to receive provider events; checkout initialization will need the PayAza API endpoint details from your developer docs/API keys page.
+          Monnify and PayAza are wired into checkout. TouchPay settings are saved here so that flow can be connected later.
         </div>
       </section>
 
@@ -1006,42 +988,30 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {WHATSAPP_PROVIDERS.map((provider) => {
-            const isSelected = settings.defaultWhatsAppProvider === provider.key;
-            const providerConfig = settings.whatsappProviders?.[provider.key] || {
-              enabled: false,
-            };
+        <div className="mt-6 max-w-xl">
+          <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
+            WhatsApp delivery method
+          </label>
+          <select
+            value={settings.defaultWhatsAppProvider}
+            onChange={(event) => updateField("defaultWhatsAppProvider", event.target.value)}
+            className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+          >
+            {WHATSAPP_PROVIDERS.map((provider) => {
+              const providerConfig = settings.whatsappProviders?.[provider.key] || {
+                enabled: false,
+              };
 
-            return (
-              <button
-                key={provider.key}
-                type="button"
-                onClick={() => updateField("defaultWhatsAppProvider", provider.key)}
-                className={`rounded-2xl border p-5 text-left transition ${
-                  isSelected
-                    ? "border-blue-600 bg-blue-50 dark:bg-blue-950/40"
-                    : "border-gray-200 bg-white hover:border-gray-300 dark:border-slate-700 dark:bg-slate-950"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">{provider.name}</p>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">{provider.blurb}</p>
-                  </div>
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                      providerConfig.enabled
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {providerConfig.enabled ? "Enabled" : "Disabled"}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
+              return (
+                <option key={provider.key} value={provider.key}>
+                  {provider.name} - {providerConfig.enabled ? "Enabled" : "Disabled"}
+                </option>
+              );
+            })}
+          </select>
+          <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
+            {selectedWhatsAppProvider.blurb}
+          </p>
         </div>
 
         {selectedWhatsAppProvider.key === "browser" && (

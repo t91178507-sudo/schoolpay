@@ -24,6 +24,7 @@ function createEmptyInvoiceItem() {
 export default function CategoriesPage() {
   const session = useBusinessSession();
   const customerLabels = getCustomerLabels(session.businessType);
+  const isSchoolBusiness = String(session.businessType || "").toLowerCase() === "school";
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -68,7 +69,25 @@ export default function CategoriesPage() {
 
   const categoryList = Object.keys(grouped).sort();
   const selectedCustomers = selectedCategory ? grouped[selectedCategory] || [] : [];
-  const invoiceTotal = calculateInvoiceTotal(invoiceItems);
+  const getBusinessInvoiceItems = (items, description, editable) => {
+    if (editable) {
+      return items;
+    }
+
+    const firstItem = items[0] || createEmptyInvoiceItem();
+
+    return [
+      {
+        ...firstItem,
+        description: description.trim() || "Invoice payment",
+        quantity: 1,
+      },
+    ];
+  };
+
+  const invoiceTotal = calculateInvoiceTotal(
+    getBusinessInvoiceItems(invoiceItems, invoiceDescription, isSchoolBusiness)
+  );
 
   const createInvoicePayload = (
     customer,
@@ -200,7 +219,12 @@ export default function CategoriesPage() {
     setInvoiceError("");
 
     try {
-      const sanitizedItems = sanitizeInvoiceItems(invoiceItems);
+      const invoiceItemsForBusiness = getBusinessInvoiceItems(
+        invoiceItems,
+        invoiceDescription,
+        isSchoolBusiness
+      );
+      const sanitizedItems = sanitizeInvoiceItems(invoiceItemsForBusiness);
       const amount = calculateInvoiceTotal(sanitizedItems);
 
       if (!invoiceDescription.trim()) {
@@ -278,7 +302,12 @@ export default function CategoriesPage() {
   };
 
   const confirmBulkGenerate = async () => {
-    const sanitizedBulkItems = sanitizeInvoiceItems(bulkItems);
+    const bulkItemsForBusiness = getBusinessInvoiceItems(
+      bulkItems,
+      bulkDescription,
+      isSchoolBusiness
+    );
+    const sanitizedBulkItems = sanitizeInvoiceItems(bulkItemsForBusiness);
     const amount = calculateInvoiceTotal(sanitizedBulkItems);
 
     if (!bulkDescription.trim()) {
@@ -668,22 +697,29 @@ export default function CategoriesPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Items</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
+                      {isSchoolBusiness ? "Items" : "Invoice amount"}
+                    </h3>
                     <p className="text-sm text-gray-500 dark:text-slate-400">
-                      The invoice total is calculated from the line items below.
+                      {isSchoolBusiness
+                        ? "The invoice total is calculated from the line items below."
+                        : "Enter the fixed amount for this invoice."}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={addInvoiceItem}
-                    className="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-medium"
-                  >
-                    Add item
-                  </button>
+                  {isSchoolBusiness && (
+                    <button
+                      type="button"
+                      onClick={addInvoiceItem}
+                      className="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-medium"
+                    >
+                      Add item
+                    </button>
+                  )}
                 </div>
 
                 <div className="space-y-3">
-                  {invoiceItems.map((item, index) => {
+                  {isSchoolBusiness ? (
+                    invoiceItems.map((item, index) => {
                     const quantity = Number(item.quantity || 0);
                     const unitPrice = Number(item.unitPrice || 0);
                     const lineTotal =
@@ -757,7 +793,24 @@ export default function CategoriesPage() {
                         </div>
                       </div>
                     );
-                  })}
+                    })
+                  ) : (
+                    <div className="rounded-2xl border border-gray-200 p-4 dark:border-slate-800">
+                      <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-2">
+                        Amount
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={invoiceItems[0]?.unitPrice || ""}
+                        onChange={(e) =>
+                          updateInvoiceItem(invoiceItems[0].id, "unitPrice", e.target.value)
+                        }
+                        className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -765,7 +818,9 @@ export default function CategoriesPage() {
                 <div>
                   <p className="text-sm text-slate-500">Invoice total</p>
                   <p className="text-xs text-slate-400 mt-1">
-                    Calculated from valid line items only
+                    {isSchoolBusiness
+                      ? "Calculated from valid line items only"
+                      : "Based on the invoice amount above"}
                   </p>
                 </div>
                 <p className="text-2xl font-semibold text-slate-900">
@@ -832,22 +887,29 @@ export default function CategoriesPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-900">Items</h3>
+                    <h3 className="text-lg font-semibold text-slate-900">
+                      {isSchoolBusiness ? "Items" : "Invoice amount"}
+                    </h3>
                     <p className="text-sm text-slate-500">
-                      Every {customerLabels.singular} in this category will receive the same item list.
+                      {isSchoolBusiness
+                        ? `Every ${customerLabels.singular} in this category will receive the same item list.`
+                        : `Every ${customerLabels.singular} in this category will receive the same fixed amount.`}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={addBulkItem}
-                    className="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-medium"
-                  >
-                    Add item
-                  </button>
+                  {isSchoolBusiness && (
+                    <button
+                      type="button"
+                      onClick={addBulkItem}
+                      className="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-medium"
+                    >
+                      Add item
+                    </button>
+                  )}
                 </div>
 
                 <div className="space-y-3">
-                  {bulkItems.map((item, index) => {
+                  {isSchoolBusiness ? (
+                    bulkItems.map((item, index) => {
                     const quantity = Number(item.quantity || 0);
                     const unitPrice = Number(item.unitPrice || 0);
                     const lineTotal =
@@ -921,7 +983,24 @@ export default function CategoriesPage() {
                         </div>
                       </div>
                     );
-                  })}
+                    })
+                  ) : (
+                    <div className="rounded-2xl border border-slate-200 p-4">
+                      <label className="block text-xs font-medium text-slate-500 mb-2">
+                        Amount per {customerLabels.singular}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={bulkItems[0]?.unitPrice || ""}
+                        onChange={(e) =>
+                          updateBulkItem(bulkItems[0].id, "unitPrice", e.target.value)
+                        }
+                        className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-400"
+                        placeholder="0"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -929,11 +1008,15 @@ export default function CategoriesPage() {
                 <div>
                   <p className="text-sm text-slate-500">Amount per {customerLabels.singular}</p>
                   <p className="text-xs text-slate-400 mt-1">
-                    Calculated from the shared line items
+                    {isSchoolBusiness
+                      ? "Calculated from the shared line items"
+                      : "Based on the fixed amount above"}
                   </p>
                 </div>
                 <p className="text-2xl font-semibold text-slate-900">
-                  N{calculateInvoiceTotal(bulkItems).toLocaleString()}
+                  N{calculateInvoiceTotal(
+                    getBusinessInvoiceItems(bulkItems, bulkDescription, isSchoolBusiness)
+                  ).toLocaleString()}
                 </p>
               </div>
 

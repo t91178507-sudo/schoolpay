@@ -1,5 +1,8 @@
 import { connectDB } from "../../../../../../lib/mongodb";
-import { findUserById } from "../../../../../../lib/paymentGatewaySettings";
+import {
+  findUserById,
+  resolveActivePaymentGateway,
+} from "../../../../../../lib/paymentGatewaySettings";
 
 function buildCustomerPayload(record = {}, owner = null) {
   return {
@@ -7,7 +10,7 @@ function buildCustomerPayload(record = {}, owner = null) {
     phone: record.phone || "",
     email: record.email || "",
     businessName: record.businessName || "",
-    defaultPaymentGateway: owner?.defaultPaymentGateway || "monnify",
+    defaultPaymentGateway: resolveActivePaymentGateway(owner || {}),
     token: record.customerToken || record.token || "",
   };
 }

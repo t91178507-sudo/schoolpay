@@ -53,6 +53,7 @@ export default function PaymentPage() {
   const [activeInvoice, setActiveInvoice] = useState(null);
   const [payAmount, setPayAmount] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [copiedPayazaField, setCopiedPayazaField] = useState("");
   const [launchingPayment, setLaunchingPayment] = useState(false);
   const [payazaAccount, setPayazaAccount] = useState(null);
   const [verifyingPayaza, setVerifyingPayaza] = useState(false);
@@ -255,6 +256,14 @@ export default function PaymentPage() {
     } finally {
       setVerifyingPayaza(false);
     }
+  };
+
+  const copyPayazaValue = (field, value) => {
+    if (!value) return;
+
+    navigator.clipboard.writeText(String(value));
+    setCopiedPayazaField(field);
+    setTimeout(() => setCopiedPayazaField(""), 1500);
   };
 
   const copyToken = () => {
@@ -513,34 +522,6 @@ export default function PaymentPage() {
                     ? "Loading Monnify..."
                     : `Pay N${parseAmount(payAmount).toLocaleString()}`}
             </button>
-            {payazaAccount && (
-              <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4 text-left dark:border-slate-800 dark:bg-slate-900">
-                <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
-                  Transfer to this account
-                </p>
-                <div className="mt-3 space-y-2">
-                  <DetailRow label="Bank" value={payazaAccount.bankName || "-"} />
-                  <DetailRow label="Account number" value={payazaAccount.accountNumber || "-"} />
-                  <DetailRow label="Account name" value={payazaAccount.accountName || "-"} />
-                  <DetailRow
-                    label="Amount"
-                    value={`N${Number(payazaAccount.amountPayable || payAmount).toLocaleString()}`}
-                  />
-                  <DetailRow
-                    label="Expires"
-                    value={`${payazaAccount.expiresInMinutes || 30} minutes`}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={verifyPayazaPayment}
-                  disabled={verifyingPayaza}
-                  className="mt-4 w-full rounded-xl border border-slate-300 bg-white py-3 text-[14px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
-                >
-                  {verifyingPayaza ? "Checking payment..." : "I have made the transfer"}
-                </button>
-              </div>
-            )}
             <p className="text-center text-[12px] text-slate-400 mt-3">
               Secured by {paymentGateway === "payaza" ? "PayAza" : "Monnify"}
             </p>
@@ -549,6 +530,17 @@ export default function PaymentPage() {
 
         <p className="mt-6 text-center text-[12px] text-slate-400">Powered by InvoiceHub</p>
       </div>
+      {payazaAccount && (
+        <PayazaPaymentModal
+          account={payazaAccount}
+          amount={payAmount}
+          onClose={() => setPayazaAccount(null)}
+          onVerify={verifyPayazaPayment}
+          onCopy={copyPayazaValue}
+          copiedField={copiedPayazaField}
+          verifying={verifyingPayaza}
+        />
+      )}
     </div>
   );
 }
@@ -564,6 +556,98 @@ function DetailRow({ label, value, align = "center" }) {
       <span className="text-[14px] font-medium text-slate-900 dark:text-slate-100 text-right">
         {value}
       </span>
+    </div>
+  );
+}
+
+function PayazaPaymentModal({
+  account,
+  amount,
+  onClose,
+  onVerify,
+  onCopy,
+  copiedField,
+  verifying,
+}) {
+  const amountPayable = Number(account.amountPayable || amount || 0);
+  const formattedAmount = amountPayable.toLocaleString();
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-6 backdrop-blur-sm">
+      <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-slate-900">
+        <div className="border-b border-slate-100 px-6 py-5 dark:border-slate-800">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
+                PayAza transfer
+              </p>
+              <h2 className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                Complete your payment
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+              aria-label="Close PayAza payment"
+            >
+              x
+            </button>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
+            Transfer the exact amount to the temporary account below. PayAza will confirm the payment automatically.
+          </p>
+        </div>
+
+        <div className="space-y-4 px-6 py-5">
+          <div className="rounded-2xl bg-slate-950 px-5 py-4 text-white">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Amount to transfer</p>
+            <p className="mt-1 text-3xl font-semibold tabular-nums">N{formattedAmount}</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
+            <div className="space-y-3">
+              <DetailRow label="Bank" value={account.bankName || "-"} />
+              <DetailRow label="Account name" value={account.accountName || "-"} />
+              <DetailRow label="Expires" value={`${account.expiresInMinutes || 30} minutes`} />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onCopy("accountNumber", account.accountNumber)}
+            className="w-full rounded-2xl border-2 border-emerald-500 bg-emerald-50 px-5 py-4 text-left shadow-sm transition hover:bg-emerald-100 dark:border-emerald-400 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/70"
+          >
+            <span className="block text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+              Account number
+            </span>
+            <span className="mt-1 flex items-center justify-between gap-3">
+              <span className="font-mono text-2xl font-black tracking-wide text-emerald-950 dark:text-emerald-50">
+                {account.accountNumber || "-"}
+              </span>
+              <span className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-bold text-white">
+                {copiedField === "accountNumber" ? "Copied" : "Copy"}
+              </span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onVerify}
+            disabled={verifying}
+            className="w-full rounded-xl bg-slate-900 py-3.5 text-[15px] font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {verifying ? "Checking payment..." : "I have made the transfer"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full rounded-xl border border-slate-300 bg-white py-3 text-[14px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Back to invoice
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
