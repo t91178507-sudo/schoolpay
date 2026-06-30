@@ -63,10 +63,7 @@ export async function sendWhatsAppWebMessage(config = {}, { phone, text }) {
 
   const response = await fetch(`${config.bridgeBaseUrl}/api/messages/send-text`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
-    },
+    headers: buildBridgeHeaders(config),
     body: JSON.stringify(buildWhatsAppWebSendPayload(config, { phone, text })),
     cache: "no-store",
   });
@@ -143,6 +140,7 @@ async function fetchBridgeJson(url, options = {}, timeoutMs = 1500) {
 function buildBridgeHeaders(config = {}) {
   return {
     "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true",
     ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
   };
 }
@@ -157,7 +155,7 @@ export async function fetchWhatsAppWebStatus(config = {}) {
     url,
     {
       method: "GET",
-      headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
+      headers: buildBridgeHeaders(config),
       cache: "no-store",
     },
     1500
