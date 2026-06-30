@@ -54,6 +54,8 @@ export default function PaymentPage() {
   const [payAmount, setPayAmount] = useState(0);
   const [copied, setCopied] = useState(false);
   const [launchingPayment, setLaunchingPayment] = useState(false);
+  const [payazaAccount, setPayazaAccount] = useState(null);
+  const [verifyingPayaza, setVerifyingPayaza] = useState(false);
   const [sdkReady, setSdkReady] = useState(
     () => typeof window !== "undefined" && Boolean(window.MonnifySDK)
   );
@@ -61,6 +63,7 @@ export default function PaymentPage() {
   const openInvoice = (invoice) => {
     setActiveInvoice(invoice);
     setPayAmount(getOutstandingAmount(invoice));
+    setPayazaAccount(null);
   };
 
   useEffect(() => {
@@ -174,6 +177,83 @@ export default function PaymentPage() {
       alert(err.message || "Unable to start Monnify payment");
       setLaunchingPayment(false);
       return;
+    }
+  };
+
+  const payWithPayaza = async () => {
+    if (!activeInvoice) return;
+    const invoiceAmount = getOutstandingAmount(activeInvoice);
+    const requestedAmount = parseAmount(payAmount);
+
+    if (requestedAmount <= 0) {
+      alert("Enter a valid amount");
+      return;
+    }
+
+    if (requestedAmount > invoiceAmount) {
+      alert(
+        `Amount cannot be more than the outstanding invoice balance. Maximum: N${invoiceAmount.toLocaleString()}.`
+      );
+      return;
+    }
+
+    setLaunchingPayment(true);
+
+    try {
+      const res = await fetch("/api/payaza/virtual-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: activeInvoice.token,
+          invoiceId: activeInvoice._id,
+          amount: requestedAmount,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.virtualAccount) {
+        throw new Error(data.error || "Unable to create PayAza virtual account");
+      }
+
+      setPayazaAccount({
+        ...data.virtualAccount,
+        invoiceId: data.invoiceId,
+        paymentReference: data.paymentReference,
+      });
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Unable to start PayAza payment");
+    } finally {
+      setLaunchingPayment(false);
+    }
+  };
+
+  const verifyPayazaPayment = async () => {
+    if (!activeInvoice || !payazaAccount?.paymentReference) return;
+    setVerifyingPayaza(true);
+
+    try {
+      const res = await fetch("/api/payaza/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: activeInvoice.token,
+          invoiceId: activeInvoice._id,
+          paymentReference: payazaAccount.paymentReference,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Payment is not complete yet");
+      }
+
+      window.location.reload();
+    } catch (err) {
+      alert(err.message || "Payment is not complete yet");
+    } finally {
+      setVerifyingPayaza(false);
     }
   };
 
@@ -321,6 +401,7 @@ export default function PaymentPage() {
   const invoiceDescription =
     activeInvoice.description || activeInvoice.category || activeInvoice.class || "-";
   const outstandingAmount = getOutstandingAmount(activeInvoice);
+  const paymentGateway = customer.defaultPaymentGateway === "payaza" ? "payaza" : "monnify";
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 py-16 px-4">
@@ -413,20 +494,55 @@ export default function PaymentPage() {
 
           <div className="px-8 pb-8 pt-2">
             <button
-              onClick={payWithMonnify}
-              disabled={isPaid || launchingPayment || !sdkReady || parseAmount(payAmount) <= 0}
+              onClick={paymentGateway === "payaza" ? payWithPayaza : payWithMonnify}
+              disabled={
+                isPaid ||
+                launchingPayment ||
+                (paymentGateway === "monnify" && !sdkReady) ||
+                parseAmount(payAmount) <= 0
+              }
               className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-medium text-[15px] transition-colors"
             >
               {isPaid
                 ? "Already paid"
                 : launchingPayment
-                  ? "Opening Monnify..."
-                  : !sdkReady
+                  ? paymentGateway === "payaza"
+                    ? "Generating account..."
+                    : "Opening Monnify..."
+                  : paymentGateway === "monnify" && !sdkReady
                     ? "Loading Monnify..."
                     : `Pay N${parseAmount(payAmount).toLocaleString()}`}
             </button>
+            {payazaAccount && (
+              <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4 text-left dark:border-slate-800 dark:bg-slate-900">
+                <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
+                  Transfer to this account
+                </p>
+                <div className="mt-3 space-y-2">
+                  <DetailRow label="Bank" value={payazaAccount.bankName || "-"} />
+                  <DetailRow label="Account number" value={payazaAccount.accountNumber || "-"} />
+                  <DetailRow label="Account name" value={payazaAccount.accountName || "-"} />
+                  <DetailRow
+                    label="Amount"
+                    value={`N${Number(payazaAccount.amountPayable || payAmount).toLocaleString()}`}
+                  />
+                  <DetailRow
+                    label="Expires"
+                    value={`${payazaAccount.expiresInMinutes || 30} minutes`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={verifyPayazaPayment}
+                  disabled={verifyingPayaza}
+                  className="mt-4 w-full rounded-xl border border-slate-300 bg-white py-3 text-[14px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                >
+                  {verifyingPayaza ? "Checking payment..." : "I have made the transfer"}
+                </button>
+              </div>
+            )}
             <p className="text-center text-[12px] text-slate-400 mt-3">
-              Secured by Monnify
+              Secured by {paymentGateway === "payaza" ? "PayAza" : "Monnify"}
             </p>
           </div>
         </div>

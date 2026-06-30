@@ -483,6 +483,19 @@ export function resolveMonnifyConfig(user = {}) {
   };
 }
 
+export function resolvePayazaConfig(user = {}) {
+  const gateway = user.paymentGateways?.payaza || {};
+
+  return {
+    publicKey: decryptGatewayValue(gateway, "publicKey") || "",
+    secretKey: decryptGatewayValue(gateway, "secretKey") || "",
+    webhookUrl: normalizeText(gateway.webhookUrl),
+    callbackUrl: normalizeText(gateway.callbackUrl),
+    enabled: gateway.enabled === true,
+    environment: gateway.environment === "live" ? "live" : "test",
+  };
+}
+
 export function resolveBrowserWhatsAppConfig(user = {}) {
   const provider = user.whatsappProviders?.browser || {};
 
