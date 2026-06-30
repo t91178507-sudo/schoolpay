@@ -7,7 +7,7 @@ import {
   resolveGreenApiConfig,
   resolveBrowserWhatsAppConfig,
   resolveTwilioSandboxConfig,
-  resolveWhatsAppWebConfig,
+  resolveWhatsAppWebConfigForUser,
 } from "./paymentGatewaySettings";
 import { markInvoiceNotificationPrepared } from "./paymentLifecycle";
 import {
@@ -85,21 +85,8 @@ export async function deliverInvoiceMessage({
 
   const twilioConfig = resolveTwilioSandboxConfig(owner || {});
   const browserConfig = resolveBrowserWhatsAppConfig(owner || {});
-  const whatsAppWebConfig = resolveWhatsAppWebConfig(owner || {});
+  const whatsAppWebConfig = await resolveWhatsAppWebConfigForUser(db, owner || {});
   const greenApiConfig = resolveGreenApiConfig(owner || {});
-
-  if (isGreenApiConfigured(greenApiConfig)) {
-    try {
-      await sendGreenApiWhatsAppMessage(greenApiConfig, { phone, text: message });
-      await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
-
-      return { sent: true, provider: "greenApi" };
-    } catch (error) {
-      if (!shouldFallbackToBrowser(error)) {
-        throw error;
-      }
-    }
-  }
 
   if (isWhatsAppWebConfigured(whatsAppWebConfig)) {
     try {
@@ -107,6 +94,19 @@ export async function deliverInvoiceMessage({
       await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
 
       return { sent: true, provider: "whatsappWeb" };
+    } catch (error) {
+      if (!shouldFallbackToBrowser(error)) {
+        throw error;
+      }
+    }
+  }
+
+  if (isGreenApiConfigured(greenApiConfig)) {
+    try {
+      await sendGreenApiWhatsAppMessage(greenApiConfig, { phone, text: message });
+      await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
+
+      return { sent: true, provider: "greenApi" };
     } catch (error) {
       if (!shouldFallbackToBrowser(error)) {
         throw error;
@@ -166,21 +166,8 @@ export async function deliverPaymentConfirmation({
 
   const twilioConfig = resolveTwilioSandboxConfig(owner || {});
   const browserConfig = resolveBrowserWhatsAppConfig(owner || {});
-  const whatsAppWebConfig = resolveWhatsAppWebConfig(owner || {});
+  const whatsAppWebConfig = await resolveWhatsAppWebConfigForUser(db, owner || {});
   const greenApiConfig = resolveGreenApiConfig(owner || {});
-
-  if (isGreenApiConfigured(greenApiConfig)) {
-    try {
-      await sendGreenApiWhatsAppMessage(greenApiConfig, { phone, text: message });
-      await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
-
-      return { sent: true, provider: "greenApi" };
-    } catch (error) {
-      if (!shouldFallbackToBrowser(error)) {
-        throw error;
-      }
-    }
-  }
 
   if (isWhatsAppWebConfigured(whatsAppWebConfig)) {
     try {
@@ -188,6 +175,19 @@ export async function deliverPaymentConfirmation({
       await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
 
       return { sent: true, provider: "whatsappWeb" };
+    } catch (error) {
+      if (!shouldFallbackToBrowser(error)) {
+        throw error;
+      }
+    }
+  }
+
+  if (isGreenApiConfigured(greenApiConfig)) {
+    try {
+      await sendGreenApiWhatsAppMessage(greenApiConfig, { phone, text: message });
+      await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
+
+      return { sent: true, provider: "greenApi" };
     } catch (error) {
       if (!shouldFallbackToBrowser(error)) {
         throw error;

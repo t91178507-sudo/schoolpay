@@ -1,5 +1,6 @@
 import { connectDB } from "../../../../lib/mongodb";
 import { requireAdmin } from "../../../../lib/adminAuth";
+import { getPlatformWhatsAppBridgeSettings } from "../../../../lib/paymentGatewaySettings";
 
 function parseMoney(value) {
   const amount = Number(value);
@@ -21,12 +22,13 @@ export async function GET(req) {
 
     const db = await connectDB();
 
-    const [users, totalCustomers, totalInvoices, allInvoices] =
+    const [users, totalCustomers, totalInvoices, allInvoices, platformBridge] =
       await Promise.all([
         db.collection("users").find({}, { projection: { password: 0 } }).toArray(),
         db.collection("customers").countDocuments(),
         db.collection("invoices").countDocuments(),
         db.collection("invoices").find({}).toArray(),
+        getPlatformWhatsAppBridgeSettings(db),
       ]);
 
     const totalRevenue = allInvoices.reduce(
@@ -57,11 +59,13 @@ export async function GET(req) {
       (invoice) =>
         String(invoice.customerNotificationStatus || "").toLowerCase() === "unavailable"
     ).length;
-    const whatsappWebBusinesses = users.filter(
-      (user) =>
-        user.defaultWhatsAppProvider === "whatsappWeb" &&
-        user.whatsappProviders?.whatsappWeb?.enabled === true
-    ).length;
+    const whatsappWebBusinesses = platformBridge.enabled
+      ? users.length
+      : users.filter(
+          (user) =>
+            user.defaultWhatsAppProvider === "whatsappWeb" &&
+            user.whatsappProviders?.whatsappWeb?.enabled === true
+        ).length;
     const monnifyConfiguredBusinesses = users.filter((user) => {
       const gateway = user.paymentGateways?.monnify || {};
       return Boolean(gateway.enabled && gateway.apiKey && gateway.secretKey && gateway.contractCode);

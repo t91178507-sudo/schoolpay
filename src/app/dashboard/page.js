@@ -18,6 +18,7 @@ export default function Dashboard() {
   const customerLabels = getCustomerLabels(session.businessType);
   const [stats, setStats] = useState({
     totalCustomers: 0,
+    expectedRevenue: 0,
     totalRevenue: 0,
     paidInvoices: 0,
     unpaidInvoices: 0,
@@ -37,6 +38,11 @@ export default function Dashboard() {
         const customers = customersRes.ok ? await customersRes.json() : [];
         const invoices = invoicesRes.ok ? await invoicesRes.json() : [];
 
+        const expectedRevenue = invoices.reduce(
+          (sum, inv) => sum + Number(inv.amount || 0),
+          0
+        );
+
         const totalRevenue = invoices
           .filter((invoice) => invoice.status === "Paid")
           .reduce((sum, inv) => sum + Number(inv.paidAmount || inv.amount || 0), 0);
@@ -46,6 +52,7 @@ export default function Dashboard() {
 
         setStats({
           totalCustomers: customers.length,
+          expectedRevenue,
           totalRevenue,
           paidInvoices: paid,
           unpaidInvoices: unpaid,
@@ -116,6 +123,11 @@ export default function Dashboard() {
 
       <StatGrid>
         <StatCard label={`Total ${customerLabels.pluralTitle}`} value={stats.totalCustomers} tone="blue" />
+        <StatCard
+          label="Expected Revenue"
+          value={`N${stats.expectedRevenue.toLocaleString()}`}
+          tone="violet"
+        />
         <StatCard
           label="Collected Revenue"
           value={`N${stats.totalRevenue.toLocaleString()}`}

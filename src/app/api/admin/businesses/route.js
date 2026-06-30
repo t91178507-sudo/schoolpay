@@ -1,6 +1,9 @@
 import { connectDB } from "../../../../lib/mongodb";
 import { requireAdmin } from "../../../../lib/adminAuth";
-import { buildSettingsPayload } from "../../../../lib/paymentGatewaySettings";
+import {
+  buildSettingsPayload,
+  getPlatformSettings,
+} from "../../../../lib/paymentGatewaySettings";
 
 function parseMoney(value) {
   const amount = Number(value);
@@ -27,14 +30,15 @@ export async function GET(req) {
       .find({}, { projection: { password: 0 } })
       .toArray();
 
-    const [customers, invoices] = await Promise.all([
+    const [customers, invoices, platformSettings] = await Promise.all([
       db.collection("customers").find({}).toArray(),
       db.collection("invoices").find({}).toArray(),
+      getPlatformSettings(db),
     ]);
 
     const businesses = users.map((user) => {
       const userId = user._id.toString();
-      const settings = buildSettingsPayload(user);
+      const settings = buildSettingsPayload(user, platformSettings || {});
       const ownedCustomers = customers.filter((customer) => customer.ownerId === userId);
       const ownedInvoices = invoices.filter((invoice) => invoice.ownerId === userId);
       const paidInvoices = ownedInvoices.filter((invoice) => invoice.status === "Paid");

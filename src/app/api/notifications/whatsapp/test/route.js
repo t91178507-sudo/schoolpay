@@ -3,7 +3,7 @@ import { connectDB } from "../../../../../lib/mongodb";
 import {
   findUserById,
   resolveGreenApiConfig,
-  resolveWhatsAppWebConfig,
+  resolveWhatsAppWebConfigForUser,
   resolveTwilioSandboxConfig,
 } from "../../../../../lib/paymentGatewaySettings";
 import {
@@ -36,6 +36,20 @@ export async function POST(req) {
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
+    const whatsAppWebConfig = await resolveWhatsAppWebConfigForUser(db, user);
+    if (isWhatsAppWebConfigured(whatsAppWebConfig)) {
+      const result = await sendWhatsAppWebMessage(whatsAppWebConfig, {
+        phone,
+        text: "InvoiceHub test message\n\nYour WhatsApp Web bridge connection is working.",
+      });
+
+      return Response.json({
+        success: true,
+        provider: "whatsappWeb",
+        result,
+      });
+    }
+
     const greenApiConfig = resolveGreenApiConfig(user);
     if (isGreenApiConfigured(greenApiConfig)) {
       const result = await sendGreenApiWhatsAppMessage(greenApiConfig, {
@@ -46,20 +60,6 @@ export async function POST(req) {
       return Response.json({
         success: true,
         provider: "greenApi",
-        result,
-      });
-    }
-
-    const whatsAppWebConfig = resolveWhatsAppWebConfig(user);
-    if (isWhatsAppWebConfigured(whatsAppWebConfig)) {
-      const result = await sendWhatsAppWebMessage(whatsAppWebConfig, {
-        phone,
-        text: "InvoiceHub test message\n\nYour WhatsApp Web bridge connection is working.",
-      });
-
-      return Response.json({
-        success: true,
-        provider: "whatsappWeb",
         result,
       });
     }

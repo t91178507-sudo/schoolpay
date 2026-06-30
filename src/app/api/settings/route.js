@@ -3,6 +3,7 @@ import { requireAuth } from "../../../lib/auth";
 import { connectDB } from "../../../lib/mongodb";
 import {
   buildSettingsPayload,
+  getPlatformSettings,
   sanitizeSettingsInput,
 } from "../../../lib/paymentGatewaySettings";
 
@@ -19,7 +20,9 @@ export async function GET(req) {
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
-    return Response.json(buildSettingsPayload(user));
+    const platformSettings = await getPlatformSettings(db);
+
+    return Response.json(buildSettingsPayload(user, platformSettings || {}));
   } catch (error) {
     const status = error.status || 500;
     return Response.json(
@@ -67,7 +70,7 @@ export async function PUT(req) {
 
     return Response.json({
       success: true,
-      settings: buildSettingsPayload(updatedUser),
+      settings: buildSettingsPayload(updatedUser, await getPlatformSettings(db) || {}),
     });
   } catch (error) {
     const status = error.status || 500;

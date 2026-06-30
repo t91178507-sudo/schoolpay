@@ -2,7 +2,7 @@ import { requireAuth } from "../../../../../../lib/auth";
 import { connectDB } from "../../../../../../lib/mongodb";
 import {
   findUserById,
-  resolveWhatsAppWebConfig,
+  resolveWhatsAppWebConfigForUser,
 } from "../../../../../../lib/paymentGatewaySettings";
 import {
   deleteWhatsAppWebSession,
@@ -20,7 +20,7 @@ export async function POST(req) {
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
-    const config = resolveWhatsAppWebConfig(user);
+    const config = await resolveWhatsAppWebConfigForUser(db, user);
 
     if (!hasWhatsAppWebBridgeConfig(config)) {
       return Response.json(
@@ -54,7 +54,7 @@ export async function DELETE(req) {
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
-    const config = resolveWhatsAppWebConfig(user);
+    const config = await resolveWhatsAppWebConfigForUser(db, user);
 
     if (!hasWhatsAppWebBridgeConfig(config)) {
       return Response.json(

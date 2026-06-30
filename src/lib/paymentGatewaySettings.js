@@ -74,6 +74,7 @@ const WHATSAPP_SECRET_FIELDS = Object.freeze({
 });
 
 const ENCRYPTED_PREFIX = "enc::";
+export const PLATFORM_SETTINGS_ID = "platform";
 
 function mergeGateway(defaultGateway, savedGateway = {}) {
   return {
@@ -84,6 +85,10 @@ function mergeGateway(defaultGateway, savedGateway = {}) {
 
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeBridgeBaseUrl(value) {
+  return normalizeText(value).replace(/\/+$/, "");
 }
 
 function normalizeGatewayBoolean(value) {
@@ -116,6 +121,28 @@ function buildDefaultWhatsAppWebProvider(user = {}) {
     ...DEFAULT_WHATSAPP_PROVIDERS.whatsappWeb,
     sessionName,
     qrConnectUrl: `http://localhost:8787/qr?sessionName=${encodeURIComponent(sessionName)}`,
+  };
+}
+
+function buildWhatsAppWebQrConnectUrl(bridgeBaseUrl, sessionName) {
+  if (!bridgeBaseUrl || !sessionName) {
+    return "";
+  }
+
+  return `${bridgeBaseUrl}/qr?sessionName=${encodeURIComponent(sessionName)}`;
+}
+
+function normalizePlatformWhatsAppBridge(platformSettings = {}) {
+  const bridge = platformSettings.whatsappBridge || platformSettings || {};
+  const bridgeBaseUrl = normalizeBridgeBaseUrl(bridge.bridgeBaseUrl);
+  const apiKey = normalizeText(bridge.apiKey);
+
+  return {
+    enabled: Boolean(bridgeBaseUrl && apiKey),
+    bridgeBaseUrl,
+    bridgePort: normalizeText(bridge.bridgePort),
+    apiKey,
+    updatedAt: bridge.updatedAt || null,
   };
 }
 
@@ -232,11 +259,15 @@ function isWhatsAppSecretField(providerKey, fieldKey) {
   return WHATSAPP_SECRET_FIELDS[providerKey]?.includes(fieldKey) || false;
 }
 
-function buildWhatsAppPayload(providerKey, savedProvider = {}, user = {}) {
+function buildWhatsAppPayload(providerKey, savedProvider = {}, user = {}, platformSettings = {}) {
   const defaultProvider =
     providerKey === "whatsappWeb"
       ? buildDefaultWhatsAppWebProvider(user)
       : DEFAULT_WHATSAPP_PROVIDERS[providerKey];
+  const platformBridge =
+    providerKey === "whatsappWeb"
+      ? normalizePlatformWhatsAppBridge(platformSettings)
+      : null;
   const normalizedSavedProvider =
     providerKey === "whatsappWeb"
       ? {
@@ -259,6 +290,18 @@ function buildWhatsAppPayload(providerKey, savedProvider = {}, user = {}) {
     ...defaultProvider,
     ...normalizedSavedProvider,
   };
+
+  if (platformBridge?.enabled) {
+    merged.enabled = true;
+    merged.bridgeBaseUrl = platformBridge.bridgeBaseUrl;
+    merged.bridgePort = platformBridge.bridgePort;
+    merged.apiKey = platformBridge.apiKey;
+    merged.qrConnectUrl = buildWhatsAppWebQrConnectUrl(
+      platformBridge.bridgeBaseUrl,
+      merged.sessionName
+    );
+  }
+
   const nextProvider = { ...merged };
 
   for (const fieldKey of WHATSAPP_SECRET_FIELDS[providerKey] || []) {
@@ -275,7 +318,7 @@ function decryptGatewayValue(savedGateway = {}, fieldKey, fallback = "") {
   return decrypted || fallback;
 }
 
-export function buildSettingsPayload(user = {}) {
+export function buildSettingsPayload(user = {}, platformSettings = {}) {
   const paymentGateways = user.paymentGateways || {};
   const whatsappProviders = user.whatsappProviders || {};
 
@@ -299,22 +342,26 @@ export function buildSettingsPayload(user = {}) {
       browser: buildWhatsAppPayload(
         "browser",
         whatsappProviders.browser,
-        user
+        user,
+        platformSettings
       ),
       twilioSandbox: buildWhatsAppPayload(
         "twilioSandbox",
         whatsappProviders.twilioSandbox,
-        user
+        user,
+        platformSettings
       ),
       whatsappWeb: buildWhatsAppPayload(
         "whatsappWeb",
         whatsappProviders.whatsappWeb,
-        user
+        user,
+        platformSettings
       ),
       greenApi: buildWhatsAppPayload(
         "greenApi",
         whatsappProviders.greenApi,
-        user
+        user,
+        platformSettings
       ),
     },
   };
@@ -439,6 +486,16 @@ export async function findUserById(db, userId) {
   });
 }
 
+export async function getPlatformSettings(db) {
+  return db.collection("platformSettings").findOne({
+    _id: PLATFORM_SETTINGS_ID,
+  });
+}
+
+export async function getPlatformWhatsAppBridgeSettings(db) {
+  return normalizePlatformWhatsAppBridge((await getPlatformSettings(db)) || {});
+}
+
 export function resolveMonnifyConfig(user = {}) {
   const gateway = user.paymentGateways?.monnify || {};
 
@@ -479,29 +536,46 @@ export function resolveBrowserWhatsAppConfig(user = {}) {
   };
 }
 
-export function resolveWhatsAppWebConfig(user = {}) {
+export function resolveWhatsAppWebConfig(user = {}, platformSettings = {}) {
   const provider = user.whatsappProviders?.whatsappWeb || {};
   const defaultProvider = buildDefaultWhatsAppWebProvider(user);
+  const platformBridge = normalizePlatformWhatsAppBridge(platformSettings);
   const savedSessionName = normalizeText(provider.sessionName);
   const sessionName =
     shouldUseDefaultWhatsAppWebSession(savedSessionName, defaultProvider)
       ? defaultProvider.sessionName
       : savedSessionName;
   const savedQrUrl = normalizeText(provider.qrConnectUrl);
+  const bridgeBaseUrl =
+    platformBridge.bridgeBaseUrl ||
+    normalizeBridgeBaseUrl(provider.bridgeBaseUrl) ||
+    "http://localhost:8787";
 
   return {
-    enabled: provider.enabled === true,
+    enabled: provider.enabled === true || platformBridge.enabled,
     senderPhoneNumber: normalizeText(provider.senderPhoneNumber),
-    bridgeBaseUrl:
-      (normalizeText(provider.bridgeBaseUrl) || "http://localhost:8787").replace(/\/+$/, ""),
+    bridgeBaseUrl,
+    bridgePort: platformBridge.bridgePort || normalizeText(provider.bridgePort),
     sessionName,
-    apiKey: decryptGatewayValue(provider, "apiKey") || "invoicehub-bridge-local",
+    apiKey:
+      platformBridge.apiKey ||
+      decryptGatewayValue(provider, "apiKey") ||
+      "invoicehub-bridge-local",
     qrConnectUrl:
-      (shouldUseDefaultWhatsAppWebQrUrl(savedQrUrl, defaultProvider)
-        ? defaultProvider.qrConnectUrl
-        : savedQrUrl),
+      platformBridge.bridgeBaseUrl
+        ? buildWhatsAppWebQrConnectUrl(platformBridge.bridgeBaseUrl, sessionName)
+        : (shouldUseDefaultWhatsAppWebQrUrl(savedQrUrl, defaultProvider)
+            ? defaultProvider.qrConnectUrl
+            : savedQrUrl),
     statusWebhookUrl: normalizeText(provider.statusWebhookUrl),
   };
+}
+
+export async function resolveWhatsAppWebConfigForUser(db, user = {}) {
+  return resolveWhatsAppWebConfig(
+    user,
+    await getPlatformWhatsAppBridgeSettings(db)
+  );
 }
 
 export function resolveGreenApiConfig(user = {}) {

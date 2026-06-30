@@ -2,7 +2,7 @@ import { requireAuth } from "../../../../../../lib/auth";
 import { connectDB } from "../../../../../../lib/mongodb";
 import {
   findUserById,
-  resolveWhatsAppWebConfig,
+  resolveWhatsAppWebConfigForUser,
 } from "../../../../../../lib/paymentGatewaySettings";
 import {
   hasWhatsAppWebBridgeConfig,
@@ -25,7 +25,7 @@ export async function POST(req) {
       return Response.json({ error: "Phone number is required" }, { status: 400 });
     }
 
-    const config = resolveWhatsAppWebConfig(user);
+    const config = await resolveWhatsAppWebConfigForUser(db, user);
 
     if (!hasWhatsAppWebBridgeConfig(config)) {
       return Response.json(
