@@ -84,6 +84,18 @@ function addMessageLog(sessionState, entry) {
   ].slice(0, 50);
 }
 
+function isRecoverableBrowserError(error) {
+  const message = String(error?.message || error || "").toLowerCase();
+
+  return (
+    message.includes("detached frame") ||
+    message.includes("execution context was destroyed") ||
+    message.includes("target closed") ||
+    message.includes("session closed") ||
+    message.includes("page crashed")
+  );
+}
+
 function getSessionStoragePath(sessionName) {
   return path.join(process.cwd(), ".sessions", `session-${sessionName}`);
 }
@@ -277,6 +289,20 @@ function scheduleRestart(sessionState, reason) {
   }, 5000);
 }
 
+async function restartSessionImmediately(sessionState, reason) {
+  clearRestartTimer(sessionState);
+  sessionState.lastError = reason || sessionState.lastError || "Restarting WhatsApp session";
+  touchSession(sessionState, "retrying");
+
+  if (sessionState.client) {
+    await sessionState.client.destroy().catch(() => {});
+  }
+
+  sessionState.client = null;
+  sessionState.initializingPromise = null;
+  await ensureSession(sessionState.sessionName);
+}
+
 async function ensureSession(sessionName) {
   const sessionState = getSessionState(sessionName);
 
@@ -331,6 +357,52 @@ function waitForPairingCode(sessionState, timeoutMs = 45000) {
       }
     }, 500);
   });
+}
+
+function waitForReadySession(sessionState, timeoutMs = 20000) {
+  if (sessionState.client && sessionState.status === "ready") {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const interval = setInterval(() => {
+      if (sessionState.client && sessionState.status === "ready") {
+        clearInterval(interval);
+        resolve();
+        return;
+      }
+
+      if (["qr", "pairing_code", "auth_failure", "logged_out", "deleted"].includes(sessionState.status)) {
+        clearInterval(interval);
+        reject(new Error(`WhatsApp session is ${sessionState.status}`));
+        return;
+      }
+
+      if (Date.now() - start > timeoutMs) {
+        clearInterval(interval);
+        reject(new Error("Timed out waiting for WhatsApp session to recover"));
+      }
+    }, 500);
+  });
+}
+
+async function sendTextWithRecovery(sessionState, chatId, text) {
+  try {
+    return await sessionState.client.sendMessage(chatId, text);
+  } catch (error) {
+    if (!isRecoverableBrowserError(error)) {
+      throw error;
+    }
+
+    await restartSessionImmediately(
+      sessionState,
+      error.message || "WhatsApp browser context detached"
+    );
+    await waitForReadySession(sessionState);
+
+    return sessionState.client.sendMessage(chatId, text);
+  }
 }
 
 function requireApiKey(req, res, next) {
@@ -452,7 +524,7 @@ app.post("/api/messages/send-text", requireApiKey, async (req, res) => {
     }
 
     const chatId = `${to}@c.us`;
-    const result = await sessionState.client.sendMessage(chatId, text);
+    const result = await sendTextWithRecovery(sessionState, chatId, text);
     touchSession(sessionState);
     addMessageLog(sessionState, {
       direction: "outbound",

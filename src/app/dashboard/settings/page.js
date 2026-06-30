@@ -68,30 +68,6 @@ const WHATSAPP_PROVIDERS = [
       { key: "statusWebhookUrl", label: "Status Webhook URL", type: "url" },
     ],
   },
-  {
-    key: "greenApi",
-    name: "Green API",
-    blurb: "Send WhatsApp messages through a Green API authorized instance.",
-    fields: [
-      { key: "apiUrl", label: "API URL", type: "url" },
-      { key: "mediaUrl", label: "Media URL", type: "url" },
-      { key: "idInstance", label: "Instance ID", type: "text" },
-      { key: "apiTokenInstance", label: "Instance API Token", type: "password" },
-      { key: "senderPhoneNumber", label: "Authorized Phone", type: "tel" },
-    ],
-  },
-  {
-    key: "twilioSandbox",
-    name: "Twilio Sandbox",
-    blurb: "Use Twilio's WhatsApp Sandbox to send working test messages while you validate the flow.",
-    fields: [
-      { key: "accountSid", label: "Account SID", type: "password" },
-      { key: "authToken", label: "Auth Token", type: "password" },
-      { key: "fromNumber", label: "Sandbox From Number", type: "text" },
-      { key: "contentSid", label: "Content SID", type: "text" },
-      { key: "statusCallbackUrl", label: "Status Callback URL", type: "url" },
-    ],
-  },
 ];
 
 const EMPTY_SETTINGS = {
@@ -145,22 +121,6 @@ const EMPTY_SETTINGS = {
       apiKey: "invoicehub-bridge-local",
       qrConnectUrl: "",
       statusWebhookUrl: "",
-    },
-    greenApi: {
-      enabled: false,
-      apiUrl: "",
-      mediaUrl: "",
-      idInstance: "",
-      apiTokenInstance: "",
-      senderPhoneNumber: "",
-    },
-    twilioSandbox: {
-      enabled: false,
-      accountSid: "",
-      authToken: "",
-      fromNumber: "whatsapp:+14155238886",
-      contentSid: "",
-      statusCallbackUrl: "",
     },
   },
 };
@@ -563,12 +523,7 @@ export default function SettingsPage() {
         throw new Error(data.error || "Unable to send test message");
       }
 
-      const providerLabel =
-        data.provider === "whatsappWeb"
-          ? "WhatsApp Web"
-          : data.provider === "greenApi"
-            ? "Green API"
-            : "Twilio Sandbox";
+      const providerLabel = data.provider === "whatsappWeb" ? "WhatsApp Web" : "Browser WhatsApp";
       setMessage(`Test message sent successfully through ${providerLabel}.`);
     } catch (testError) {
       setError(testError.message || "Unable to send test message");
@@ -1395,229 +1350,6 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {selectedWhatsAppProvider.key === "greenApi" && (
-          <div className="mt-8 overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-800">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 bg-slate-50 px-6 py-5 dark:border-slate-800 dark:bg-slate-950/60">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Green API</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-                  Use an authorized Green API instance to send invoice and payment WhatsApp messages automatically.
-                </p>
-              </div>
-
-              <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={settings.whatsappProviders.greenApi.enabled}
-                  onChange={(event) =>
-                    updateWhatsAppProviderField("greenApi", "enabled", event.target.checked)
-                  }
-                  className="h-4 w-4 accent-blue-600"
-                />
-                Enabled
-              </label>
-            </div>
-
-            <div className="p-6">
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                {selectedWhatsAppProvider.fields.map((field) => {
-                  const secretKeyId = `greenApi.${field.key}`;
-                  const isSecret = field.type === "password";
-                  const isConfigured = Boolean(
-                    settings.whatsappProviders.greenApi[`${field.key}Configured`]
-                  );
-
-                  return (
-                    <div key={field.key}>
-                      <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
-                        {field.label}
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={
-                            isSecret && !visibleSecrets[secretKeyId] ? "password" : field.type
-                          }
-                          value={settings.whatsappProviders.greenApi[field.key] || ""}
-                          onChange={(event) =>
-                            updateWhatsAppProviderField(
-                              "greenApi",
-                              field.key,
-                              event.target.value
-                            )
-                          }
-                          placeholder={
-                            isConfigured && isSecret
-                              ? `${field.label} saved securely`
-                              : field.label
-                          }
-                          className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                        />
-                        {isSecret && (
-                          <button
-                            type="button"
-                            onClick={() => toggleSecretVisibility(secretKeyId)}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 dark:text-slate-400"
-                          >
-                            {visibleSecrets[secretKeyId] ? "Hide" : "Show"}
-                          </button>
-                        )}
-                      </div>
-                      {isSecret && isConfigured && (
-                        <p className="mt-2 text-xs text-emerald-700">
-                          Saved securely on the server. Leave blank to keep the current value.
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
-                <p className="text-sm font-medium text-slate-900 dark:text-white">How this behaves</p>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  Green API sends directly through your authorized instance. The recipient number is converted to WhatsApp chat format automatically before the message is sent.
-                </p>
-              </div>
-
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <p className="text-sm font-medium text-slate-900 dark:text-white">Send test message</p>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  This checks whether InvoiceHub can reach Green API and send through the authorized instance.
-                </p>
-
-                <div className="mt-4 flex flex-col gap-3 md:flex-row">
-                  <input
-                    type="tel"
-                    value={whatsAppTestPhone}
-                    onChange={(event) => setWhatsAppTestPhone(event.target.value)}
-                    placeholder="08103902471"
-                    className="flex-1 rounded-2xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSendWhatsAppTest}
-                    disabled={testingWhatsApp}
-                    className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-300"
-                  >
-                    {testingWhatsApp ? "Sending..." : "Send test message"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {selectedWhatsAppProvider.key === "twilioSandbox" && (
-          <div className="mt-8 overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-800">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 bg-slate-50 px-6 py-5 dark:border-slate-800 dark:bg-slate-950/60">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Twilio Sandbox</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-                  Configure Twilio&apos;s WhatsApp sandbox for working test messages before moving to a production provider.
-                </p>
-              </div>
-
-              <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={settings.whatsappProviders.twilioSandbox.enabled}
-                  onChange={(event) =>
-                    updateWhatsAppProviderField("twilioSandbox", "enabled", event.target.checked)
-                  }
-                  className="h-4 w-4 accent-blue-600"
-                />
-                Enabled
-              </label>
-            </div>
-
-            <div className="p-6">
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                {selectedWhatsAppProvider.fields.map((field) => {
-                  const secretKeyId = `twilioSandbox.${field.key}`;
-                  const isSecret = field.type === "password";
-                  const isConfigured = Boolean(
-                    settings.whatsappProviders.twilioSandbox[`${field.key}Configured`]
-                  );
-
-                  return (
-                    <div key={field.key}>
-                      <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
-                        {field.label}
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={
-                            isSecret && !visibleSecrets[secretKeyId] ? "password" : field.type
-                          }
-                          value={settings.whatsappProviders.twilioSandbox[field.key] || ""}
-                          onChange={(event) =>
-                            updateWhatsAppProviderField(
-                              "twilioSandbox",
-                              field.key,
-                              event.target.value
-                            )
-                          }
-                          placeholder={
-                            isConfigured && isSecret
-                              ? `${field.label} saved securely`
-                              : field.label
-                          }
-                          className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                        />
-                        {isSecret && (
-                          <button
-                            type="button"
-                            onClick={() => toggleSecretVisibility(secretKeyId)}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 dark:text-slate-400"
-                          >
-                            {visibleSecrets[secretKeyId] ? "Hide" : "Show"}
-                          </button>
-                        )}
-                      </div>
-                      {isSecret && isConfigured && (
-                        <p className="mt-2 text-xs text-emerald-700">
-                          Saved securely on the server. Leave blank to keep the current value.
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
-                <p className="text-sm font-medium text-slate-900 dark:text-white">How this behaves</p>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  Twilio Sandbox is best for testing. Your recipient must join the sandbox first. When a number is not sandbox-ready, InvoiceHub falls back to a prepared Browser WhatsApp message instead of blocking the workflow.
-                </p>
-              </div>
-
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <p className="text-sm font-medium text-slate-900 dark:text-white">Send test message</p>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  Use this to verify your Twilio Sandbox credentials and confirm the phone number has joined the sandbox.
-                </p>
-
-                <div className="mt-4 flex flex-col gap-3 md:flex-row">
-                  <input
-                    type="tel"
-                    value={whatsAppTestPhone}
-                    onChange={(event) => setWhatsAppTestPhone(event.target.value)}
-                    placeholder="08103902471"
-                    className="flex-1 rounded-2xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSendWhatsAppTest}
-                    disabled={testingWhatsApp}
-                    className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-300"
-                  >
-                    {testingWhatsApp ? "Sending..." : "Send test message"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-8 space-y-5 dark:border-slate-800 dark:bg-slate-900">
@@ -1755,7 +1487,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
-          This flow currently uses Monnify account transfer checkout. The scanned page asks for phone number and amount, then creates a paid invoice from the successful webhook or verify callback. If Twilio Sandbox is selected, payment confirmations can be sent automatically to joined test numbers.
+          This flow currently uses Monnify account transfer checkout. The scanned page asks for phone number and amount, then creates a paid invoice from the successful webhook or verify callback. When the WhatsApp bridge is configured, payment confirmations can be sent automatically from the connected session.
         </div>
       </section>
 

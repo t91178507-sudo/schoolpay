@@ -34,14 +34,6 @@ export const DEFAULT_WHATSAPP_PROVIDERS = Object.freeze({
   browser: {
     enabled: true,
   },
-  twilioSandbox: {
-    enabled: false,
-    accountSid: "",
-    authToken: "",
-    fromNumber: "+14155238886",
-    contentSid: "",
-    statusCallbackUrl: "",
-  },
   whatsappWeb: {
     enabled: false,
     senderPhoneNumber: "",
@@ -50,14 +42,6 @@ export const DEFAULT_WHATSAPP_PROVIDERS = Object.freeze({
     apiKey: "invoicehub-bridge-local",
     qrConnectUrl: "http://localhost:8787/qr",
     statusWebhookUrl: "",
-  },
-  greenApi: {
-    enabled: false,
-    apiUrl: "",
-    mediaUrl: "",
-    idInstance: "",
-    apiTokenInstance: "",
-    senderPhoneNumber: "",
   },
 });
 
@@ -68,9 +52,7 @@ const SECRET_FIELDS = Object.freeze({
 });
 
 const WHATSAPP_SECRET_FIELDS = Object.freeze({
-  twilioSandbox: ["accountSid", "authToken"],
   whatsappWeb: ["apiKey"],
-  greenApi: ["apiTokenInstance"],
 });
 
 const ENCRYPTED_PREFIX = "enc::";
@@ -345,21 +327,9 @@ export function buildSettingsPayload(user = {}, platformSettings = {}) {
         user,
         platformSettings
       ),
-      twilioSandbox: buildWhatsAppPayload(
-        "twilioSandbox",
-        whatsappProviders.twilioSandbox,
-        user,
-        platformSettings
-      ),
       whatsappWeb: buildWhatsAppPayload(
         "whatsappWeb",
         whatsappProviders.whatsappWeb,
-        user,
-        platformSettings
-      ),
-      greenApi: buildWhatsAppPayload(
-        "greenApi",
-        whatsappProviders.greenApi,
         user,
         platformSettings
       ),
@@ -463,7 +433,7 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
     defaultPaymentGateway: ["monnify", "payaza", "touchpay"].includes(body.defaultPaymentGateway)
       ? body.defaultPaymentGateway
       : "monnify",
-    defaultWhatsAppProvider: ["browser", "twilioSandbox", "whatsappWeb", "greenApi"].includes(body.defaultWhatsAppProvider)
+    defaultWhatsAppProvider: ["browser", "whatsappWeb"].includes(body.defaultWhatsAppProvider)
       ? body.defaultWhatsAppProvider
       : "browser",
     paymentGateways: {
@@ -473,9 +443,7 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
     },
     whatsappProviders: {
       browser: normalizeWhatsAppProvider("browser"),
-      twilioSandbox: normalizeWhatsAppProvider("twilioSandbox"),
       whatsappWeb: normalizeWhatsAppProvider("whatsappWeb"),
-      greenApi: normalizeWhatsAppProvider("greenApi"),
     },
   };
 }
@@ -512,19 +480,6 @@ export function resolveMonnifyConfig(user = {}) {
     callbackUrl: normalizeText(gateway.callbackUrl),
     enabled: gateway.enabled === true,
     environment: gateway.environment === "live" ? "live" : "sandbox",
-  };
-}
-
-export function resolveTwilioSandboxConfig(user = {}) {
-  const provider = user.whatsappProviders?.twilioSandbox || {};
-
-  return {
-    enabled: provider.enabled === true && user.defaultWhatsAppProvider === "twilioSandbox",
-    accountSid: decryptGatewayValue(provider, "accountSid") || "",
-    authToken: decryptGatewayValue(provider, "authToken") || "",
-    fromNumber: normalizeText(provider.fromNumber) || "whatsapp:+14155238886",
-    contentSid: normalizeText(provider.contentSid),
-    statusCallbackUrl: normalizeText(provider.statusCallbackUrl),
   };
 }
 
@@ -576,17 +531,4 @@ export async function resolveWhatsAppWebConfigForUser(db, user = {}) {
     user,
     await getPlatformWhatsAppBridgeSettings(db)
   );
-}
-
-export function resolveGreenApiConfig(user = {}) {
-  const provider = user.whatsappProviders?.greenApi || {};
-
-  return {
-    enabled: provider.enabled === true && user.defaultWhatsAppProvider === "greenApi",
-    apiUrl: normalizeText(provider.apiUrl).replace(/\/+$/, ""),
-    mediaUrl: normalizeText(provider.mediaUrl).replace(/\/+$/, ""),
-    idInstance: normalizeText(provider.idInstance),
-    apiTokenInstance: decryptGatewayValue(provider, "apiTokenInstance") || "",
-    senderPhoneNumber: normalizeText(provider.senderPhoneNumber),
-  };
 }

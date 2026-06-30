@@ -2,22 +2,12 @@ import { requireAuth } from "../../../../../lib/auth";
 import { connectDB } from "../../../../../lib/mongodb";
 import {
   findUserById,
-  resolveGreenApiConfig,
   resolveWhatsAppWebConfigForUser,
-  resolveTwilioSandboxConfig,
 } from "../../../../../lib/paymentGatewaySettings";
-import {
-  isTwilioSandboxConfigured,
-  sendTwilioWhatsAppMessage,
-} from "../../../../../lib/twilioWhatsApp";
 import {
   isWhatsAppWebConfigured,
   sendWhatsAppWebMessage,
 } from "../../../../../lib/whatsappWebBridge";
-import {
-  isGreenApiConfigured,
-  sendGreenApiWhatsAppMessage,
-} from "../../../../../lib/greenApiWhatsApp";
 
 export async function POST(req) {
   try {
@@ -50,37 +40,8 @@ export async function POST(req) {
       });
     }
 
-    const greenApiConfig = resolveGreenApiConfig(user);
-    if (isGreenApiConfigured(greenApiConfig)) {
-      const result = await sendGreenApiWhatsAppMessage(greenApiConfig, {
-        phone,
-        text: "InvoiceHub test message\n\nYour Green API WhatsApp connection is working.",
-      });
-
-      return Response.json({
-        success: true,
-        provider: "greenApi",
-        result,
-      });
-    }
-
-    const twilioConfig = resolveTwilioSandboxConfig(user);
-
-    if (isTwilioSandboxConfigured(twilioConfig)) {
-      const result = await sendTwilioWhatsAppMessage(twilioConfig, {
-        phone,
-        text: "InvoiceHub test message\n\nYour Twilio Sandbox connection is working.",
-      });
-
-      return Response.json({
-        success: true,
-        provider: "twilioSandbox",
-        result,
-      });
-    }
-
     return Response.json(
-      { error: "No active WhatsApp provider is selected and fully configured in settings" },
+      { error: "WhatsApp Web bridge is not configured" },
       { status: 400 }
     );
   } catch (error) {
