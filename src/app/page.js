@@ -3,31 +3,31 @@ import Link from "next/link";
 import PublicLegalFooter from "../components/PublicLegalFooter";
 
 const proofPoints = [
-  { label: "Invoices sent faster", value: "3x" },
-  { label: "Payment follow-up time", value: "-62%" },
-  { label: "Shared customer records", value: "1 hub" },
+  { label: "Gateway options", value: "2" },
+  { label: "Payment tracking", value: "Live" },
+  { label: "Customer records", value: "1 hub" },
 ];
 
 const workflow = [
   {
     title: "Create polished invoices",
-    text: "Create professional invoices with clear line items, due dates, and payment options customers can act on quickly.",
+    text: "Create professional invoices with clear line items, due dates, and payment instructions customers can act on quickly.",
   },
   {
-    title: "Keep every account in view",
-    text: "Track customers, invoice history, and payment progress from one workspace built for daily billing operations.",
+    title: "Connect your payment gateway",
+    text: "Use your own PayAza or Monnify account so customer payments go through the provider configured for your business.",
   },
   {
-    title: "Collect with less follow-up",
+    title: "Track every confirmation",
     text: "Share invoice links in seconds and stay on top of unpaid, partial, and confirmed payments without the usual back-and-forth.",
   },
 ];
 
 const features = [
-  "Customer categories for cleaner billing operations",
-  "Invoice links you can share in seconds",
-  "Payment tracking across every outstanding account",
-  "Admin oversight for users, invoices, and collections",
+  "Connect PayAza or Monnify from business settings",
+  "Invoice links and QR payment pages customers can use quickly",
+  "Payment tracking across unpaid, partial, and confirmed invoices",
+  "WhatsApp-ready receipts and payment confirmations",
 ];
 
 export default function Home() {
@@ -45,22 +45,22 @@ export default function Home() {
         <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(15,23,42,0.94)_0%,rgba(15,23,42,0.78)_45%,rgba(16,185,129,0.18)_100%)]" />
 
         <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-6 pb-14 pt-6 lg:px-10 lg:pb-20">
-          <header className="rounded-2xl border border-white/10 bg-slate-950/55 px-5 py-4 backdrop-blur md:px-6">
+          <header className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 backdrop-blur md:px-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex min-w-0 items-center gap-3">
                 <Link href="/" className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500 text-lg font-bold text-white">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-base font-bold text-white">
                     I
                   </div>
                   <div className="min-w-0">
-                    <p className="text-lg font-semibold text-white">InvoiceHub</p>
-                    <p className="text-xs text-slate-300">Invoicing and payment collection software</p>
+                    <p className="text-base font-semibold leading-5 text-white">InvoiceHub</p>
+                    <p className="text-xs leading-5 text-slate-300">Invoicing and collections software</p>
                   </div>
                 </Link>
               </div>
 
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-8">
-                <nav className="flex flex-wrap items-center gap-5 text-sm text-slate-200">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-7">
+                <nav className="flex flex-wrap items-center gap-5 text-sm font-medium text-slate-300">
                   <a href="#workflow" className="transition hover:text-white">
                     Workflow
                   </a>
@@ -75,13 +75,13 @@ export default function Home() {
                 <div className="flex flex-wrap items-center gap-3">
                   <Link
                     href="/auth/login"
-                    className="rounded-xl border border-white/15 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+                    className="rounded-xl border border-white/15 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
                   >
                     Log in
                   </Link>
                   <Link
                     href="/auth/register"
-                    className="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-400"
+                    className="rounded-xl bg-emerald-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400"
                   >
                     Start free
                   </Link>
@@ -91,32 +91,67 @@ export default function Home() {
           </header>
 
           <div className="flex flex-1 flex-col justify-end pt-16 lg:pt-20">
-            <div className="max-w-3xl">
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-300">
-              InvoiceHub
-            </p>
-            <h1 className="mt-5 text-5xl font-semibold leading-tight sm:text-6xl lg:text-7xl">
-              Invoice management that helps you bill clearly and get paid faster.
-            </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200">
-              Create invoices, share payment links, track collections, and keep
-              every customer payment status visible from one focused workspace.
-            </p>
+            <div className="grid gap-10 lg:grid-cols-[1fr_0.82fr] lg:items-end">
+              <div className="max-w-3xl">
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-300">
+                  InvoiceHub
+                </p>
+                <h1 className="mt-5 text-5xl font-semibold leading-tight sm:text-6xl lg:text-7xl">
+                  Send invoices and collect payments with confidence.
+                </h1>
+                <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200">
+                  Connect your own PayAza or Monnify account, generate invoices,
+                  receive customer payments directly, and track every confirmation
+                  from one secure workspace.
+                </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <Link
-                href="/auth/register"
-                className="rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-400"
-              >
-                Create your workspace
-              </Link>
-              <Link
-                href="/auth/login"
-                className="rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-white hover:bg-white/10"
-              >
-                Sign in
-              </Link>
-            </div>
+                <div className="mt-8 flex flex-wrap items-center gap-4">
+                  <Link
+                    href="/auth/register"
+                    className="rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-400"
+                  >
+                    Create your workspace
+                  </Link>
+                  <Link
+                    href="/auth/login"
+                    className="rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-white hover:bg-white/10"
+                  >
+                    Sign in
+                  </Link>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-white/10 bg-slate-950/55 p-6 shadow-2xl backdrop-blur">
+                <div className="flex items-start gap-5">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-400/15 text-sm font-bold tracking-wide text-emerald-200">
+                    NGN
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-lg font-bold leading-6 text-white">
+                      Payment-ready invoicing
+                    </p>
+                    <p className="mt-1 max-w-sm text-sm leading-6 text-sky-100">
+                      Connect PayAza or Monnify and start receiving customer
+                      payments directly into your business account.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-2.5 text-sm text-sky-50">
+                  <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/8 px-4 py-3">
+                    <span>Gateway setup</span>
+                    <span className="font-semibold text-emerald-300">PayAza or Monnify</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/8 px-4 py-3">
+                    <span>Payment tracking</span>
+                    <span className="font-semibold text-emerald-300">Automatic updates</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/8 px-4 py-3">
+                    <span>Customer receipts</span>
+                    <span className="font-semibold text-emerald-300">WhatsApp-ready</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="mt-14 grid gap-4 md:grid-cols-3">
@@ -230,12 +265,12 @@ export default function Home() {
               Platform
             </p>
             <h2 className="mt-4 text-4xl font-semibold text-slate-950 dark:text-slate-100">
-              A cleaner billing workspace for teams that need less friction.
+              A cleaner billing workspace with payment collection built in.
             </h2>
             <p className="mt-4 text-lg leading-8 text-slate-600 dark:text-slate-400">
               InvoiceHub keeps the essentials close: customer lists, invoice
-              generation, payment visibility, and admin oversight without the
-              clutter that usually slows teams down.
+              generation, PayAza or Monnify setup, payment visibility, and admin
+              oversight without the clutter that usually slows teams down.
             </p>
           </div>
 
@@ -266,11 +301,12 @@ export default function Home() {
               Results
             </p>
             <h2 className="mt-4 text-4xl font-semibold">
-              Give your invoicing process the clarity customers actually respond to.
+              Give customers a clear way to pay and your team a clear way to track it.
             </h2>
             <p className="mt-4 text-lg leading-8 text-slate-300">
-              When invoices are easy to send, easy to understand, and easy to
-              pay, teams spend less time chasing and more time closing.
+              When invoices are easy to send, easy to understand, and connected
+              to the right payment gateway, teams spend less time chasing and
+              more time closing.
             </p>
           </div>
 

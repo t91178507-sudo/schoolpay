@@ -151,6 +151,8 @@ export default function SettingsPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [visibleSecrets, setVisibleSecrets] = useState({});
+  const [verifyingGateway, setVerifyingGateway] = useState("");
+  const [gatewayConnectionStatus, setGatewayConnectionStatus] = useState({});
   const [whatsAppWebStatus, setWhatsAppWebStatus] = useState(null);
   const [whatsAppWebLogs, setWhatsAppWebLogs] = useState([]);
   const [loadingWhatsAppWebStatus, setLoadingWhatsAppWebStatus] = useState(false);
@@ -432,6 +434,52 @@ export default function SettingsPage() {
       setError(saveError.message || "Unable to save settings");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const verifyGatewayConnection = async (gatewayKey) => {
+    setVerifyingGateway(gatewayKey);
+    setMessage("");
+    setError("");
+    setGatewayConnectionStatus((current) => ({
+      ...current,
+      [gatewayKey]: null,
+    }));
+
+    try {
+      const res = await authFetch("/api/settings/gateway-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gateway: gatewayKey,
+          settings,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || data.message || "Unable to verify connection");
+      }
+
+      setGatewayConnectionStatus((current) => ({
+        ...current,
+        [gatewayKey]: {
+          ok: true,
+          message: data.message || `${data.provider || "Gateway"} connection verified.`,
+        },
+      }));
+      setMessage(`${data.provider || "Gateway"} connection verified.`);
+    } catch (verifyError) {
+      setGatewayConnectionStatus((current) => ({
+        ...current,
+        [gatewayKey]: {
+          ok: false,
+          message: verifyError.message || "Connection verification failed.",
+        },
+      }));
+      setError(verifyError.message || "Connection verification failed.");
+    } finally {
+      setVerifyingGateway("");
     }
   };
 
@@ -857,7 +905,18 @@ export default function SettingsPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => verifyGatewayConnection(selectedGateway.key)}
+                  disabled={verifyingGateway === selectedGateway.key}
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                >
+                  {verifyingGateway === selectedGateway.key
+                    ? "Verifying..."
+                    : "Verify connection"}
+                </button>
+
                 <select
                   value={
                     settings.paymentGateways[selectedGateway.key].environment
@@ -971,6 +1030,37 @@ export default function SettingsPage() {
                   Copy this into your {selectedGateway.name} dashboard if you want this app to receive server-side updates for that provider.
                 </p>
               </div>
+              {gatewayConnectionStatus[selectedGateway.key] && (
+                <div
+                  className={`mt-5 rounded-2xl border-2 px-5 py-4 ${
+                    gatewayConnectionStatus[selectedGateway.key].ok
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm dark:border-emerald-400 dark:bg-emerald-950/50 dark:text-emerald-100"
+                      : "border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+                  }`}
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-base font-bold">
+                        {gatewayConnectionStatus[selectedGateway.key].ok
+                          ? "Connection verified"
+                          : "Connection failed"}
+                      </p>
+                      <p className="mt-1 text-sm font-medium">
+                        {gatewayConnectionStatus[selectedGateway.key].message}
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${
+                        gatewayConnectionStatus[selectedGateway.key].ok
+                          ? "bg-emerald-600 text-white"
+                          : "bg-red-600 text-white"
+                      }`}
+                    >
+                      {gatewayConnectionStatus[selectedGateway.key].ok ? "Verified" : "Check details"}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

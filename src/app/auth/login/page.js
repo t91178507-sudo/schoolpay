@@ -59,8 +59,8 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex">
-      <div className="hidden lg:flex w-1/2 bg-[#123B5D] text-white relative overflow-hidden flex-col justify-center p-12">
-        <div className="absolute top-10 left-10">
+      <div className="hidden lg:flex w-1/2 bg-[#123B5D] text-white relative overflow-hidden flex-col justify-center p-10 xl:p-12">
+        <div className="absolute top-8 left-10">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-2xl font-bold">
               ₦
@@ -69,43 +69,72 @@ export default function Login() {
           </div>
         </div>
 
-        <div className="max-w-lg mt-20">
-          <h1 className="text-5xl font-bold leading-tight mb-6">
-            Keep invoices moving with
-            <span className="text-emerald-300"> faster collections</span>
+        <div className="max-w-xl mt-14">
+          <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-5">
+            Send invoices and collect payments
+            <span className="text-emerald-300"> with confidence</span>
           </h1>
 
-          <div className="bg-[#0E2E48] rounded-3xl p-8 mt-16 relative">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 bg-slate-300 rounded-full"></div>
-              <div>
-                <p className="font-semibold">Amina Yusuf</p>
-                <p className="text-sm text-emerald-300">Operations Lead, Northfield Supply</p>
+          <p className="max-w-xl text-base xl:text-lg leading-7 text-sky-100">
+            Connect your own Monnify or PayAza account, generate invoices,
+            receive customer payments directly, and track every confirmation
+            from one secure workspace.
+          </p>
+
+          <div className="bg-[#0E2E48] rounded-3xl p-6 mt-8 relative border border-white/10 shadow-2xl">
+            <div className="flex items-start gap-5 mb-5">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-400/15 text-sm font-bold tracking-wide text-emerald-200">
+                NGN
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg font-bold leading-6 text-white">
+                  Payment-ready invoicing
+                </p>
+                <p className="mt-1 max-w-sm text-sm leading-6 text-sky-100">
+                  Connect PayAza or Monnify and start receiving customer
+                  payments directly into your business account.
+                </p>
               </div>
             </div>
 
-            <p className="italic text-lg leading-relaxed">
-              &ldquo;InvoiceHub gave our team one place to send invoices, follow payments, and stay on top of every account.&rdquo;
-            </p>
+            <div className="grid gap-2.5 text-sm text-sky-50">
+              <div className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
+                <span>Gateway setup</span>
+                <span className="font-semibold text-emerald-300">PayAza or Monnify</span>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
+                <span>Payment tracking</span>
+                <span className="font-semibold text-emerald-300">Automatic status updates</span>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
+                <span>Customer receipts</span>
+                <span className="font-semibold text-emerald-300">WhatsApp-ready</span>
+              </div>
+            </div>
 
-            <div className="absolute bottom-6 right-8 text-6xl opacity-20">&quot;</div>
+            <p className="mt-5 text-sm leading-6 text-sky-100">
+              Your customers get a simple payment experience, while your team
+              keeps clear records of invoices, payments, and outstanding balances.
+            </p>
           </div>
         </div>
 
         <div className="absolute bottom-0 left-0 w-full h-96 bg-gradient-to-br from-emerald-500/10 to-transparent"></div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-6 bg-gray-50">
-        <div className="w-full max-w-md">
-          <div className="bg-white rounded-3xl shadow-xl p-10">
-            <div className="text-center mb-10">
-              <h2 className="text-3xl font-bold text-gray-900">Log in to InvoiceHub</h2>
-              <p className="text-gray-600 mt-2 text-sm">
+      <div className="flex-1 flex items-center justify-center px-5 py-8 bg-gray-50">
+        <div className="w-full max-w-lg">
+          <div className="overflow-hidden rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70">
+            <div className="px-8 pt-10 pb-7 text-center sm:px-10">
+              <h2 className="text-3xl font-bold tracking-tight text-gray-900">
+                Log in to InvoiceHub
+              </h2>
+              <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-gray-600">
                 Enter your email and password to access your invoice workspace.
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6 px-8 pb-8 sm:px-10">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address
@@ -160,7 +189,7 @@ export default function Login() {
               </button>
             </form>
 
-            <div className="text-center mt-8 text-sm text-gray-600">
+            <div className="border-t border-slate-100 px-8 py-6 text-center text-sm text-gray-600 sm:px-10">
               Don&apos;t have an account?{" "}
               <Link
                 href="/auth/register"
