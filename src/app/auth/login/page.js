@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { emitSessionChange } from "../../../lib/clientSession";
@@ -13,13 +13,13 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [registered, setRegistered] = useState(false);
+  const [registered] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("registered") === "1"
+  );
 
   const router = useRouter();
-
-  useEffect(() => {
-    setRegistered(new URLSearchParams(window.location.search).get("registered") === "1");
-  }, []);
 
   const handleChange = (e) => {
     setFormData({
@@ -82,7 +82,7 @@ export default function Login() {
           </h1>
 
           <p className="max-w-xl text-base xl:text-lg leading-7 text-sky-100">
-            Connect your own Monnify or PayAza account, generate invoices,
+            Connect your preferred payment provider, generate invoices,
             receive customer payments directly, and track every confirmation
             from one secure workspace.
           </p>
@@ -97,7 +97,7 @@ export default function Login() {
                   Payment-ready invoicing
                 </p>
                 <p className="mt-1 max-w-sm text-sm leading-6 text-sky-100">
-                  Connect PayAza or Monnify and start receiving customer
+                  Connect your business payment account and start receiving customer
                   payments directly into your business account.
                 </p>
               </div>
@@ -105,8 +105,8 @@ export default function Login() {
 
             <div className="grid gap-2.5 text-sm text-sky-50">
               <div className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
-                <span>Gateway setup</span>
-                <span className="font-semibold text-emerald-300">PayAza or Monnify</span>
+                <span>Payment setup</span>
+                <span className="font-semibold text-emerald-300">Your provider</span>
               </div>
               <div className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
                 <span>Payment tracking</span>

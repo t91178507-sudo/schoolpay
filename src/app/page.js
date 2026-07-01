@@ -14,8 +14,8 @@ const workflow = [
     text: "Create professional invoices with clear line items, due dates, and payment instructions customers can act on quickly.",
   },
   {
-    title: "Connect your payment gateway",
-    text: "Use your own PayAza or Monnify account so customer payments go through the provider configured for your business.",
+    title: "Connect your payment provider",
+    text: "Use your own business payment account so customer payments go through the provider configured for your business.",
   },
   {
     title: "Track every confirmation",
@@ -24,7 +24,7 @@ const workflow = [
 ];
 
 const features = [
-  "Connect PayAza or Monnify from business settings",
+  "Connect your preferred payment provider from business settings",
   "Invoice links and QR payment pages customers can use quickly",
   "Payment tracking across unpaid, partial, and confirmed invoices",
   "WhatsApp-ready receipts and payment confirmations",
@@ -100,7 +100,7 @@ export default function Home() {
                   Send invoices and collect payments with confidence.
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200">
-                  Connect your own PayAza or Monnify account, generate invoices,
+                  Connect your preferred payment provider, generate invoices,
                   receive customer payments directly, and track every confirmation
                   from one secure workspace.
                 </p>
@@ -131,7 +131,7 @@ export default function Home() {
                       Payment-ready invoicing
                     </p>
                     <p className="mt-1 max-w-sm text-sm leading-6 text-sky-100">
-                      Connect PayAza or Monnify and start receiving customer
+                      Connect your business payment account and start receiving customer
                       payments directly into your business account.
                     </p>
                   </div>
@@ -139,8 +139,8 @@ export default function Home() {
 
                 <div className="mt-5 grid gap-2.5 text-sm text-sky-50">
                   <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/8 px-4 py-3">
-                    <span>Gateway setup</span>
-                    <span className="font-semibold text-emerald-300">PayAza or Monnify</span>
+                    <span>Payment setup</span>
+                    <span className="font-semibold text-emerald-300">Your provider</span>
                   </div>
                   <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/8 px-4 py-3">
                     <span>Payment tracking</span>
@@ -269,7 +269,7 @@ export default function Home() {
             </h2>
             <p className="mt-4 text-lg leading-8 text-slate-600 dark:text-slate-400">
               InvoiceHub keeps the essentials close: customer lists, invoice
-              generation, PayAza or Monnify setup, payment visibility, and admin
+              generation, payment provider setup, payment visibility, and admin
               oversight without the clutter that usually slows teams down.
             </p>
           </div>
@@ -305,7 +305,7 @@ export default function Home() {
             </h2>
             <p className="mt-4 text-lg leading-8 text-slate-300">
               When invoices are easy to send, easy to understand, and connected
-              to the right payment gateway, teams spend less time chasing and
+              to the right payment provider, teams spend less time chasing and
               more time closing.
             </p>
           </div>
