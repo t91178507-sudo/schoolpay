@@ -11,6 +11,7 @@ export default function QuickPaySuccessPage() {
     searchParams.get("paymentReference") ||
     searchParams.get("reference") ||
     "";
+  const provider = searchParams.get("provider") || "monnify";
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("Confirming your payment...");
 
@@ -19,7 +20,7 @@ export default function QuickPaySuccessPage() {
       return;
     }
 
-    fetch("/api/monnify/qr-verify", {
+    fetch(provider === "payaza" ? "/api/payaza/qr-verify" : "/api/monnify/qr-verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -42,7 +43,7 @@ export default function QuickPaySuccessPage() {
         setStatus("error");
         setMessage(err.message || "We could not confirm this payment.");
       });
-  }, [paymentReference, token]);
+  }, [paymentReference, provider, token]);
 
   const displayStatus = !paymentReference ? "error" : status;
   const displayMessage = !paymentReference

@@ -108,7 +108,7 @@ export async function ensureQuickPayPaidInvoice(
     paidAt: paidAt || new Date(),
     paidAmount: normalizedAmount,
     paymentReference,
-    paymentProvider: "Monnify",
+    paymentProvider: transaction.paymentProvider || transaction.gateway || "Monnify",
     paymentVerificationMethod: "quick-pay",
     paymentStatus: "paid",
     paymentConfirmedAt: paidAt || new Date(),
