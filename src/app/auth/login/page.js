@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { emitSessionChange } from "../../../lib/clientSession";
 
@@ -15,6 +16,8 @@ export default function Login() {
   const [error, setError] = useState("");
 
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const registered = searchParams.get("registered") === "1";
 
   const handleChange = (e) => {
     setFormData({
@@ -59,17 +62,18 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex">
-      <div className="hidden lg:flex w-1/2 bg-[#123B5D] text-white relative overflow-hidden flex-col justify-center p-10 xl:p-12">
-        <div className="absolute top-8 left-10">
-          <div className="flex items-center gap-3">
+      <div className="hidden lg:flex w-1/2 bg-[#123B5D] text-white relative overflow-hidden flex-col p-10 xl:p-12">
+        <div className="relative z-10">
+          <Link href="/" className="inline-flex items-center gap-3 transition-opacity hover:opacity-85">
             <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-2xl font-bold">
               ₦
             </div>
             <span className="text-3xl font-bold tracking-tight">InvoiceHub</span>
-          </div>
+          </Link>
         </div>
 
-        <div className="max-w-xl mt-14">
+        <div className="relative z-10 flex flex-1 items-center">
+          <div className="max-w-xl">
           <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-5">
             Send invoices and collect payments
             <span className="text-emerald-300"> with confidence</span>
@@ -117,6 +121,7 @@ export default function Login() {
               keeps clear records of invoices, payments, and outstanding balances.
             </p>
           </div>
+          </div>
         </div>
 
         <div className="absolute bottom-0 left-0 w-full h-96 bg-gradient-to-br from-emerald-500/10 to-transparent"></div>
@@ -135,6 +140,12 @@ export default function Login() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6 px-8 pb-8 sm:px-10">
+              {registered && (
+                <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-center text-sm font-medium text-emerald-700">
+                  Account created successfully. Please log in to continue.
+                </p>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address

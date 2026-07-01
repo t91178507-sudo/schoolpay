@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { emitSessionChange } from "../../../lib/clientSession";
 
 const businessTypes = [
   "Retail",
@@ -82,15 +81,13 @@ export default function Register() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        localStorage.setItem("isLoggedIn", "true");
-        localStorage.setItem("authToken", data.token || "");
-        localStorage.setItem("userName", `${formData.firstName} ${formData.lastName}`);
-        localStorage.setItem("businessName", formData.businessName);
-        localStorage.setItem("businessType", formData.businessType);
-        localStorage.setItem("businessLogo", data.user?.businessLogo || "");
-        emitSessionChange();
-
-        router.push("/dashboard");
+        localStorage.removeItem("isLoggedIn");
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("userName");
+        localStorage.removeItem("businessName");
+        localStorage.removeItem("businessType");
+        localStorage.removeItem("businessLogo");
+        router.push("/auth/login?registered=1");
       } else {
         setError(data.error || "Registration failed. Please try again.");
       }
