@@ -162,6 +162,23 @@ export async function fetchWhatsAppWebStatus(config = {}) {
   );
 }
 
+export async function fetchWhatsAppWebQr(config = {}) {
+  assertReachableWhatsAppBridgeConfig(config);
+
+  const url = new URL(`${config.bridgeBaseUrl}/api/session/qr`);
+  url.searchParams.set("sessionName", config.sessionName);
+
+  return fetchBridgeJson(
+    url,
+    {
+      method: "GET",
+      headers: buildBridgeHeaders(config),
+      cache: "no-store",
+    },
+    3000
+  );
+}
+
 export async function fetchWhatsAppWebLogs(config = {}) {
   assertReachableWhatsAppBridgeConfig(config);
 

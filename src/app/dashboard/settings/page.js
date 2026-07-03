@@ -752,7 +752,7 @@ export default function SettingsPage() {
             )}
 
             <div className="space-y-2">
-              <label className="inline-flex items-center px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-medium cursor-pointer">
+              <label className="inline-flex cursor-pointer items-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800">
                 Upload logo
                 <input
                   type="file"
@@ -839,7 +839,7 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={() => setDarkModePreference(!darkMode)}
-            className={`inline-flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+            className={`inline-flex items-center gap-3 rounded-xl border px-4 py-2.5 text-sm font-medium transition ${
               darkMode
                 ? "border-slate-700 bg-slate-950 text-white hover:bg-slate-900"
                 : "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
@@ -910,7 +910,7 @@ export default function SettingsPage() {
                   type="button"
                   onClick={() => verifyGatewayConnection(selectedGateway.key)}
                   disabled={verifyingGateway === selectedGateway.key}
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                  className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
                 >
                   {verifyingGateway === selectedGateway.key
                     ? "Verifying..."
@@ -1466,7 +1466,7 @@ export default function SettingsPage() {
             type="button"
             onClick={handleCreateQuickPay}
             disabled={quickPaySaving}
-            className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-medium"
+            className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:bg-emerald-300"
           >
             {quickPaySaving ? "Generating..." : "Generate QR code"}
           </button>
@@ -1515,7 +1515,7 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => copyQuickPayLink(profile.token)}
-                    className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                   >
                     Copy link
                   </button>
@@ -1523,14 +1523,14 @@ export default function SettingsPage() {
                     href={`/pay/qr/${profile.token}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="px-4 py-2 rounded-xl bg-slate-900 text-sm font-medium text-white hover:bg-slate-800"
+                    className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
                   >
                     Open page
                   </a>
                   <button
                     type="button"
                     onClick={() => handleDeleteQuickPay(profile._id)}
-                    className="px-4 py-2 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50"
+                    className="rounded-xl px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
                   >
                     Delete
                   </button>
@@ -1568,7 +1568,7 @@ export default function SettingsPage() {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="px-6 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white font-medium"
+          className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:bg-slate-300"
         >
           {saving ? "Saving..." : "Save settings"}
         </button>

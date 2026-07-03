@@ -32,6 +32,7 @@ export function StatCard({ label, value, hint, tone = "slate" }) {
     emerald: "text-emerald-600",
     orange: "text-orange-600",
     blue: "text-blue-600",
+    violet: "text-violet-600",
   };
 
   return (

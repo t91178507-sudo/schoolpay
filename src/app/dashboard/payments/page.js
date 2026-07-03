@@ -292,22 +292,22 @@ export default function Payments() {
             </div>
 
             <div className="hidden overflow-x-auto lg:block">
-              <table className="w-full">
+              <table className="w-full table-fixed">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
-                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     {customerLabels.singularTitle}
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     Description
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     Payment
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     WhatsApp Notification
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     Reference
                   </th>
                 </tr>
@@ -315,7 +315,7 @@ export default function Payments() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredRows.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-950/60">
-                    <td className="px-6 py-5 align-top">
+                    <td className="px-5 py-4 align-top">
                       <div className="space-y-1">
                         <p className="font-medium text-slate-900 dark:text-slate-100">{row.customerName}</p>
                         <div className="flex flex-wrap items-center gap-2">
@@ -324,7 +324,7 @@ export default function Payments() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-5 align-top">
+                    <td className="px-5 py-4 align-top">
                       <div className="space-y-1">
                         <p className="text-sm text-slate-800 dark:text-slate-300">{row.description}</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -332,7 +332,7 @@ export default function Payments() {
                         </p>
                       </div>
                     </td>
-                    <td className="px-6 py-5 align-top">
+                    <td className="px-5 py-4 align-top">
                       <div className="space-y-2">
                         <p className="font-semibold text-slate-900 dark:text-slate-100">
                           N{Number(row.amount || 0).toLocaleString()}
@@ -346,12 +346,12 @@ export default function Payments() {
                         <p className="text-xs text-slate-400 dark:text-slate-500">{formatDateTime(row.happenedAt)}</p>
                       </div>
                     </td>
-                    <td className="px-6 py-5 align-top">
+                    <td className="px-5 py-4 align-top">
                       <StatusBadge tone={getNotificationTone(row.notificationStatus)}>
                         {formatNotificationStatus(row.notificationStatus)}
                       </StatusBadge>
                     </td>
-                    <td className="px-6 py-5 align-top">
+                    <td className="px-5 py-4 align-top">
                       <p className="max-w-[14rem] break-all font-mono text-xs text-slate-500 dark:text-slate-400">
                         {row.reference || "-"}
                       </p>
@@ -367,3 +367,4 @@ export default function Payments() {
     </PageShell>
   );
 }
+

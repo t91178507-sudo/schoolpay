@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import {
   PageHeader,
@@ -26,17 +27,30 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentTime, setCurrentTime] = useState(null);
+  const [whatsAppStatus, setWhatsAppStatus] = useState({
+    connected: false,
+    label: "Disconnected",
+    number: "",
+    status: "",
+    qrConnectUrl: "",
+    qrDataUrl: "",
+    lastError: "",
+  });
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [customersRes, invoicesRes] = await Promise.all([
+        const [customersRes, invoicesRes, whatsAppRes] = await Promise.all([
           authFetch("/api/customers"),
           authFetch("/api/invoices"),
+          authFetch("/api/notifications/whatsapp/bridge/status").catch(() => null),
         ]);
 
         const customers = customersRes.ok ? await customersRes.json() : [];
         const invoices = invoicesRes.ok ? await invoicesRes.json() : [];
+        const whatsAppData = whatsAppRes?.ok ? await whatsAppRes.json() : null;
+        const bridgeStatus = whatsAppData?.status || {};
+        const connected = whatsAppData?.bridgeReachable === true && bridgeStatus.status === "ready";
 
         const expectedRevenue = invoices.reduce(
           (sum, inv) => sum + Number(inv.amount || 0),
@@ -56,6 +70,15 @@ export default function Dashboard() {
           totalRevenue,
           paidInvoices: paid,
           unpaidInvoices: unpaid,
+        });
+        setWhatsAppStatus({
+          connected,
+          label: connected ? "Connected" : "Disconnected",
+          number: connected ? bridgeStatus.connectedNumber || "" : "",
+          status: bridgeStatus.status || "",
+          qrConnectUrl: bridgeStatus.qrConnectUrl || "",
+          qrDataUrl: bridgeStatus.qrDataUrl || "",
+          lastError: bridgeStatus.lastError || "",
         });
       } catch (err) {
         console.error(err);
@@ -105,7 +128,7 @@ export default function Dashboard() {
           <p className="text-xl text-red-600">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-4 rounded-xl bg-blue-600 px-6 py-3 text-white"
+            className="mt-4 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
           >
             Retry
           </button>
@@ -143,10 +166,57 @@ export default function Dashboard() {
           <p className="mt-2 text-sm text-slate-500">
             InvoiceHub is now tracking invoices, QR payment sessions, and confirmation states in one workflow. Use the history pages to monitor payment completion and notification readiness.
           </p>
+          {!whatsAppStatus.connected ? (
+            <div className="mt-5">
+              {whatsAppStatus.qrDataUrl ? (
+                <div className="inline-flex overflow-hidden rounded-xl border border-slate-200 bg-white p-2">
+                  <Image
+                    src={whatsAppStatus.qrDataUrl}
+                    alt="WhatsApp QR code"
+                    width={160}
+                    height={160}
+                    unoptimized
+                    className="h-40 w-40"
+                  />
+                </div>
+              ) : (
+                <Link
+                  href="/dashboard/settings"
+                  className="mt-4 inline-flex rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-700"
+                >
+                  Open WhatsApp settings
+                </Link>
+              )}
+            </div>
+          ) : null}
         </SurfaceCard>
 
         <SurfaceCard className="p-6">
           <div className="space-y-3 text-sm">
+            <div className="rounded-xl border border-slate-200 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                WhatsApp connection
+              </p>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <span
+                  className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                    whatsAppStatus.connected
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-red-100 text-red-700"
+                  }`}
+                >
+                  {whatsAppStatus.label}
+                </span>
+                {whatsAppStatus.number ? (
+                  <span className="text-xs text-slate-500">{whatsAppStatus.number}</span>
+                ) : null}
+              </div>
+              {!whatsAppStatus.connected && whatsAppStatus.status ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  Bridge status: {whatsAppStatus.status}
+                </p>
+              ) : null}
+            </div>
             <QuickLink href="/dashboard/invoices" label="Manage invoices" />
             <QuickLink href="/dashboard/payments" label="Open payment history" />
           </div>

@@ -6,6 +6,7 @@ import {
 } from "../../../../../../lib/paymentGatewaySettings";
 import {
   fetchWhatsAppWebLogs,
+  fetchWhatsAppWebQr,
   fetchWhatsAppWebStatus,
   hasWhatsAppWebBridgeConfig,
   requestWhatsAppWebPairingCode,
@@ -32,12 +33,16 @@ export async function GET(req) {
 
     let status;
     let logs = { logs: [] };
+    let qr = null;
 
     try {
       [status, logs] = await Promise.all([
         fetchWhatsAppWebStatus(config),
         fetchWhatsAppWebLogs(config).catch(() => ({ logs: [] })),
       ]);
+      if (status?.qrAvailable || status?.status === "qr") {
+        qr = await fetchWhatsAppWebQr(config).catch(() => null);
+      }
     } catch (bridgeError) {
       return Response.json({
         success: false,
@@ -58,7 +63,10 @@ export async function GET(req) {
     return Response.json({
       success: true,
       bridgeReachable: true,
-      status,
+      status: {
+        ...status,
+        qrDataUrl: qr?.qrDataUrl || "",
+      },
       logs: Array.isArray(logs.logs) ? logs.logs : [],
     });
   } catch (error) {

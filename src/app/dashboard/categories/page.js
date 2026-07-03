@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import * as XLSX from "xlsx";
 import AddCustomerModal from "../../../components/AddCustomerModal";
 import { authFetch } from "../../../lib/authFetch";
 import { getCustomerLabels } from "../../../lib/businessLabels";
@@ -28,6 +29,7 @@ export default function CategoriesPage() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [invoiceCustomer, setInvoiceCustomer] = useState(null);
   const [invoiceDescription, setInvoiceDescription] = useState("");
@@ -39,6 +41,7 @@ export default function CategoriesPage() {
   const [bulkItems, setBulkItems] = useState([createEmptyInvoiceItem()]);
   const [bulkError, setBulkError] = useState("");
   const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [importingStudents, setImportingStudents] = useState(false);
 
   const fetchCustomers = useCallback(async () => {
     try {
@@ -67,8 +70,51 @@ export default function CategoriesPage() {
     return acc;
   }, {});
 
+  const searchMatches = (values, query) => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return true;
+
+    return values
+      .filter((value) => value !== undefined && value !== null)
+      .some((value) => String(value).toLowerCase().includes(normalizedQuery));
+  };
+
   const categoryList = Object.keys(grouped).sort();
+  const visibleCategoryList = categoryList.filter((category) => {
+    const categoryCustomers = grouped[category] || [];
+
+    return (
+      searchMatches([category], searchQuery) ||
+      categoryCustomers.some((customer) =>
+        searchMatches(
+          [
+            customer.name,
+            customer.phone,
+            customer.customerPhone,
+            customer.parentPhone,
+            customer.email,
+            customer.token,
+          ],
+          searchQuery
+        )
+      )
+    );
+  });
   const selectedCustomers = selectedCategory ? grouped[selectedCategory] || [] : [];
+  const visibleSelectedCustomers = selectedCustomers.filter((customer) =>
+    searchMatches(
+      [
+        customer.name,
+        customer.phone,
+        customer.customerPhone,
+        customer.parentPhone,
+        customer.email,
+        customer.token,
+        customer.category,
+      ],
+      searchQuery
+    )
+  );
   const getBusinessInvoiceItems = (items, description, editable) => {
     if (editable) {
       return items;
@@ -414,30 +460,157 @@ export default function CategoriesPage() {
   };
 
   const deleteCategory = async (category) => {
-    const customersInCategory = grouped[category] || [];
-    if (customersInCategory.length === 0) {
-      setSelectedCategory(null);
-      return;
-    }
-
     const confirmed = confirm(
-      `Delete the "${category}" category? This will permanently delete all ${customersInCategory.length} ${customersInCategory.length !== 1 ? customerLabels.plural : customerLabels.singular} in it. Existing invoices will be kept.`
+      `Delete the "${category}" category? ${customerLabels.pluralTitle} and invoices will be moved to Uncategorized.`
     );
 
     if (!confirmed) return;
 
     try {
-      await Promise.all(
-        customersInCategory.map((customer) =>
-          authFetch(`/api/customers/${customer._id}`, { method: "DELETE" })
-        )
-      );
+      const res = await authFetch("/api/categories", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete category");
+      }
 
       setSelectedCategory(null);
       fetchCustomers();
     } catch (error) {
       console.error(error);
-      alert("Failed to delete category");
+      alert(error.message || "Failed to delete category");
+    }
+  };
+
+  const renameCategory = async (category) => {
+    const newCategory = prompt("Enter the new category name", category);
+    const trimmedCategory = String(newCategory || "").trim();
+
+    if (!trimmedCategory || trimmedCategory === category) return;
+
+    try {
+      const res = await authFetch("/api/categories", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentCategory: category,
+          newCategory: trimmedCategory,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to rename category");
+      }
+
+      if (selectedCategory === category) {
+        setSelectedCategory(trimmedCategory);
+      }
+
+      fetchCustomers();
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Failed to rename category");
+    }
+  };
+
+  const normalizeImportKey = (key) =>
+    String(key || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+
+  const getImportValue = (row, keys) => {
+    const normalizedRow = Object.entries(row || {}).reduce((acc, [key, value]) => {
+      acc[normalizeImportKey(key)] = value;
+      return acc;
+    }, {});
+
+    for (const key of keys) {
+      const value = normalizedRow[normalizeImportKey(key)];
+      if (value !== undefined && value !== null && String(value).trim()) {
+        return String(value).trim();
+      }
+    }
+
+    return "";
+  };
+
+  const parseImportRows = async (file) => {
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+
+    return rows.map((row) => ({
+      name: getImportValue(row, [
+        "student name",
+        "student",
+        "name",
+        "customer name",
+        "first name",
+        "firstname",
+        "full name",
+        "fullname",
+      ]),
+      phone: getImportValue(row, ["phone number", "phone", "mobile", "telephone"]),
+      email: getImportValue(row, ["email", "email address"]),
+      location: getImportValue(row, ["location", "address"]),
+    }));
+  };
+
+  const importStudentsFromFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file || !selectedCategory) return;
+
+    setImportingStudents(true);
+
+    try {
+      const students = await parseImportRows(file);
+
+      if (students.length === 0) {
+        alert("No rows found in the selected file.");
+        return;
+      }
+
+      const businessName =
+        typeof window !== "undefined"
+          ? localStorage.getItem("businessName") || ""
+          : "";
+
+      const res = await authFetch("/api/customers/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: selectedCategory,
+          businessName,
+          students,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Unable to import students");
+      }
+
+      await fetchCustomers();
+      alert(
+        `Imported ${data.insertedCount || 0} ${customerLabels.plural}.` +
+          (data.skippedCount ? ` ${data.skippedCount} row(s) skipped.` : "")
+      );
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Unable to import students");
+    } finally {
+      setImportingStudents(false);
     }
   };
 
@@ -470,7 +643,7 @@ export default function CategoriesPage() {
 
             <button
               onClick={() => setShowAddModal(true)}
-              className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-2xl font-medium flex items-center gap-2 transition"
+              className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
             >
               + Add New {customerLabels.singularTitle}
             </button>
@@ -486,19 +659,39 @@ export default function CategoriesPage() {
           </button>
         )}
 
+        <div className="mb-6 max-w-xl">
+          <label htmlFor="student-category-search" className="sr-only">
+            Search {selectedCategory ? customerLabels.plural : "categories"}
+          </label>
+          <input
+            id="student-category-search"
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={
+              selectedCategory
+                ? `Search ${customerLabels.plural}`
+                : `Search categories or ${customerLabels.plural}`
+            }
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-800"
+          />
+        </div>
+
         {!selectedCategory ? (
           <div>
             <h2 className="text-xl font-medium text-gray-700 dark:text-slate-300 mb-6">
-              All categories ({categoryList.length})
+              All categories ({visibleCategoryList.length})
             </h2>
 
-            {categoryList.length === 0 ? (
+            {visibleCategoryList.length === 0 ? (
               <div className="text-center py-20 text-gray-500 dark:text-slate-400">
-                No {customerLabels.plural} yet. Add your first {customerLabels.singular} to create a category.
+                {categoryList.length === 0
+                  ? `No ${customerLabels.plural} yet. Add your first ${customerLabels.singular} to create a category.`
+                  : "No matching categories found."}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {categoryList.map((category) => {
+                {visibleCategoryList.map((category) => {
                   const count = grouped[category]?.length || 0;
 
                   return (
@@ -511,23 +704,46 @@ export default function CategoriesPage() {
                         <div className="w-14 h-14 bg-slate-100 text-slate-600 rounded-2xl flex items-center justify-center text-3xl dark:bg-slate-800 dark:text-slate-300">
                           C
                         </div>
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <h3 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">
                             {category}
                           </h3>
                         </div>
                       </div>
 
-                      <div className="flex justify-between items-end">
+                      <div className="flex justify-between items-end gap-4">
                         <div>
                           <p className="text-sm text-slate-500 dark:text-slate-400">{customerLabels.pluralTitle}</p>
                           <p className="mt-1 text-4xl font-bold text-slate-800 dark:text-slate-100 sm:text-5xl">
                             {count}
                           </p>
                         </div>
-                        <div className="text-slate-500 text-sm font-medium group-hover:translate-x-1 transition-transform">
+                        <div className="text-right text-slate-500 text-sm font-medium group-hover:translate-x-1 transition-transform">
                           View {customerLabels.pluralTitle} →
                         </div>
+                      </div>
+
+                      <div className="mt-6 flex gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            renameCategory(category);
+                          }}
+                          className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            deleteCategory(category);
+                          }}
+                          className="flex-1 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:text-red-400 dark:hover:bg-red-950/30"
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
                   );
@@ -546,7 +762,7 @@ export default function CategoriesPage() {
                   <div>
                       <h2 className="text-3xl font-semibold sm:text-4xl">{selectedCategory}</h2>
                     <p className="text-slate-300 mt-1 text-lg">
-                      {selectedCustomers.length} {selectedCustomers.length === 1 ? customerLabels.singularTitle : customerLabels.pluralTitle}
+                      {visibleSelectedCustomers.length} {visibleSelectedCustomers.length === 1 ? customerLabels.singularTitle : customerLabels.pluralTitle}
                     </p>
                   </div>
                 </div>
@@ -561,22 +777,44 @@ export default function CategoriesPage() {
                       setBulkError("");
                       setShowBulkModal(true);
                     }}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition"
+                    className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-500"
                   >
                     Generate Invoice for All
                   </button>
                   <button
+                    onClick={() => renameCategory(selectedCategory)}
+                    className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/20"
+                  >
+                    Rename Category
+                  </button>
+                  <button
                     onClick={() => deleteCategory(selectedCategory)}
-                    className="bg-white/10 hover:bg-red-500/80 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition"
+                    className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-500/80"
                   >
                     Delete Category
                   </button>
+                  <label className="cursor-pointer rounded-xl bg-white/10 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/20">
+                    {importingStudents ? "Importing..." : "Import"}
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      onChange={importStudentsFromFile}
+                      disabled={importingStudents}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
               </div>
             </div>
 
+            {visibleSelectedCustomers.length === 0 ? (
+              <div className="p-10 text-center text-gray-500 dark:text-slate-400">
+                No matching {customerLabels.plural} found.
+              </div>
+            ) : (
+              <>
             <div className="divide-y divide-gray-100 dark:divide-slate-800 lg:hidden">
-              {selectedCustomers.map((customer) => (
+              {visibleSelectedCustomers.map((customer) => (
                 <div key={customer._id} className="space-y-4 p-5">
                   <div className="space-y-1">
                     <p className="font-medium text-gray-900 dark:text-slate-100">{customer.name}</p>
@@ -606,62 +844,66 @@ export default function CategoriesPage() {
             </div>
 
             <div className="hidden overflow-x-auto lg:block">
-              <table className="w-full">
+              <table className="w-full table-fixed">
                 <thead>
                   <tr className="border-b bg-slate-50">
-                    <th className="px-10 py-5 text-left text-sm font-medium text-gray-500">
+                    <th className="w-[24%] px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                       {customerLabels.singularTitle} Name
                     </th>
-                    <th className="px-10 py-5 text-left text-sm font-medium text-gray-500">
+                    <th className="w-[18%] px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                       Phone Number
                     </th>
-                    <th className="px-10 py-5 text-left text-sm font-medium text-gray-500">
+                    <th className="w-[24%] px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                       Email
                     </th>
-                    <th className="px-10 py-5 text-left text-sm font-medium text-gray-500">
+                    <th className="w-[16%] px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                       Token
                     </th>
-                    <th className="px-10 py-5 text-right text-sm font-medium text-gray-500">
+                    <th className="w-[18%] px-5 py-4 text-right text-xs font-medium uppercase tracking-wide text-gray-500">
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
-                  {selectedCustomers.map((customer) => (
+                  {visibleSelectedCustomers.map((customer) => (
                     <tr key={customer._id} className="hover:bg-gray-50 dark:hover:bg-slate-950/60 transition-colors">
-                      <td className="px-10 py-6 font-medium text-gray-900 dark:text-slate-100">
+                      <td className="px-5 py-4 font-medium text-gray-900 dark:text-slate-100">
                         {customer.name}
                       </td>
-                      <td className="px-10 py-6 text-gray-600 dark:text-slate-400">
+                      <td className="px-5 py-4 text-gray-600 dark:text-slate-400">
                         {customer.phone || "—"}
                       </td>
-                      <td className="px-10 py-6 text-gray-600 dark:text-slate-400">
+                      <td className="px-5 py-4 text-gray-600 dark:text-slate-400">
                         {customer.email || "—"}
                       </td>
-                      <td className="px-10 py-6">
+                      <td className="px-5 py-4">
                         <span className="font-mono text-xs bg-gray-100 dark:bg-slate-800 dark:text-slate-300 px-3 py-1 rounded-full">
                           {customer.token ? `${customer.token.substring(0, 15)}...` : "—"}
                         </span>
                       </td>
-                      <td className="px-10 py-6 text-right space-x-4">
-                        <button
-                          onClick={() => openInvoiceModal(customer)}
-                          className="text-emerald-600 hover:text-emerald-700 text-sm font-medium"
-                        >
-                          Generate Invoice
-                        </button>
-                        <button
-                          onClick={() => deleteCustomer(customer._id)}
-                          className="text-red-600 hover:text-red-700 text-sm font-medium"
-                        >
-                          Delete
-                        </button>
+                      <td className="px-5 py-4">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button
+                            onClick={() => openInvoiceModal(customer)}
+                            className="whitespace-nowrap rounded-xl border border-emerald-200 px-3 py-2 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50"
+                          >
+                            Invoice
+                          </button>
+                          <button
+                            onClick={() => deleteCustomer(customer._id)}
+                            className="whitespace-nowrap rounded-xl border border-red-200 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -710,7 +952,7 @@ export default function CategoriesPage() {
                     <button
                       type="button"
                       onClick={addInvoiceItem}
-                      className="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-medium"
+                      className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
                     >
                       Add item
                     </button>
@@ -836,7 +1078,7 @@ export default function CategoriesPage() {
                 <button
                   type="button"
                   onClick={closeInvoiceModal}
-                  className="flex-1 py-3.5 text-gray-700 dark:text-slate-300 font-medium border border-gray-300 dark:border-slate-700 rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-800 transition"
+                  className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
                   Cancel
                 </button>
@@ -844,7 +1086,7 @@ export default function CategoriesPage() {
                   type="button"
                   onClick={confirmGenerateInvoice}
                   disabled={generating}
-                  className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-medium rounded-2xl transition"
+                  className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:bg-emerald-300"
                 >
                   {generating ? "Generating..." : "Generate Invoice"}
                 </button>
@@ -900,7 +1142,7 @@ export default function CategoriesPage() {
                     <button
                       type="button"
                       onClick={addBulkItem}
-                      className="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-medium"
+                      className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
                     >
                       Add item
                     </button>
@@ -1032,7 +1274,7 @@ export default function CategoriesPage() {
                 <button
                   type="button"
                   onClick={() => setShowBulkModal(false)}
-                  className="flex-1 py-3.5 text-slate-700 font-medium border border-slate-300 rounded-2xl hover:bg-slate-50 transition"
+                  className="flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
                   Cancel
                 </button>
@@ -1040,7 +1282,7 @@ export default function CategoriesPage() {
                   type="button"
                   onClick={confirmBulkGenerate}
                   disabled={bulkGenerating}
-                  className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-medium rounded-2xl transition"
+                  className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:bg-emerald-300"
                 >
                   {bulkGenerating ? "Generating..." : "Generate All"}
                 </button>

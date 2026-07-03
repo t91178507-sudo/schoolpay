@@ -95,6 +95,7 @@ export function buildInvoiceMessage({
   businessName,
   invoiceNumber,
   customerName,
+  customerLabel = "Customer Name",
   amount,
   description,
   items = [],
@@ -108,7 +109,7 @@ export function buildInvoiceMessage({
   return `${formatLogoLine(businessLogo)}${businessName || "InvoiceHub"}${reminderLine}
 
 Invoice Number: ${invoiceNumber || "Pending"}
-Customer Name: ${customerName}
+${customerLabel}: ${customerName}
 Amount: ${formatCurrency(amount)}
 Description: ${description || "Invoice payment"}
 Date: ${formatMessageDate(date)}
@@ -121,6 +122,7 @@ export function buildPaymentConfirmationMessage({
   businessName,
   invoiceNumber,
   customerName,
+  customerLabel = "Customer Name",
   amount,
   description,
 }) {
@@ -129,7 +131,7 @@ export function buildPaymentConfirmationMessage({
 Payment received successfully.
 
 Invoice Number: ${invoiceNumber || "Pending"}
-Customer Name: ${customerName}
+${customerLabel}: ${customerName}
 Amount Paid: ${formatCurrency(amount)}
 Description: ${description || "Invoice payment"}
 

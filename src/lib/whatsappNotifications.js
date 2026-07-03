@@ -40,6 +40,12 @@ function shouldFallbackToBrowser(error) {
   );
 }
 
+function getCustomerMessageLabel(owner = {}) {
+  return String(owner.businessType || "").toLowerCase() === "school"
+    ? "Student Name"
+    : "Customer Name";
+}
+
 export async function deliverInvoiceMessage({
   db,
   invoice,
@@ -60,6 +66,7 @@ export async function deliverInvoiceMessage({
     businessName: invoice.businessName || owner?.businessName || "",
     invoiceNumber: invoice.invoiceNumber || "",
     customerName,
+    customerLabel: getCustomerMessageLabel(owner),
     amount: invoice.amount,
     description:
       invoice.description || invoice.category || invoice.class || "Invoice payment",
@@ -117,6 +124,7 @@ export async function deliverPaymentConfirmation({
     businessName: invoice.businessName || owner?.businessName || "",
     invoiceNumber: invoice.invoiceNumber || "",
     customerName,
+    customerLabel: getCustomerMessageLabel(owner),
     amount: amount ?? invoice.paidAmount ?? invoice.amount ?? 0,
     description:
       invoice.description || invoice.category || invoice.class || "Invoice payment",

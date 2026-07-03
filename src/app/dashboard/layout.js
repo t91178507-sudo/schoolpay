@@ -28,6 +28,7 @@ export default function DashboardLayout({ children }) {
     { name: `${customerLabels.singularTitle} groups`, href: "/dashboard/categories", badge: "G" },
     { name: `${customerLabels.singularTitle} overview`, href: "/dashboard/customers", badge: "C" },
     { name: "Invoices", href: "/dashboard/invoices", badge: "I" },
+    { name: "Communication", href: "/dashboard/communication", badge: "M" },
     { name: "Payment history", href: "/dashboard/payments", badge: "P" },
     { name: "Settings", href: "/dashboard/settings", badge: "S" },
   ];

@@ -36,6 +36,7 @@ export default function CustomersOverview() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [historyCustomer, setHistoryCustomer] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const loadData = async () => {
@@ -109,6 +110,24 @@ export default function CustomersOverview() {
     (sum, customer) => sum + Number(customer.amountPending || 0),
     0
   );
+  const filteredCustomerRows = customerRows.filter((customer) => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (!normalizedQuery) return true;
+
+    return [
+      customer.name,
+      customer.phone,
+      customer.email,
+      customer.category,
+      customer.token,
+      customer.invoiceCount,
+      customer.totalAmount,
+      customer.amountPaid,
+      customer.amountPending,
+    ]
+      .filter((value) => value !== undefined && value !== null)
+      .some((value) => String(value).toLowerCase().includes(normalizedQuery));
+  });
 
   if (loading) {
     return (
@@ -125,7 +144,7 @@ export default function CustomersOverview() {
           <p className="text-xl text-red-600">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-4 rounded-xl bg-blue-600 px-6 py-3 text-white"
+            className="mt-4 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
           >
             Retry
           </button>
@@ -141,7 +160,21 @@ export default function CustomersOverview() {
         description={`See each ${customerLabels.singular}'s invoice count, paid totals, and what is still outstanding.`}
       />
 
-      <StatGrid className="xl:grid-cols-3">
+      <div className="max-w-xl">
+        <label htmlFor="customer-overview-search" className="sr-only">
+          Search {customerLabels.plural}
+        </label>
+        <input
+          id="customer-overview-search"
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder={`Search ${customerLabels.plural}`}
+          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-800"
+        />
+      </div>
+
+      <StatGrid className="xl:!grid-cols-3">
         <StatCard label={customerLabels.pluralTitle} value={customerRows.length} tone="blue" />
         <StatCard
           label="Total invoiced"
@@ -156,14 +189,22 @@ export default function CustomersOverview() {
       </StatGrid>
 
       <SurfaceCard className="p-6">
-        {customerRows.length === 0 ? (
+        {filteredCustomerRows.length === 0 ? (
           <EmptyState
-            title={`No ${customerLabels.plural} found`}
-            description={`Add a ${customerLabels.singular} first, then invoice activity will appear here.`}
+            title={
+              customerRows.length === 0
+                ? `No ${customerLabels.plural} found`
+                : `No matching ${customerLabels.plural}`
+            }
+            description={
+              customerRows.length === 0
+                ? `Add a ${customerLabels.singular} first, then invoice activity will appear here.`
+                : "Try another name, phone number, category, or balance."
+            }
           />
         ) : (
           <div className="space-y-4">
-            {customerRows.map((customer) => (
+            {filteredCustomerRows.map((customer) => (
               <div
                 key={customer._id}
                 className="rounded-2xl border border-slate-200 p-5 transition hover:border-slate-300 hover:bg-slate-50/40"
@@ -243,7 +284,7 @@ export default function CustomersOverview() {
               </div>
               <button
                 onClick={() => setHistoryCustomer(null)}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-500 hover:bg-slate-50"
+                className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 Close
               </button>

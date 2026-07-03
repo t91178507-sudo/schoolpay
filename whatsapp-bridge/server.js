@@ -92,7 +92,8 @@ function isRecoverableBrowserError(error) {
     message.includes("execution context was destroyed") ||
     message.includes("target closed") ||
     message.includes("session closed") ||
-    message.includes("page crashed")
+    message.includes("page crashed") ||
+    message.includes("getchat")
   );
 }
 
