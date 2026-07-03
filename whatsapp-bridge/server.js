@@ -18,7 +18,7 @@ const BROWSER_PATH =
   process.env.WHATSAPP_BRIDGE_BROWSER_PATH ||
   (process.platform === "win32"
     ? "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
-    : "/usr/bin/chromium");
+    : "");
 
 const app = express();
 app.use(cors());
@@ -194,7 +194,7 @@ async function buildClient(sessionState) {
         }
       : {}),
     puppeteer: {
-      executablePath: BROWSER_PATH,
+      ...(BROWSER_PATH ? { executablePath: BROWSER_PATH } : {}),
       headless: true,
       args: [
         "--no-sandbox",
