@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "postinstall": "puppeteer browsers install chrome",
     "start": "node server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "puppeteer": "^24.38.0",
     "qrcode": "^1.5.4",
     "whatsapp-web.js": "^1.27.0"
   }
