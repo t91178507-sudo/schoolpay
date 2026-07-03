@@ -21,7 +21,9 @@ function applyBridgePort(bridgeBaseUrl, bridgePort) {
 
   try {
     const url = new URL(bridgeBaseUrl);
-    if (!url.port) {
+    const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+
+    if (!url.port && isLocalHost) {
       url.port = bridgePort;
     }
     return url.toString().replace(/\/+$/, "");
