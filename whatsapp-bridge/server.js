@@ -137,6 +137,7 @@ function buildSessionState(sessionName) {
     lastError: "",
     lastUpdatedAt: new Date().toISOString(),
     restartTimer: null,
+    readyTimeoutTimer: null,
     messageLogs: [],
     logoutRequested: false,
   };
@@ -216,6 +217,8 @@ async function clearStoredSession(sessionName) {
 }
 
 function clearSessionRuntime(sessionState, nextStatus = "deleted") {
+  clearRestartTimer(sessionState);
+  clearReadyTimeout(sessionState);
   sessionState.client = null;
   sessionState.initializingPromise = null;
   sessionState.qrDataUrl = "";
@@ -232,6 +235,33 @@ function clearRestartTimer(sessionState) {
     clearTimeout(sessionState.restartTimer);
     sessionState.restartTimer = null;
   }
+}
+
+function clearReadyTimeout(sessionState) {
+  if (sessionState.readyTimeoutTimer) {
+    clearTimeout(sessionState.readyTimeoutTimer);
+    sessionState.readyTimeoutTimer = null;
+  }
+}
+
+function armReadyTimeout(
+  sessionState,
+  reason = "Timed out waiting for WhatsApp Web to finish connecting"
+) {
+  if (sessionState.logoutRequested) {
+    return;
+  }
+
+  clearReadyTimeout(sessionState);
+  sessionState.readyTimeoutTimer = setTimeout(() => {
+    sessionState.readyTimeoutTimer = null;
+
+    if (sessionState.logoutRequested || sessionState.status === "ready") {
+      return;
+    }
+
+    scheduleRestart(sessionState, reason);
+  }, 90000);
 }
 
 function serializeSessionState(sessionState) {
@@ -287,6 +317,11 @@ async function buildClient(sessionState) {
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--disable-extensions",
+        "--disable-background-networking",
+        "--disable-software-rasterizer",
+        "--no-zygote",
       ],
     },
   });
@@ -300,6 +335,7 @@ async function buildClient(sessionState) {
     sessionState.connectedNumber = "";
     sessionState.lastError = "";
     touchSession(sessionState, "qr");
+    armReadyTimeout(sessionState);
   });
 
   nextClient.on("code", (code) => {
@@ -308,12 +344,20 @@ async function buildClient(sessionState) {
     sessionState.qrDataUrl = "";
     sessionState.lastError = "";
     touchSession(sessionState, "pairing_code");
+    armReadyTimeout(sessionState, "Timed out waiting for WhatsApp pairing to complete");
   });
 
-  nextClient.on("loading_screen", () => touchSession(sessionState, "loading"));
-  nextClient.on("authenticated", () => touchSession(sessionState, "authenticated"));
+  nextClient.on("loading_screen", () => {
+    touchSession(sessionState, "loading");
+    armReadyTimeout(sessionState, "WhatsApp Web is stuck on the loading screen");
+  });
+  nextClient.on("authenticated", () => {
+    touchSession(sessionState, "authenticated");
+    armReadyTimeout(sessionState, "Authenticated, but WhatsApp Web did not become ready");
+  });
   nextClient.on("ready", async () => {
     sessionState.logoutRequested = false;
+    clearReadyTimeout(sessionState);
     sessionState.qrDataUrl = "";
     sessionState.pairingCode = "";
     sessionState.pairingPhoneNumber = "";
@@ -324,6 +368,7 @@ async function buildClient(sessionState) {
   });
 
   nextClient.on("auth_failure", (message) => {
+    clearReadyTimeout(sessionState);
     sessionState.lastError = String(message || "Authentication failed");
     sessionState.connectedNumber = "";
     touchSession(sessionState, sessionState.logoutRequested ? "logged_out" : "auth_failure");
@@ -334,6 +379,7 @@ async function buildClient(sessionState) {
   });
 
   nextClient.on("disconnected", (reason) => {
+    clearReadyTimeout(sessionState);
     sessionState.lastError = String(reason || "Disconnected");
     sessionState.connectedNumber = "";
     touchSession(sessionState, sessionState.logoutRequested ? "logged_out" : "disconnected");
@@ -353,6 +399,7 @@ function scheduleRestart(sessionState, reason) {
     return;
   }
 
+  clearReadyTimeout(sessionState);
   sessionState.lastError = reason || sessionState.lastError;
   touchSession(sessionState, "retrying");
 
@@ -379,6 +426,7 @@ function scheduleRestart(sessionState, reason) {
 
 async function restartSessionImmediately(sessionState, reason) {
   clearRestartTimer(sessionState);
+  clearReadyTimeout(sessionState);
   sessionState.lastError = reason || sessionState.lastError || "Restarting WhatsApp session";
   touchSession(sessionState, "retrying");
 
