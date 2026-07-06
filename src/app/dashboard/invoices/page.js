@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FiCheckCircle, FiMessageCircle, FiTrash2 } from "react-icons/fi";
 import {
   EmptyState,
   PageHeader,
@@ -559,7 +560,7 @@ export default function Invoices() {
               <>
                 <div className="divide-y divide-slate-200 lg:hidden">
                   {filteredRecurringInvoices.map((schedule) => (
-                    <div key={schedule._id} className="space-y-4 p-4 sm:p-5">
+                    <div key={schedule._id} className="space-y-3 p-3.5 sm:p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="space-y-1">
                           <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
@@ -574,7 +575,7 @@ export default function Invoices() {
                         </StatusBadge>
                       </div>
 
-                      <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="grid gap-3 sm:grid-cols-2">
                         <div className="space-y-2">
                           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                             Details
@@ -630,19 +631,19 @@ export default function Invoices() {
                   <table className="w-full table-fixed">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
-                        <th className="w-[24%] px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                        <th className="w-[24%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                           Schedule
                         </th>
-                        <th className="w-[28%] px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                        <th className="w-[28%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                           Details
                         </th>
-                        <th className="w-[16%] px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                        <th className="w-[16%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                           Amount
                         </th>
-                        <th className="w-[16%] px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                        <th className="w-[16%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                           Notification
                         </th>
-                        <th className="w-[16%] px-5 py-4 text-right text-xs font-medium uppercase tracking-wide text-slate-500">
+                        <th className="w-[16%] px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-slate-500">
                           Actions
                         </th>
                       </tr>
@@ -650,7 +651,7 @@ export default function Invoices() {
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {filteredRecurringInvoices.map((schedule) => (
                         <tr key={schedule._id} className="hover:bg-slate-50 dark:hover:bg-slate-950/60">
-                          <td className="px-5 py-4 align-top">
+                          <td className="px-4 py-3 align-top">
                             <div className="space-y-1">
                               <p className="font-semibold text-slate-900 dark:text-slate-100">
                                 {schedule.customerName || schedule.customer || customerLabels.singularTitle}
@@ -663,7 +664,7 @@ export default function Invoices() {
                               </p>
                             </div>
                           </td>
-                          <td className="px-5 py-4 align-top">
+                          <td className="px-4 py-3 align-top">
                             <div className="space-y-2">
                               <p className="text-sm text-slate-700 dark:text-slate-300">
                                 {schedule.description || "-"}
@@ -676,7 +677,7 @@ export default function Invoices() {
                               </p>
                             </div>
                           </td>
-                          <td className="px-5 py-4 align-top">
+                          <td className="px-4 py-3 align-top">
                             <div className="space-y-2">
                               <p className="font-semibold text-slate-900 dark:text-slate-100">
                                 N{Number(schedule.amount || 0).toLocaleString()}
@@ -686,12 +687,12 @@ export default function Invoices() {
                               </StatusBadge>
                             </div>
                           </td>
-                          <td className="px-5 py-4 align-top">
+                          <td className="px-4 py-3 align-top">
                             <StatusBadge tone={getNotificationTone(schedule.lastNotification?.status)}>
                               {normalizeNotificationStatus(schedule.lastNotification?.status)}
                             </StatusBadge>
                           </td>
-                          <td className="px-5 py-4 align-top">
+                          <td className="px-4 py-3 align-top">
                             <div className="ml-auto flex max-w-[12rem] flex-wrap items-center justify-end gap-2">
                               <button
                                 type="button"
@@ -820,7 +821,7 @@ export default function Invoices() {
                 const invoiceCategory = invoice.category || invoice.class || "Uncategorized";
 
                 return (
-                  <div key={invoice._id} className="space-y-4 p-4 sm:p-5">
+                  <div key={invoice._id} className="space-y-3 p-3.5 sm:p-4">
                     <div className="space-y-1">
                       <p className="text-base font-semibold text-slate-900 dark:text-slate-100">{customerName}</p>
                       <p className="font-mono text-xs text-slate-500 dark:text-slate-400">
@@ -830,7 +831,7 @@ export default function Invoices() {
                       <p className="text-sm text-slate-500 dark:text-slate-400">{formatDateTime(invoice.date)}</p>
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-2">
                         <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                           Details
@@ -871,21 +872,24 @@ export default function Invoices() {
                       {invoice.status !== "Paid" ? (
                         <button
                           onClick={() => markPaid(invoice._id)}
-                          className="rounded-xl bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-green-700"
+                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-green-700"
                         >
+                          <FiCheckCircle className="h-4 w-4" />
                           Mark paid
                         </button>
                       ) : null}
                       <button
                         onClick={() => shareWhatsApp(invoice)}
-                        className="rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#20BA5C]"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#20BA5C]"
                       >
+                        <FiMessageCircle className="h-4 w-4" />
                         Share on WhatsApp
                       </button>
                       <button
                         onClick={() => deleteInvoice(invoice._id)}
-                        className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-700"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-700"
                       >
+                        <FiTrash2 className="h-4 w-4" />
                         Delete
                       </button>
                     </div>
@@ -898,22 +902,22 @@ export default function Invoices() {
               <table className="w-full table-fixed">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
-                  <th className="px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     Invoice
                   </th>
-                  <th className="px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     Category
                   </th>
-                  <th className="px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     Details
                   </th>
-                  <th className="px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     Payment
                   </th>
-                  <th className="px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     Notification
                   </th>
-                  <th className="w-[18%] px-4 py-4 text-right text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="w-[18%] px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-slate-500">
                     Actions
                   </th>
                 </tr>
@@ -926,7 +930,7 @@ export default function Invoices() {
 
                   return (
                     <tr key={invoice._id} className="hover:bg-slate-50 dark:hover:bg-slate-950/60">
-                      <td className="px-5 py-4 align-top">
+                      <td className="px-4 py-3 align-top">
                         <div className="space-y-1">
                           <p className="font-semibold text-slate-900 dark:text-slate-100">{customerName}</p>
                           <p className="font-mono text-xs text-slate-500 dark:text-slate-400">
@@ -935,10 +939,10 @@ export default function Invoices() {
                           <p className="text-sm text-slate-500 dark:text-slate-400">{formatDateTime(invoice.date)}</p>
                         </div>
                       </td>
-                      <td className="px-5 py-4 align-top">
+                      <td className="px-4 py-3 align-top">
                         <StatusBadge tone="slate">{invoiceCategory}</StatusBadge>
                       </td>
-                      <td className="px-5 py-4 align-top">
+                      <td className="px-4 py-3 align-top">
                         <div className="space-y-2">
                           <p className="text-sm text-slate-700 dark:text-slate-300">
                             {invoice.description || invoice.category || invoice.class || "-"}
@@ -949,7 +953,7 @@ export default function Invoices() {
                           </p>
                         </div>
                       </td>
-                      <td className="px-5 py-4 align-top">
+                      <td className="px-4 py-3 align-top">
                         <div className="space-y-2">
                           <p className="font-semibold text-slate-900 dark:text-slate-100">
                             N{Number(getOutstandingAmount(invoice) || 0).toLocaleString()}
@@ -966,34 +970,40 @@ export default function Invoices() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-4 align-top">
+                      <td className="px-4 py-3 align-top">
                         <StatusBadge tone={getNotificationTone(invoice.customerNotificationStatus)}>
                           {normalizeNotificationStatus(invoice.customerNotificationStatus)}
                         </StatusBadge>
                       </td>
-                      <td className="px-4 py-4 align-top">
+                      <td className="px-4 py-3 align-top">
                         <div className="ml-auto grid max-w-[12rem] grid-cols-2 gap-2">
                           {invoice.status !== "Paid" && (
                             <button
                               onClick={() => markPaid(invoice._id)}
-                              className="rounded-xl bg-green-600 px-2.5 py-2 text-xs font-medium text-white transition hover:bg-green-700"
+                              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-green-600 px-2.5 py-2 text-xs font-medium text-white transition hover:bg-green-700"
+                              title="Mark paid"
                             >
-                              Mark paid
+                              <FiCheckCircle className="h-3.5 w-3.5" />
+                              <span>Paid</span>
                             </button>
                           )}
                           <button
                             onClick={() => shareWhatsApp(invoice)}
-                            className={`rounded-xl bg-[#25D366] px-2.5 py-2 text-xs font-medium text-white transition hover:bg-[#20BA5C] ${
+                            className={`inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#25D366] px-2.5 py-2 text-xs font-medium text-white transition hover:bg-[#20BA5C] ${
                               invoice.status === "Paid" ? "col-span-2" : ""
                             }`}
+                            title="Share on WhatsApp"
                           >
-                            WhatsApp
+                            <FiMessageCircle className="h-3.5 w-3.5" />
+                            <span>WhatsApp</span>
                           </button>
                           <button
                             onClick={() => deleteInvoice(invoice._id)}
-                            className="col-span-2 rounded-xl bg-red-600 px-2.5 py-2 text-xs font-medium text-white transition hover:bg-red-700"
+                            className="col-span-2 inline-flex items-center justify-center gap-1.5 rounded-xl bg-red-600 px-2.5 py-2 text-xs font-medium text-white transition hover:bg-red-700"
+                            title="Delete invoice"
                           >
-                            Delete
+                            <FiTrash2 className="h-3.5 w-3.5" />
+                            <span>Delete</span>
                           </button>
                         </div>
                       </td>

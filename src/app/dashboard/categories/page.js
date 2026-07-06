@@ -815,7 +815,7 @@ export default function CategoriesPage() {
               <>
             <div className="divide-y divide-gray-100 dark:divide-slate-800 lg:hidden">
               {visibleSelectedCustomers.map((customer) => (
-                <div key={customer._id} className="space-y-4 p-5">
+                <div key={customer._id} className="space-y-3 p-4">
                   <div className="space-y-1">
                     <p className="font-medium text-gray-900 dark:text-slate-100">{customer.name}</p>
                     <p className="text-sm text-gray-600 dark:text-slate-400">{customer.phone || "-"}</p>
@@ -847,19 +847,19 @@ export default function CategoriesPage() {
               <table className="w-full table-fixed">
                 <thead>
                   <tr className="border-b bg-slate-50">
-                    <th className="w-[24%] px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="w-[24%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                       {customerLabels.singularTitle} Name
                     </th>
-                    <th className="w-[18%] px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="w-[18%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                       Phone Number
                     </th>
-                    <th className="w-[24%] px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="w-[24%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                       Email
                     </th>
-                    <th className="w-[16%] px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="w-[16%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                       Token
                     </th>
-                    <th className="w-[18%] px-5 py-4 text-right text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="w-[18%] px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-gray-500">
                       Actions
                     </th>
                   </tr>
@@ -867,21 +867,21 @@ export default function CategoriesPage() {
                 <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                   {visibleSelectedCustomers.map((customer) => (
                     <tr key={customer._id} className="hover:bg-gray-50 dark:hover:bg-slate-950/60 transition-colors">
-                      <td className="px-5 py-4 font-medium text-gray-900 dark:text-slate-100">
+                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-slate-100">
                         {customer.name}
                       </td>
-                      <td className="px-5 py-4 text-gray-600 dark:text-slate-400">
+                      <td className="px-4 py-3 text-gray-600 dark:text-slate-400">
                         {customer.phone || "—"}
                       </td>
-                      <td className="px-5 py-4 text-gray-600 dark:text-slate-400">
+                      <td className="px-4 py-3 text-gray-600 dark:text-slate-400">
                         {customer.email || "—"}
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         <span className="font-mono text-xs bg-gray-100 dark:bg-slate-800 dark:text-slate-300 px-3 py-1 rounded-full">
                           {customer.token ? `${customer.token.substring(0, 15)}...` : "—"}
                         </span>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         <div className="flex flex-wrap justify-end gap-2">
                           <button
                             onClick={() => openInvoiceModal(customer)}

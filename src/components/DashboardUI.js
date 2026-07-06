@@ -1,5 +1,8 @@
 "use client";
 
+import { useRef } from "react";
+import { FiCalendar } from "react-icons/fi";
+
 export function PageShell({ children }) {
   return <div className="space-y-8">{children}</div>;
 }
@@ -64,13 +67,42 @@ export function Toolbar({ children }) {
   );
 }
 
-export function InputField(props) {
-  return (
-    <input
-      {...props}
-      className={`h-11 rounded-xl border border-slate-300 px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-slate-600 ${props.className || ""}`.trim()}
-    />
-  );
+export function InputField({ className = "", type, ...props }) {
+  const inputRef = useRef(null);
+  const baseClassName =
+    "h-11 rounded-xl border border-slate-300 px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-slate-600";
+
+  if (type === "date") {
+    const openDatePicker = () => {
+      const input = inputRef.current;
+      if (!input) return;
+      input.focus();
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+      }
+    };
+
+    return (
+      <div className={`relative ${className}`.trim()}>
+        <input
+          {...props}
+          ref={inputRef}
+          type={type}
+          className={`${baseClassName} w-full pr-11`.trim()}
+        />
+        <button
+          type="button"
+          aria-label="Open date picker"
+          onClick={openDatePicker}
+          className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+        >
+          <FiCalendar className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return <input {...props} type={type} className={`${baseClassName} ${className}`.trim()} />;
 }
 
 export function SelectField(props) {

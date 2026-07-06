@@ -3,31 +3,46 @@ import Link from "next/link";
 import PublicLegalFooter from "../components/PublicLegalFooter";
 
 const proofPoints = [
-  { label: "Gateway options", value: "2" },
-  { label: "Payment tracking", value: "Live" },
-  { label: "Customer records", value: "1 hub" },
+  { label: "Invoice workspace", value: "1 hub" },
+  { label: "Payment visibility", value: "Live" },
+  { label: "Collection follow-up", value: "Built in" },
 ];
 
 const workflow = [
   {
-    title: "Create polished invoices",
-    text: "Create professional invoices with clear line items, due dates, and payment instructions customers can act on quickly.",
+    title: "Create and share invoices",
+    text: "Generate polished invoices with clear descriptions, due dates, payment pages, and customer-ready sharing links.",
   },
   {
-    title: "Connect your payment provider",
-    text: "Use your own business payment account so customer payments go through the provider configured for your business.",
+    title: "Connect your business payment setup",
+    text: "Use your own configured payment provider so customer payments go to your business account, not to the platform.",
   },
   {
-    title: "Track every confirmation",
-    text: "Share invoice links in seconds and stay on top of unpaid, partial, and confirmed payments without the usual back-and-forth.",
+    title: "Track every payment and reminder",
+    text: "Monitor unpaid, partial, and confirmed invoices, send reminders, and keep records without scattered chats and spreadsheets.",
   },
 ];
 
 const features = [
-  "Connect your preferred payment provider from business settings",
-  "Invoice links and QR payment pages customers can use quickly",
+  "Invoice links and QR payment pages customers can open quickly",
   "Payment tracking across unpaid, partial, and confirmed invoices",
-  "WhatsApp-ready receipts and payment confirmations",
+  "WhatsApp-ready reminders, receipts, and confirmations",
+  "Admin controls, customer records, and collection visibility in one place",
+];
+
+const audiences = [
+  {
+    title: "Schools and education teams",
+    text: "Use InvoiceHub to organize students, categories, recurring billing, and payment visibility without chasing fees manually.",
+  },
+  {
+    title: "Service businesses and merchants",
+    text: "Manage customer billing, share payment-ready invoices, and follow outstanding balances from one cleaner workflow.",
+  },
+  {
+    title: "Operations and finance teams",
+    text: "Keep records organized, reduce manual follow-up, and see what has been sent, paid, pending, or overdue at a glance.",
+  },
 ];
 
 export default function Home() {
@@ -61,15 +76,18 @@ export default function Home() {
 
               <div className="flex flex-wrap items-center gap-3 lg:gap-7">
                 <nav className="hidden flex-wrap items-center gap-5 text-sm font-medium text-slate-300 md:flex">
-                  <a href="#workflow" className="transition hover:text-white">
-                    Workflow
+                  <a href="#problem" className="transition hover:text-white">
+                    Problem
                   </a>
-                  <a href="#platform" className="transition hover:text-white">
-                    Platform
+                  <a href="#audience" className="transition hover:text-white">
+                    Who it's for
                   </a>
-                  <a href="#results" className="transition hover:text-white">
-                    Results
+                  <a href="#how-it-works" className="transition hover:text-white">
+                    How it works
                   </a>
+                  <Link href="/book-demo" className="transition hover:text-white">
+                    Book a demo
+                  </Link>
                 </nav>
 
                 <div className="flex items-center gap-2 sm:gap-3">
@@ -97,14 +115,15 @@ export default function Home() {
                   <span className="h-2 w-2 rounded-full bg-emerald-300" />
                   InvoiceHub
                 </div>
-                <h1 className="mt-5 max-w-4xl text-[3.1rem] font-semibold leading-[1.05] tracking-tight sm:text-6xl lg:text-[5.4rem]">
-                  Send invoices and collect payments{" "}
-                  <span className="text-emerald-300">with confidence.</span>
+                <h1 className="mt-5 max-w-4xl text-[2.6rem] font-semibold leading-[1.02] tracking-tight sm:text-[4.25rem] lg:text-[5.1rem]">
+                  InvoiceHub helps businesses send invoices, collect payments,
+                  and stay on top of follow-up{" "}
+                  <span className="text-emerald-300">without the usual mess.</span>
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200 sm:text-xl">
-                  Connect your preferred payment provider, generate invoices,
-                  receive customer payments directly, and track every confirmation
-                  from one secure workspace.
+                  The platform brings invoice creation, customer billing,
+                  payment pages, reminders, and payment status tracking into one
+                  secure workspace for schools, service teams, and growing businesses.
                 </p>
 
                 <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -119,6 +138,12 @@ export default function Home() {
                     className="rounded-2xl border border-white/20 px-6 py-3.5 text-sm font-medium text-white transition hover:bg-white/10"
                   >
                     Sign in
+                  </Link>
+                  <Link
+                    href="/book-demo"
+                    className="rounded-2xl border border-emerald-300/35 px-6 py-3.5 text-sm font-medium text-emerald-100 transition hover:bg-emerald-400/10"
+                  >
+                    Book a demo
                   </Link>
                 </div>
               </div>
@@ -184,15 +209,20 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="workflow" className="bg-white py-20 dark:bg-slate-950 lg:py-24">
+      <section id="problem" className="bg-white py-20 dark:bg-slate-950 lg:py-24">
         <div className="mx-auto grid max-w-7xl gap-14 px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-10">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-600">
-              Workflow
+              The problem
             </p>
             <h2 className="mt-4 max-w-2xl text-4xl font-semibold text-slate-950 dark:text-slate-100">
-              Built for businesses that invoice often and need sharper payment follow-through.
+              Too many teams still manage invoices, reminders, and payment checks across chats, screenshots, and spreadsheets.
             </h2>
+            <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-400">
+              InvoiceHub solves the day-to-day billing problem: sending invoices
+              quickly, giving customers a clear way to pay, and helping your team
+              see what is still unpaid without guessing or chasing manually.
+            </p>
             <div className="mt-10 space-y-8">
               {workflow.map((item, index) => (
                 <div key={item.title} className="flex gap-5">
@@ -217,11 +247,11 @@ export default function Home() {
               <div className="border-b border-white/10 px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-400">Collections snapshot</p>
-                    <p className="mt-1 text-xl font-semibold">June billing cycle</p>
+                     <p className="text-sm text-slate-400">Collections snapshot</p>
+                     <p className="mt-1 text-xl font-semibold">One workspace, clearer billing</p>
                   </div>
                   <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-300">
-                    84% paid
+                    Actionable
                   </span>
                 </div>
               </div>
@@ -229,19 +259,19 @@ export default function Home() {
               <div className="space-y-5 px-6 py-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="rounded-xl bg-white/5 p-4">
-                    <p className="text-sm text-slate-400">Outstanding</p>
-                    <p className="mt-2 text-3xl font-semibold">N 1.28M</p>
+                    <p className="text-sm text-slate-400">Invoices to follow up</p>
+                    <p className="mt-2 text-3xl font-semibold">24</p>
                   </div>
                   <div className="rounded-xl bg-white/5 p-4">
-                    <p className="text-sm text-slate-400">Invoices sent</p>
-                    <p className="mt-2 text-3xl font-semibold">246</p>
+                    <p className="text-sm text-slate-400">Payments confirmed</p>
+                    <p className="mt-2 text-3xl font-semibold">186</p>
                   </div>
                 </div>
 
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-300">Northfield Supply</span>
-                    <span className="text-emerald-300">Paid</span>
+                    <span className="text-slate-300">Invoice sent</span>
+                    <span className="text-emerald-300">Payment page opened</span>
                   </div>
                   <div className="mt-3 h-2 rounded-full bg-white/10">
                     <div className="h-2 w-[92%] rounded-full bg-emerald-400" />
@@ -250,8 +280,8 @@ export default function Home() {
 
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-300">Oakline Studio</span>
-                    <span className="text-amber-300">Pending</span>
+                    <span className="text-slate-300">Reminder queued</span>
+                    <span className="text-amber-300">Pending payment</span>
                   </div>
                   <div className="mt-3 h-2 rounded-full bg-white/10">
                     <div className="h-2 w-[58%] rounded-full bg-amber-400" />
@@ -260,8 +290,8 @@ export default function Home() {
 
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-300">Prime Retail Group</span>
-                    <span className="text-sky-300">Sent today</span>
+                    <span className="text-slate-300">Receipt prepared</span>
+                    <span className="text-sky-300">Shared with customer</span>
                   </div>
                   <div className="mt-3 h-2 rounded-full bg-white/10">
                     <div className="h-2 w-[36%] rounded-full bg-sky-400" />
@@ -273,23 +303,44 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="platform" className="bg-slate-50 py-20 dark:bg-slate-900 lg:py-24">
+      <section id="audience" className="bg-slate-50 py-20 dark:bg-slate-900 lg:py-24">
         <div className="mx-auto max-w-7xl px-6 lg:px-10">
           <div className="max-w-3xl">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-600">
-              Platform
+              Who it&apos;s for
             </p>
             <h2 className="mt-4 text-4xl font-semibold text-slate-950 dark:text-slate-100">
-              A cleaner billing workspace with payment collection built in.
+              Built for teams that need better billing discipline without adding heavy finance software.
             </h2>
             <p className="mt-4 text-lg leading-8 text-slate-600 dark:text-slate-400">
-              InvoiceHub keeps the essentials close: customer lists, invoice
-              generation, payment provider setup, payment visibility, and admin
-              oversight without the clutter that usually slows teams down.
+              InvoiceHub is especially useful for businesses and institutions
+              that send frequent invoices, follow up on unpaid balances, and need
+              a simple way to keep customers or students organized.
             </p>
           </div>
 
-          <div className="mt-12 grid gap-4 md:grid-cols-2">
+          <div className="mt-12 grid gap-4 md:grid-cols-3">
+            {audiences.map((audience) => (
+              <div
+                key={audience.title}
+                className="rounded-2xl border border-slate-200 bg-white px-6 py-6 dark:border-slate-800 dark:bg-slate-950"
+              >
+                <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{audience.title}</p>
+                <p className="mt-3 text-base leading-7 text-slate-600 dark:text-slate-400">{audience.text}</p>
+              </div>
+            ))}
+          </div>
+
+          <div id="how-it-works" className="mt-16 max-w-3xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-600">
+              How it works
+            </p>
+            <h2 className="mt-4 text-4xl font-semibold text-slate-950 dark:text-slate-100">
+              Connect your setup, send invoices, and track what happens next.
+            </h2>
+          </div>
+
+          <div className="mt-10 grid gap-4 md:grid-cols-2">
             {features.map((feature) => (
               <div
                 key={feature}
@@ -309,28 +360,28 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="results" className="bg-slate-950 py-20 text-white lg:py-24">
+      <section id="book-demo" className="bg-slate-950 py-20 text-white lg:py-24">
         <div className="mx-auto flex max-w-7xl flex-col gap-10 px-6 lg:flex-row lg:items-end lg:justify-between lg:px-10">
           <div className="max-w-3xl">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">
-              Results
+              Book a demo
             </p>
             <h2 className="mt-4 text-4xl font-semibold">
-              Give customers a clear way to pay and your team a clear way to track it.
+              See how InvoiceHub fits your billing workflow before you roll it out.
             </h2>
             <p className="mt-4 text-lg leading-8 text-slate-300">
-              When invoices are easy to send, easy to understand, and connected
-              to the right payment provider, teams spend less time chasing and
-              more time closing.
+              If you want to explore invoice creation, payment collection,
+              student or customer organization, reminders, and dashboard tracking
+              in one walkthrough, start with the platform and review the flow in context.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-4">
             <Link
-              href="/auth/register"
+              href="/book-demo"
               className="rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-400"
             >
-              Start with InvoiceHub
+              Book a demo
             </Link>
             <Link
               href="/auth/login"

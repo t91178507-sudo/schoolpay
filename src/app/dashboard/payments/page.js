@@ -72,6 +72,10 @@ function formatDateInput(value) {
   return date.toISOString().slice(0, 10);
 }
 
+function formatCurrency(value) {
+  return `N${Number(value || 0).toLocaleString()}`;
+}
+
 function escapeCsvValue(value) {
   const text = String(value ?? "");
   if (/[",\n\r]/.test(text)) {
@@ -124,6 +128,7 @@ export default function Payments() {
         id: `invoice-${invoice._id}`,
         type: "invoice",
         source,
+        sourceLabel: getSourceLabel({ type: "invoice", source }),
         customerName,
         description:
           invoice.description || invoice.category || invoice.class || "Invoice payment",
@@ -139,6 +144,11 @@ export default function Payments() {
         phone: invoice.phone || "",
         invoiceNumber: invoice.invoiceNumber || "-",
         token: invoice.token || "",
+        transactionId:
+          invoice.paymentReference ||
+          invoice.pendingPaymentReference ||
+          invoice.invoiceNumber ||
+          String(invoice._id || "-"),
         happenedAt:
           invoice.paidAt ||
           invoice.paymentConfirmedAt ||
@@ -204,6 +214,10 @@ export default function Payments() {
   const latestPaymentDate = filteredRows[0]?.happenedAt
     ? formatDateInput(filteredRows[0].happenedAt)
     : "";
+  const providerCount = new Set(
+    filteredRows.map((row) => String(row.provider || "").trim()).filter(Boolean)
+  ).size;
+  const filterSummary = `${filteredRows.length} record${filteredRows.length === 1 ? "" : "s"} found`;
 
   const exportPayments = () => {
     const headers = [
@@ -265,40 +279,51 @@ export default function Payments() {
       <StatGrid>
         <StatCard
           label="Collected"
-          value={`N${totalCollected.toLocaleString()}`}
+          value={formatCurrency(totalCollected)}
           tone="emerald"
         />
-        <StatCard label="History rows" value={filteredRows.length} tone="slate" />
-        <StatCard label="Pending items" value={pendingCount} tone="orange" />
+        <StatCard label="Transactions" value={filteredRows.length} tone="slate" />
+        <StatCard label="Providers" value={providerCount} tone="blue" />
         <StatCard
           label="WhatsApp sent"
           value={sentNotifications}
-          tone="blue"
+          tone="emerald"
         />
       </StatGrid>
 
-      <SurfaceCard className="p-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-              Filter payments
-            </h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Narrow history by customer, status, notification, source, and date range.
-            </p>
-          </div>
-          <div className="text-sm text-slate-500 dark:text-slate-400">
-            {latestPaymentDate ? `Latest payment: ${latestPaymentDate}` : "No payment date yet"}
+      <SurfaceCard className="overflow-hidden">
+        <div className="border-b border-slate-200 bg-slate-50/90 px-5 py-4 dark:border-slate-800 dark:bg-slate-950/60">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                Transaction filters
+              </h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Filter by date range, source, payment status, notification status, and customer details.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 dark:border-slate-700 dark:bg-slate-900">
+                {filterSummary}
+              </span>
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 dark:border-slate-700 dark:bg-slate-900">
+                {latestPaymentDate ? `Latest: ${latestPaymentDate}` : "No payment date yet"}
+              </span>
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 dark:border-slate-700 dark:bg-slate-900">
+                Pending: {pendingCount}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+        <div className="p-5">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-8">
           <InputField
             type="text"
             placeholder={`Search ${customerLabels.singular}, phone, reference...`}
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            className="xl:col-span-2"
+            className="2xl:col-span-2"
           />
           <InputField
             type="date"
@@ -333,13 +358,21 @@ export default function Payments() {
           <SelectField
             value={notificationFilter}
             onChange={(event) => setNotificationFilter(event.target.value)}
-            className="md:col-span-2 xl:col-span-2"
+            className="md:col-span-2 2xl:col-span-2"
           >
             <option value="all">All notifications</option>
             <option value="sent">Sent</option>
             <option value="pending">Pending</option>
             <option value="failed">Failed</option>
           </SelectField>
+          <button
+            type="button"
+            onClick={exportPayments}
+            disabled={filteredRows.length === 0}
+            className="h-11 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-blue-600 dark:hover:bg-blue-500 dark:disabled:bg-slate-700"
+          >
+            Export
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -355,10 +388,11 @@ export default function Payments() {
             Clear filters
           </button>
         </div>
+        </div>
       </SurfaceCard>
 
       <SurfaceCard className="overflow-hidden">
-        <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-950/60 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-950/60 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-base font-semibold text-slate-900 dark:text-white">
               Payment records
@@ -367,14 +401,26 @@ export default function Payments() {
               Showing {filteredRows.length} filtered record{filteredRows.length === 1 ? "" : "s"}.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={exportPayments}
-            disabled={filteredRows.length === 0}
-            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            Export
-          </button>
+          <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[28rem]">
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Total collected</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {formatCurrency(totalCollected)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Notifications sent</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {sentNotifications}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Pending items</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {pendingCount}
+              </p>
+            </div>
+          </div>
         </div>
         {loading ? (
           <div className="py-16 text-center text-sm text-slate-500 dark:text-slate-400">Loading payment history...</div>
@@ -387,22 +433,23 @@ export default function Payments() {
           <>
             <div className="divide-y divide-slate-200 dark:divide-slate-800 lg:hidden">
               {filteredRows.map((row) => (
-                <div key={row.id} className="space-y-4 p-4 sm:p-5">
+                <div key={row.id} className="space-y-3 p-3.5 sm:p-4">
                   <div className="space-y-1">
                     <p className="font-medium text-slate-900 dark:text-slate-100">{row.customerName}</p>
                     <div className="flex flex-wrap items-center gap-2">
-                      <StatusBadge tone="slate">{getSourceLabel(row)}</StatusBadge>
+                      <StatusBadge tone="slate">{row.sourceLabel}</StatusBadge>
                       {row.phone ? <span className="text-xs text-slate-500 dark:text-slate-400">{row.phone}</span> : null}
                     </div>
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                         Description
                       </p>
                       <p className="text-sm text-slate-800 dark:text-slate-300">{row.description}</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">Invoice: {row.invoiceNumber || "-"}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Transaction ID: {row.transactionId}</p>
                     </div>
 
                     <div className="space-y-2">
@@ -410,7 +457,7 @@ export default function Payments() {
                         Payment
                       </p>
                       <p className="font-semibold text-slate-900 dark:text-slate-100">
-                        N{Number(row.amount || 0).toLocaleString()}
+                        {formatCurrency(row.amount)}
                       </p>
                       <div className="flex flex-wrap items-center gap-2">
                         <StatusBadge tone={getStatusTone(row.status)}>
@@ -438,36 +485,57 @@ export default function Payments() {
               <table className="w-full table-fixed">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
-                  <th className="px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Transaction ID
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Date
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     {customerLabels.singularTitle}
                   </th>
-                  <th className="px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Description
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Details
                   </th>
-                  <th className="px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Payment
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Source
                   </th>
-                  <th className="px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    WhatsApp Notification
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Amount
                   </th>
-                  <th className="px-5 py-4 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Reference
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Notification
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Provider
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredRows.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-950/60">
-                    <td className="px-5 py-4 align-top">
+                    <td className="px-4 py-3 align-top">
+                      <p className="max-w-[12rem] break-all font-mono text-xs text-slate-600 dark:text-slate-300">
+                        {row.transactionId}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <p className="text-sm text-slate-800 dark:text-slate-300">
+                        {formatDateTime(row.happenedAt)}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 align-top">
                       <div className="space-y-1">
                         <p className="font-medium text-slate-900 dark:text-slate-100">{row.customerName}</p>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <StatusBadge tone="slate">{getSourceLabel(row)}</StatusBadge>
-                          {row.phone ? <span className="text-xs text-slate-500 dark:text-slate-400">{row.phone}</span> : null}
-                        </div>
+                        {row.phone ? (
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{row.phone}</p>
+                        ) : null}
                       </div>
                     </td>
-                    <td className="px-5 py-4 align-top">
+                    <td className="px-4 py-3 align-top">
                       <div className="space-y-1">
                         <p className="text-sm text-slate-800 dark:text-slate-300">{row.description}</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -475,28 +543,32 @@ export default function Payments() {
                         </p>
                       </div>
                     </td>
-                    <td className="px-5 py-4 align-top">
+                    <td className="px-4 py-3 align-top">
+                      <StatusBadge tone="slate">{row.sourceLabel}</StatusBadge>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">
+                        {formatCurrency(row.amount)}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 align-top">
                       <div className="space-y-2">
-                        <p className="font-semibold text-slate-900 dark:text-slate-100">
-                          N{Number(row.amount || 0).toLocaleString()}
+                        <StatusBadge tone={getStatusTone(row.status)}>
+                          {row.status || "Unknown"}
+                        </StatusBadge>
+                        <p className="text-xs text-slate-400 dark:text-slate-500">
+                          Ref: {row.reference || "-"}
                         </p>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <StatusBadge tone={getStatusTone(row.status)}>
-                            {row.status || "Unknown"}
-                          </StatusBadge>
-                          <span className="text-xs text-slate-500 dark:text-slate-400">{row.provider || "-"}</span>
-                        </div>
-                        <p className="text-xs text-slate-400 dark:text-slate-500">{formatDateTime(row.happenedAt)}</p>
                       </div>
                     </td>
-                    <td className="px-5 py-4 align-top">
+                    <td className="px-4 py-3 align-top">
                       <StatusBadge tone={getNotificationTone(row.notificationStatus)}>
                         {formatNotificationStatus(row.notificationStatus)}
                       </StatusBadge>
                     </td>
-                    <td className="px-5 py-4 align-top">
-                      <p className="max-w-[14rem] break-all font-mono text-xs text-slate-500 dark:text-slate-400">
-                        {row.reference || "-"}
+                    <td className="px-4 py-3 align-top">
+                      <p className="text-sm text-slate-700 dark:text-slate-300">
+                        {row.provider || "-"}
                       </p>
                     </td>
                   </tr>
