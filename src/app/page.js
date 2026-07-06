@@ -116,9 +116,8 @@ export default function Home() {
                   InvoiceHub
                 </div>
                 <h1 className="mt-5 max-w-4xl text-[2.6rem] font-semibold leading-[1.02] tracking-tight sm:text-[4.25rem] lg:text-[5.1rem]">
-                  InvoiceHub helps businesses send invoices, collect payments,
-                  and stay on top of follow-up{" "}
-                  <span className="text-emerald-300">without the usual mess.</span>
+                  Send invoices, collect payments, and{" "}
+                  <span className="text-emerald-300">follow up in one place.</span>
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200 sm:text-xl">
                   The platform brings invoice creation, customer billing,
