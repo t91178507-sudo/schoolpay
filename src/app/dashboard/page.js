@@ -162,14 +162,14 @@ export default function Dashboard() {
 
       <div className="grid gap-4 xl:grid-cols-3">
         <SurfaceCard className="p-6 xl:col-span-2">
-          <h2 className="text-lg font-semibold text-slate-900">Collections snapshot</h2>
-          <p className="mt-2 text-sm text-slate-500">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Collections snapshot</h2>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             InvoiceHub is now tracking invoices, QR payment sessions, and confirmation states in one workflow. Use the history pages to monitor payment completion and notification readiness.
           </p>
           {!whatsAppStatus.connected ? (
             <div className="mt-5">
               {whatsAppStatus.qrDataUrl ? (
-                <div className="inline-flex overflow-hidden rounded-xl border border-slate-200 bg-white p-2">
+                <div className="inline-flex overflow-hidden rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900">
                   <Image
                     src={whatsAppStatus.qrDataUrl}
                     alt="WhatsApp QR code"

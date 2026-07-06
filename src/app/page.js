@@ -33,34 +33,34 @@ const features = [
 export default function Home() {
   return (
     <div className="bg-white text-slate-950 dark:bg-slate-950 dark:text-slate-100">
-      <section className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
+      <section className="relative overflow-hidden bg-slate-950 text-white">
         <Image
           src="https://images.unsplash.com/photo-1554224154-26032ffc0d07?auto=format&fit=crop&w=1600&q=80"
           alt="Desk with laptop and financial documents"
           fill
           priority
-          className="object-cover"
+          className="object-cover opacity-70"
         />
-        <div className="absolute inset-0 bg-slate-950/70" />
-        <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(15,23,42,0.94)_0%,rgba(15,23,42,0.78)_45%,rgba(16,185,129,0.18)_100%)]" />
+        <div className="absolute inset-0 bg-slate-950/78" />
+        <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(2,6,23,0.96)_0%,rgba(15,23,42,0.88)_48%,rgba(6,78,59,0.72)_100%)]" />
 
-        <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-6 pb-14 pt-6 lg:px-10 lg:pb-20">
-          <header className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 backdrop-blur md:px-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="relative mx-auto flex min-h-[720px] max-w-7xl flex-col px-5 pb-10 pt-5 sm:px-6 lg:min-h-[760px] lg:px-10">
+          <header className="rounded-[1.75rem] border border-white/10 bg-slate-950/75 px-4 py-3 shadow-2xl shadow-black/20 backdrop-blur-xl md:px-5">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
                 <Link href="/" className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-base font-bold text-white">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500 text-base font-bold text-white shadow-lg shadow-emerald-950/30">
                     I
                   </div>
                   <div className="min-w-0">
-                    <p className="text-base font-semibold leading-5 text-white">InvoiceHub</p>
-                    <p className="text-xs leading-5 text-slate-300">Invoicing and collections software</p>
+                    <p className="text-lg font-semibold leading-5 text-white">InvoiceHub</p>
+                    <p className="hidden text-xs leading-5 text-slate-300 sm:block">Invoicing and collections software</p>
                   </div>
                 </Link>
               </div>
 
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-7">
-                <nav className="flex flex-wrap items-center gap-5 text-sm font-medium text-slate-300">
+              <div className="flex flex-wrap items-center gap-3 lg:gap-7">
+                <nav className="hidden flex-wrap items-center gap-5 text-sm font-medium text-slate-300 md:flex">
                   <a href="#workflow" className="transition hover:text-white">
                     Workflow
                   </a>
@@ -72,16 +72,16 @@ export default function Home() {
                   </a>
                 </nav>
 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <Link
                     href="/auth/login"
-                    className="rounded-xl border border-white/15 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+                    className="rounded-2xl border border-white/15 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
                   >
                     Log in
                   </Link>
                   <Link
                     href="/auth/register"
-                    className="rounded-xl bg-emerald-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400"
+                    className="rounded-2xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-400"
                   >
                     Start free
                   </Link>
@@ -90,78 +90,93 @@ export default function Home() {
             </div>
           </header>
 
-          <div className="flex flex-1 flex-col justify-end pt-16 lg:pt-20">
-            <div className="grid gap-10 lg:grid-cols-[1fr_0.82fr] lg:items-end">
+          <div className="flex flex-1 flex-col justify-center py-12 lg:py-16">
+            <div className="grid gap-8 lg:grid-cols-[1.04fr_0.82fr] lg:items-center">
               <div className="max-w-3xl">
-                <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-300">
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                  <span className="h-2 w-2 rounded-full bg-emerald-300" />
                   InvoiceHub
-                </p>
-                <h1 className="mt-5 text-5xl font-semibold leading-tight sm:text-6xl lg:text-7xl">
-                  Send invoices and collect payments with confidence.
+                </div>
+                <h1 className="mt-5 max-w-4xl text-[3.1rem] font-semibold leading-[1.05] tracking-tight sm:text-6xl lg:text-[5.4rem]">
+                  Send invoices and collect payments{" "}
+                  <span className="text-emerald-300">with confidence.</span>
                 </h1>
-                <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200">
+                <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-200 sm:text-xl">
                   Connect your preferred payment provider, generate invoices,
                   receive customer payments directly, and track every confirmation
                   from one secure workspace.
                 </p>
 
-                <div className="mt-8 flex flex-wrap items-center gap-4">
+                <div className="mt-8 flex flex-wrap items-center gap-3">
                   <Link
                     href="/auth/register"
-                    className="rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-400"
+                    className="rounded-2xl bg-emerald-500 px-6 py-3.5 text-sm font-semibold text-white shadow-xl shadow-emerald-950/30 transition hover:bg-emerald-400"
                   >
                     Create your workspace
                   </Link>
                   <Link
                     href="/auth/login"
-                    className="rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-white hover:bg-white/10"
+                    className="rounded-2xl border border-white/20 px-6 py-3.5 text-sm font-medium text-white transition hover:bg-white/10"
                   >
                     Sign in
                   </Link>
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-white/10 bg-slate-950/55 p-6 shadow-2xl backdrop-blur">
-                <div className="flex items-start gap-5">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-400/15 text-sm font-bold tracking-wide text-emerald-200">
+              <div className="rounded-[2rem] border border-white/10 bg-slate-950/70 p-5 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-400/15 text-sm font-bold tracking-wide text-emerald-200 shadow-inner">
                     NGN
                   </div>
                   <div className="min-w-0">
-                    <p className="text-lg font-bold leading-6 text-white">
+                    <p className="text-xl font-bold leading-6 text-white">
                       Payment-ready invoicing
                     </p>
-                    <p className="mt-1 max-w-sm text-sm leading-6 text-sky-100">
+                    <p className="mt-2 max-w-sm text-sm leading-6 text-slate-200">
                       Connect your business payment account and start receiving customer
                       payments directly into your business account.
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-5 grid gap-2.5 text-sm text-sky-50">
-                  <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/8 px-4 py-3">
+                <div className="mt-6 grid gap-2.5 text-sm text-slate-100">
+                  <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/8 px-4 py-3.5">
                     <span>Payment setup</span>
                     <span className="font-semibold text-emerald-300">Your provider</span>
                   </div>
-                  <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/8 px-4 py-3">
+                  <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/8 px-4 py-3.5">
                     <span>Payment tracking</span>
                     <span className="font-semibold text-emerald-300">Automatic updates</span>
                   </div>
-                  <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/8 px-4 py-3">
+                  <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/8 px-4 py-3.5">
                     <span>Customer receipts</span>
                     <span className="font-semibold text-emerald-300">WhatsApp-ready</span>
+                  </div>
+                </div>
+
+                <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                    Payment status
+                  </p>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full w-[78%] rounded-full bg-emerald-400" />
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-xs text-slate-300">
+                    <span>Invoices tracked</span>
+                    <span className="font-semibold text-white">Live</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="mt-14 grid gap-4 md:grid-cols-3">
+            <div className="mt-10 grid gap-3 md:grid-cols-3 lg:mt-12">
               {proofPoints.map((item) => (
                 <div
                   key={item.label}
-                  className="rounded-2xl border border-white/10 bg-white/8 px-5 py-5 backdrop-blur"
+                  className="rounded-2xl border border-white/10 bg-white/8 px-5 py-4 backdrop-blur-xl"
                 >
-                  <p className="text-3xl font-semibold text-white">{item.value}</p>
-                  <p className="mt-2 text-sm text-slate-300">{item.label}</p>
+                  <p className="text-2xl font-semibold text-white">{item.value}</p>
+                  <p className="mt-1 text-sm text-slate-300">{item.label}</p>
                 </div>
               ))}
             </div>

@@ -46,6 +46,7 @@ export default function Login() {
         localStorage.setItem("isLoggedIn", "true");
         localStorage.setItem("authToken", data.token || "");
         localStorage.setItem("userName", data.user?.fullName || "");
+        localStorage.setItem("userEmail", data.user?.email || "");
         localStorage.setItem("businessName", data.user?.businessName || "");
         localStorage.setItem("businessType", data.user?.businessType || "");
         localStorage.setItem("businessLogo", data.user?.businessLogo || "");

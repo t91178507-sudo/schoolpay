@@ -447,9 +447,9 @@ export default function Invoices() {
         </button>
       </div>
 
-      <div className="max-w-4xl">
+      <div className="max-w-8xl">
         {activePage === "invoices" ? (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-14 sm:flex-row sm:items-center">
             <div className="min-w-0 flex-1">
               <label htmlFor="invoice-search" className="sr-only">
                 Search invoices

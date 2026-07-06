@@ -134,6 +134,25 @@ function readFileAsDataUrl(file) {
   });
 }
 
+function getPublicAppOrigin() {
+  const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL || "";
+
+  if (configuredOrigin) {
+    return configuredOrigin.replace(/\/+$/, "");
+  }
+
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+
+  return "";
+}
+
+function getQuickPayUrl(token) {
+  const origin = getPublicAppOrigin();
+  return origin ? `${origin}/pay/qr/${token}` : `/pay/qr/${token}`;
+}
+
 export default function SettingsPage() {
   const session = useBusinessSession();
   const darkMode = useDarkModePreference();
@@ -217,7 +236,7 @@ export default function SettingsPage() {
       const entries = await Promise.all(
         quickPayProfiles.map(async (profile) => [
           profile.token,
-          await QRCode.toDataURL(`${window.location.origin}/pay/qr/${profile.token}`, {
+          await QRCode.toDataURL(getQuickPayUrl(profile.token), {
             width: 220,
             margin: 1,
           }),
@@ -547,8 +566,8 @@ export default function SettingsPage() {
   const copyQuickPayLink = async (token) => {
     if (typeof window === "undefined") return;
 
-    await navigator.clipboard.writeText(`${window.location.origin}/pay/qr/${token}`);
-    setMessage("QR payment link copied.");
+    await navigator.clipboard.writeText(getQuickPayUrl(token));
+    setMessage("QR payment page copied.");
   };
 
   const handleSendWhatsAppTest = async () => {
@@ -711,7 +730,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="animate-spin h-12 w-12 border-t-4 border-b-4 border-blue-600 rounded-full"></div>
       </div>
     );
@@ -1476,7 +1495,7 @@ export default function SettingsPage() {
           {quickPayProfiles.map((profile) => (
             <div
               key={profile._id}
-              className="border border-gray-200 rounded-2xl p-5 flex flex-col sm:flex-row gap-5"
+              className="border border-gray-200 rounded-2xl p-5 flex flex-col sm:flex-row gap-5 dark:border-slate-800"
             >
               <div className="flex shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950 sm:w-[220px]">
                 {quickPayQrMap[profile.token] ? (
@@ -1501,14 +1520,12 @@ export default function SettingsPage() {
                     {profile.description}
                   </p>
                   <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-                    Customer enters phone number and amount at payment time.
+                    Scanning this QR opens the payment page where the customer enters phone number and amount.
                   </p>
                 </div>
 
-                  <p className="break-all text-xs text-gray-500 dark:text-slate-400">
-                  {typeof window !== "undefined"
-                    ? `${window.location.origin}/pay/qr/${profile.token}`
-                    : `/pay/qr/${profile.token}`}
+                  <p className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                  QR destination: payment form
                 </p>
 
                 <div className="flex flex-wrap gap-3">
@@ -1520,7 +1537,7 @@ export default function SettingsPage() {
                     Copy link
                   </button>
                   <a
-                    href={`/pay/qr/${profile.token}`}
+                    href={getQuickPayUrl(profile.token)}
                     target="_blank"
                     rel="noreferrer"
                     className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"

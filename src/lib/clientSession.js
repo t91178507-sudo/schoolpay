@@ -6,6 +6,7 @@ const EMPTY_BUSINESS_SESSION = Object.freeze({
   isLoggedIn: false,
   authToken: "",
   userName: "",
+  userEmail: "",
   businessName: "",
   businessType: "",
   businessLogo: "",
@@ -43,6 +44,7 @@ function getBusinessSnapshot() {
     isLoggedIn: localStorage.getItem("isLoggedIn") === "true",
     authToken: localStorage.getItem("authToken") || "",
     userName: localStorage.getItem("userName") || "",
+    userEmail: localStorage.getItem("userEmail") || "",
     businessName: localStorage.getItem("businessName") || "",
     businessType: localStorage.getItem("businessType") || "",
     businessLogo: localStorage.getItem("businessLogo") || "",
@@ -52,6 +54,7 @@ function getBusinessSnapshot() {
     businessSnapshotCache.isLoggedIn === nextSnapshot.isLoggedIn &&
     businessSnapshotCache.authToken === nextSnapshot.authToken &&
     businessSnapshotCache.userName === nextSnapshot.userName &&
+    businessSnapshotCache.userEmail === nextSnapshot.userEmail &&
     businessSnapshotCache.businessName === nextSnapshot.businessName &&
     businessSnapshotCache.businessType === nextSnapshot.businessType &&
     businessSnapshotCache.businessLogo === nextSnapshot.businessLogo
@@ -88,6 +91,14 @@ function getThemeSnapshot() {
   return localStorage.getItem("darkMode") === "true";
 }
 
+function applyDarkModePreference(enabled) {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  document.documentElement.classList.toggle("dark", enabled);
+}
+
 export function emitSessionChange() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("session-change"));
@@ -100,6 +111,7 @@ export function setDarkModePreference(enabled) {
   }
 
   localStorage.setItem("darkMode", String(enabled));
+  applyDarkModePreference(enabled);
   emitSessionChange();
 }
 

@@ -50,6 +50,8 @@ export default function AdminDashboard() {
     { label: "Prepared receipts", value: stats.preparedNotificationCount || 0, hint: `${stats.unavailableNotificationCount || 0} unavailable` },
     { label: "WhatsApp Web", value: stats.whatsappWebBusinesses || 0, hint: "Businesses using bridge provider" },
   ];
+  const bridgeHealth = stats.whatsappBridgeHealth || {};
+  const bridgeOnline = bridgeHealth.online === true;
 
   return (
     <div className="space-y-8">
@@ -61,6 +63,43 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        <div
+          className={`rounded-2xl border p-6 ${
+            bridgeOnline
+              ? "border-emerald-200 bg-emerald-50"
+              : "border-red-200 bg-red-50"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className={bridgeOnline ? "text-sm text-emerald-700" : "text-sm text-red-700"}>
+                WhatsApp bridge
+              </p>
+              <p
+                className={`mt-3 text-3xl font-semibold ${
+                  bridgeOnline ? "text-emerald-700" : "text-red-700"
+                }`}
+              >
+                {bridgeOnline ? "Online" : "Offline"}
+              </p>
+            </div>
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-medium ${
+                bridgeOnline
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-red-100 text-red-700"
+              }`}
+            >
+              {bridgeHealth.configured === false ? "Not set" : bridgeOnline ? "Live" : "Check"}
+            </span>
+          </div>
+          <p className={bridgeOnline ? "mt-2 break-all text-xs text-emerald-700/80" : "mt-2 break-all text-xs text-red-700/80"}>
+            {bridgeHealth.url || "No bridge URL configured"}
+          </p>
+          {!bridgeOnline && bridgeHealth.error ? (
+            <p className="mt-2 text-xs text-red-600">{bridgeHealth.error}</p>
+          ) : null}
+        </div>
         {cards.map((card) => (
           <div
             key={card.label}

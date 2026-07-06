@@ -653,7 +653,7 @@ export default function CategoriesPage() {
         {selectedCategory && (
           <button
             onClick={() => setSelectedCategory(null)}
-            className="mb-6 flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+            className="mb-6 flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors dark:text-slate-400 dark:hover:text-white"
           >
             ← Back to All Categories
           </button>
@@ -1065,7 +1065,7 @@ export default function CategoriesPage() {
                       : "Based on the invoice amount above"}
                   </p>
                 </div>
-                <p className="text-2xl font-semibold text-slate-900">
+                <p className="text-2xl font-semibold text-slate-900 dark:text-white">
                   N{invoiceTotal.toLocaleString()}
                 </p>
               </div>
@@ -1098,19 +1098,19 @@ export default function CategoriesPage() {
 
       {showBulkModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full overflow-hidden">
-            <div className="px-8 py-6 border-b">
-              <h2 className="text-2xl font-semibold text-slate-900">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full overflow-hidden dark:bg-slate-900">
+            <div className="px-8 py-6 border-b border-slate-200 dark:border-slate-800">
+              <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">
                 Generate Invoice for All
               </h2>
-              <p className="text-slate-500 mt-1">
+              <p className="text-slate-500 mt-1 dark:text-slate-400">
                 {selectedCustomers.length} {selectedCustomers.length === 1 ? customerLabels.singular : customerLabels.plural} in {selectedCategory}
               </p>
             </div>
 
             <div className="p-8 space-y-6">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2 dark:text-slate-300">
                   Description
                 </label>
                 <textarea
@@ -1121,7 +1121,7 @@ export default function CategoriesPage() {
                   }}
                   autoFocus
                   rows={3}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-400"
+                  className="w-full px-4 py-3 border border-slate-300 rounded-2xl bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                   placeholder="What is this invoice for?"
                 />
               </div>
@@ -1129,10 +1129,10 @@ export default function CategoriesPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-900">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                       {isSchoolBusiness ? "Items" : "Invoice amount"}
                     </h3>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
                       {isSchoolBusiness
                         ? `Every ${customerLabels.singular} in this category will receive the same item list.`
                         : `Every ${customerLabels.singular} in this category will receive the same fixed amount.`}
@@ -1162,7 +1162,7 @@ export default function CategoriesPage() {
                     return (
                       <div
                         key={item.id}
-                        className="grid grid-cols-1 md:grid-cols-[1.8fr_0.7fr_0.8fr_auto] gap-3 items-end border border-slate-200 rounded-2xl p-4"
+                        className="grid grid-cols-1 md:grid-cols-[1.8fr_0.7fr_0.8fr_auto] gap-3 items-end border border-slate-200 rounded-2xl p-4 dark:border-slate-800"
                       >
                         <div>
                           <label className="block text-xs font-medium text-slate-500 mb-2">
@@ -1174,7 +1174,7 @@ export default function CategoriesPage() {
                             onChange={(e) =>
                               updateBulkItem(item.id, "description", e.target.value)
                             }
-                            className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-400"
+                            className="w-full px-4 py-3 border border-slate-300 rounded-2xl bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                             placeholder="Description"
                           />
                         </div>
@@ -1190,7 +1190,7 @@ export default function CategoriesPage() {
                             onChange={(e) =>
                               updateBulkItem(item.id, "quantity", e.target.value)
                             }
-                            className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-400"
+                            className="w-full px-4 py-3 border border-slate-300 rounded-2xl bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                           />
                         </div>
 
@@ -1205,13 +1205,13 @@ export default function CategoriesPage() {
                             onChange={(e) =>
                               updateBulkItem(item.id, "unitPrice", e.target.value)
                             }
-                            className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-400"
+                            className="w-full px-4 py-3 border border-slate-300 rounded-2xl bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                             placeholder="0"
                           />
                         </div>
 
                         <div className="flex items-center gap-3 md:pb-3">
-                          <div className="text-sm font-semibold text-slate-900 min-w-[90px] text-right">
+                          <div className="text-sm font-semibold text-slate-900 min-w-[90px] text-right dark:text-white">
                             N{lineTotal.toLocaleString()}
                           </div>
                           <button
@@ -1227,7 +1227,7 @@ export default function CategoriesPage() {
                     );
                     })
                   ) : (
-                    <div className="rounded-2xl border border-slate-200 p-4">
+                    <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
                       <label className="block text-xs font-medium text-slate-500 mb-2">
                         Amount per {customerLabels.singular}
                       </label>
@@ -1238,7 +1238,7 @@ export default function CategoriesPage() {
                         onChange={(e) =>
                           updateBulkItem(bulkItems[0].id, "unitPrice", e.target.value)
                         }
-                        className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-slate-400"
+                        className="w-full px-4 py-3 border border-slate-300 rounded-2xl bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                         placeholder="0"
                       />
                     </div>
@@ -1246,7 +1246,7 @@ export default function CategoriesPage() {
                 </div>
               </div>
 
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between dark:border-slate-800 dark:bg-slate-950/60">
                 <div>
                   <p className="text-sm text-slate-500">Amount per {customerLabels.singular}</p>
                   <p className="text-xs text-slate-400 mt-1">
@@ -1255,7 +1255,7 @@ export default function CategoriesPage() {
                       : "Based on the fixed amount above"}
                   </p>
                 </div>
-                <p className="text-2xl font-semibold text-slate-900">
+                <p className="text-2xl font-semibold text-slate-900 dark:text-white">
                   N{calculateInvoiceTotal(
                     getBusinessInvoiceItems(bulkItems, bulkDescription, isSchoolBusiness)
                   ).toLocaleString()}

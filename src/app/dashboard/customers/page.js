@@ -207,13 +207,13 @@ export default function CustomersOverview() {
             {filteredCustomerRows.map((customer) => (
               <div
                 key={customer._id}
-                className="rounded-2xl border border-slate-200 p-5 transition hover:border-slate-300 hover:bg-slate-50/40"
+                className="rounded-2xl border border-slate-200 p-5 transition hover:border-slate-300 hover:bg-slate-50/40 dark:border-slate-800 dark:hover:border-slate-700 dark:hover:bg-slate-950/60"
               >
                 <div className="grid gap-5 xl:grid-cols-[1.5fr_1fr_1.25fr_auto] xl:items-start">
                   <div className="min-w-0 space-y-2">
                     <div>
-                      <p className="text-xl font-semibold text-slate-900">{customer.name}</p>
-                      <p className="mt-1 text-sm text-slate-500">{customer.phone || "-"}</p>
+                      <p className="text-xl font-semibold text-slate-900 dark:text-white">{customer.name}</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{customer.phone || "-"}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <StatusBadge tone="slate">{customer.category || "Uncategorized"}</StatusBadge>
@@ -227,7 +227,7 @@ export default function CustomersOverview() {
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                       Summary
                     </p>
-                    <p className="text-sm text-slate-700">
+                    <p className="text-sm text-slate-700 dark:text-slate-300">
                       {customer.invoiceCount === 0
                         ? "No invoice history yet"
                         : customer.invoiceCount === 1
@@ -252,14 +252,14 @@ export default function CustomersOverview() {
                       </StatusBadge>
                     </div>
                     <p className="text-sm text-slate-500">
-                      Total: <span className="font-medium text-slate-700">{formatCurrency(customer.totalAmount)}</span>
+                      Total: <span className="font-medium text-slate-700 dark:text-slate-300">{formatCurrency(customer.totalAmount)}</span>
                     </p>
                   </div>
 
                   <div className="xl:justify-self-end">
                     <button
                       onClick={() => setHistoryCustomer(customer)}
-                      className="w-full whitespace-nowrap rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-white xl:w-auto"
+                      className="w-full whitespace-nowrap rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 xl:w-auto"
                     >
                       View payment history
                     </button>
@@ -273,18 +273,18 @@ export default function CustomersOverview() {
 
       {historyCustomer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="flex max-h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="flex items-start justify-between border-b border-slate-200 px-8 py-6">
+          <div className="flex max-h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-slate-900">
+            <div className="flex items-start justify-between border-b border-slate-200 px-8 py-6 dark:border-slate-800">
               <div>
-                <h2 className="text-2xl font-semibold text-slate-900">{historyCustomer.name}</h2>
-                <p className="mt-1 text-sm text-slate-500">
+                <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">{historyCustomer.name}</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   {historyCustomer.invoiceCount} invoice
                   {historyCustomer.invoiceCount !== 1 ? "s" : ""} on record
                 </p>
               </div>
               <button
                 onClick={() => setHistoryCustomer(null)}
-                className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 Close
               </button>
@@ -300,10 +300,10 @@ export default function CustomersOverview() {
                 historyCustomer.invoices.map((invoice) => (
                   <div
                     key={invoice._id}
-                    className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="space-y-1">
-                      <p className="font-medium text-slate-900">
+                      <p className="font-medium text-slate-900 dark:text-white">
                         {invoice.description || invoice.category || "Invoice payment"}
                       </p>
                       <p className="text-sm text-slate-500">

@@ -9,11 +9,17 @@ import pkg from "whatsapp-web.js";
 
 const { Client, LocalAuth } = pkg;
 
-const PORT = Number(process.env.WHATSAPP_BRIDGE_PORT || 8787);
-const API_KEY = process.env.WHATSAPP_BRIDGE_API_KEY || "invoicehub-bridge-local";
+const PORT = Number(process.env.WHATSAPP_BRIDGE_PORT || process.env.PORT || 8787);
+const API_KEY =
+  process.env.WHATSAPP_BRIDGE_API_KEY ||
+  process.env.BRIDGE_API_KEY ||
+  "invoicehub-bridge-local";
 const DEFAULT_SESSION_NAME =
   process.env.WHATSAPP_BRIDGE_SESSION_NAME || "invoicehub-scan";
-const BASE_URL = process.env.WHATSAPP_BRIDGE_BASE_URL || `http://localhost:${PORT}`;
+const BASE_URL =
+  process.env.WHATSAPP_BRIDGE_BASE_URL ||
+  process.env.BRIDGE_PUBLIC_URL ||
+  `http://localhost:${PORT}`;
 const BROWSER_PATH =
   process.env.WHATSAPP_BRIDGE_BROWSER_PATH ||
   (process.platform === "win32"
@@ -29,6 +35,87 @@ const execFileAsync = promisify(execFile);
 
 process.on("unhandledRejection", (error) => {
   console.error("Unhandled bridge promise rejection:", error);
+});
+
+app.get("/", (_req, res) => {
+  res.type("html").send(`<!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>InvoiceHub WhatsApp Bridge</title>
+        <style>
+          body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #07111f;
+            color: #e5e7eb;
+          }
+          main {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 56px 24px;
+          }
+          .card {
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 24px;
+            background: rgba(15, 23, 42, 0.82);
+            padding: 28px;
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.25);
+          }
+          .badge {
+            display: inline-flex;
+            border-radius: 999px;
+            background: rgba(16, 185, 129, 0.12);
+            color: #6ee7b7;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 700;
+          }
+          h1 {
+            margin: 18px 0 10px;
+            font-size: 36px;
+            line-height: 1.1;
+          }
+          p {
+            color: #cbd5e1;
+            line-height: 1.65;
+          }
+          a {
+            color: #6ee7b7;
+          }
+          code {
+            display: block;
+            margin-top: 10px;
+            padding: 12px;
+            border-radius: 14px;
+            background: #020617;
+            color: #bfdbfe;
+            overflow-wrap: anywhere;
+          }
+        </style>
+      </head>
+      <body>
+        <main>
+          <section class="card">
+            <span class="badge">Bridge online</span>
+            <h1>InvoiceHub WhatsApp Bridge</h1>
+            <p>
+              This service is running. Use InvoiceHub to check session status,
+              request pairing codes, send test messages, and send WhatsApp notifications.
+            </p>
+            <p>Useful routes:</p>
+            <code>GET /health</code>
+            <code>GET /qr?sessionName=${encodeURIComponent(DEFAULT_SESSION_NAME)}</code>
+            <code>GET /api/session/status?sessionName=${encodeURIComponent(DEFAULT_SESSION_NAME)}</code>
+            <p>
+              If you are configuring InvoiceHub, use this public bridge URL:
+              <br /><a href="${BASE_URL}">${BASE_URL}</a>
+            </p>
+          </section>
+        </main>
+      </body>
+    </html>`);
 });
 
 function normalizeSessionName(rawSessionName) {

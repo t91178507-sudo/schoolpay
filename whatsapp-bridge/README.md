@@ -10,6 +10,16 @@ Standalone WhatsApp Web bridge for InvoiceHub.
 - `WHATSAPP_BRIDGE_PORT`: defaults to `8787`
 - `WHATSAPP_BRIDGE_BROWSER_PATH`: defaults to `/usr/bin/chromium` on Linux
 
+Render-compatible aliases are also supported:
+
+- `PORT`: used when `WHATSAPP_BRIDGE_PORT` is not set
+- `BRIDGE_PUBLIC_URL`: used when `WHATSAPP_BRIDGE_BASE_URL` is not set
+- `BRIDGE_API_KEY`: used when `WHATSAPP_BRIDGE_API_KEY` is not set
+
+Visiting the base Render URL should show the bridge status page. `Cannot GET /`
+means the running deployment is older and should be redeployed with the latest
+bridge server.
+
 ## Docker
 
 ```bash

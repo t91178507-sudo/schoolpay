@@ -7,8 +7,6 @@ import {
   EmptyState,
   PageHeader,
   PageShell,
-  StatCard,
-  StatGrid,
   StatusBadge,
   SurfaceCard,
 } from "../../../components/DashboardUI";
@@ -27,6 +25,7 @@ export default function CommunicationPage() {
   const [message, setMessage] = useState("");
   const [messageContext, setMessageContext] = useState("");
   const [error, setError] = useState("");
+  const [bridgeToolsOpen, setBridgeToolsOpen] = useState(false);
 
   const connected = bridgeStatus?.bridgeReachable === true && bridgeStatus?.status?.status === "ready";
   const qrDataUrl = bridgeStatus?.status?.qrDataUrl || "";
@@ -170,87 +169,218 @@ export default function CommunicationPage() {
         }
       />
 
-      <StatGrid className="xl:!grid-cols-3">
-        <StatCard
-          label="WhatsApp status"
-          value={connected ? "Connected" : "Disconnected"}
-          tone={connected ? "emerald" : "orange"}
-        />
-        <StatCard label="Connected number" value={connectedNumber || "-"} tone="slate" />
-        <StatCard label="Recent activity" value={logs.length} tone="blue" />
-      </StatGrid>
-
       <div className="grid gap-4 xl:grid-cols-3">
-        <SurfaceCard className="p-6 xl:col-span-2">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                WhatsApp bridge
-              </h2>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <StatusBadge tone={connected ? "green" : "orange"}>
-                  {connected ? "Connected" : "Disconnected"}
-                </StatusBadge>
-                <span className="text-sm text-slate-500">Status: {currentStatus}</span>
-              </div>
-              {bridgeStatus?.status?.lastError ? (
-                <p className="mt-3 break-all text-sm text-red-600">
-                  {bridgeStatus.status.lastError}
+        <SurfaceCard className="overflow-hidden p-0">
+          <div className="relative min-h-40 p-6">
+            <div
+              className={`absolute right-0 top-0 h-28 w-28 rounded-bl-full ${
+                connected ? "bg-emerald-500/10" : "bg-orange-500/10"
+              }`}
+            />
+            <div className="relative flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                  WhatsApp status
                 </p>
-              ) : null}
-            </div>
-
-            <Link
-              href="/dashboard/settings"
-              className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
-            >
-              Open settings
-            </Link>
-          </div>
-
-          {!connected && qrDataUrl ? (
-            <div className="mt-6 inline-flex overflow-hidden rounded-xl border border-slate-200 bg-white p-2">
-              <Image
-                src={qrDataUrl}
-                alt="WhatsApp QR code"
-                width={180}
-                height={180}
-                unoptimized
-                className="h-44 w-44"
+                <p
+                  className={`mt-4 text-4xl font-semibold ${
+                    connected ? "text-emerald-600" : "text-orange-600"
+                  }`}
+                >
+                  {connected ? "Connected" : "Disconnected"}
+                </p>
+              </div>
+              <span
+                className={`mt-1 flex h-3 w-3 rounded-full ${
+                  connected ? "bg-emerald-500 shadow-[0_0_0_6px_rgba(16,185,129,0.12)]" : "bg-orange-500 shadow-[0_0_0_6px_rgba(249,115,22,0.12)]"
+                }`}
               />
             </div>
-          ) : null}
+          </div>
         </SurfaceCard>
 
-        <SurfaceCard className="p-6">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Send test message
-          </h2>
-          <form onSubmit={sendTestMessage} className="mt-4 space-y-3">
-            <input
-              type="tel"
-              value={testPhone}
-              onChange={(event) => setTestPhone(event.target.value)}
-              placeholder="2348012345678"
-              required
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-            />
-            <button
-              type="submit"
-              disabled={testing}
-              className="w-full rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#20BA5C] disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              {testing ? "Sending..." : "Send test"}
-            </button>
-          </form>
-          {message && messageContext === "test" ? (
-            <p className="mt-3 text-sm text-emerald-700">{message}</p>
-          ) : null}
-          {error && messageContext === "test" ? (
-            <p className="mt-3 text-sm text-red-600">{error}</p>
-          ) : null}
+        <SurfaceCard className="overflow-hidden p-0">
+          <div className="min-h-40 p-6">
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+              Connected number
+            </p>
+            <p className="mt-4 break-all font-mono text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">
+              {connectedNumber || "-"}
+            </p>
+            <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
+              Number currently authorized for outgoing messages.
+            </p>
+          </div>
+        </SurfaceCard>
+
+        <SurfaceCard className="overflow-hidden p-0">
+          <div className="min-h-40 p-6">
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+              Recent activity
+            </p>
+            <p className="mt-4 text-4xl font-semibold text-blue-600">{logs.length}</p>
+            <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
+              Bridge events from the latest message activity.
+            </p>
+          </div>
         </SurfaceCard>
       </div>
+
+      <SurfaceCard className="overflow-hidden p-0">
+        <button
+          type="button"
+          onClick={() => setBridgeToolsOpen((open) => !open)}
+          className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
+          aria-expanded={bridgeToolsOpen}
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-sm font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+              WA
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                WhatsApp bridge tools
+              </h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Status: {currentStatus} · {connected ? "Ready to send" : "Reconnect required"}
+              </p>
+            </div>
+          </div>
+          <span className="flex shrink-0 items-center gap-3">
+            <StatusBadge tone={connected ? "green" : "orange"}>
+              {connected ? "Connected" : "Disconnected"}
+            </StatusBadge>
+            <span
+              className={`text-xl text-slate-400 transition ${
+                bridgeToolsOpen ? "rotate-180" : ""
+              }`}
+            >
+              ˅
+            </span>
+          </span>
+        </button>
+
+        {bridgeToolsOpen ? (
+          <div className="border-t border-slate-200 p-6 dark:border-slate-800">
+            <div className="grid gap-4 xl:grid-cols-[1.5fr_0.8fr]">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-6 dark:border-slate-800 dark:bg-slate-950/40">
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-sm font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                        WA
+                      </span>
+                      <div>
+                        <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                          WhatsApp bridge
+                        </h3>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <StatusBadge tone={connected ? "green" : "orange"}>
+                            {connected ? "Connected" : "Disconnected"}
+                          </StatusBadge>
+                          <span className="text-sm text-slate-500 dark:text-slate-400">
+                            Status: {currentStatus}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl bg-white p-4 dark:bg-slate-900">
+                        <p className="text-xs font-medium uppercase text-slate-400">
+                          Delivery mode
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                          Browser bridge
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-white p-4 dark:bg-slate-900">
+                        <p className="text-xs font-medium uppercase text-slate-400">
+                          Message readiness
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                          {connected ? "Ready to send" : "Reconnect required"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {bridgeStatus?.status?.lastError ? (
+                      <p className="mt-4 break-all rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">
+                        {bridgeStatus.status.lastError}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <Link
+                    href="/dashboard/settings"
+                    className="inline-flex shrink-0 items-center justify-center rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-white dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    Open settings
+                  </Link>
+                </div>
+
+                {!connected && qrDataUrl ? (
+                  <div className="mt-6 border-t border-slate-200 pt-6 dark:border-slate-800">
+                    <div className="inline-flex overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900">
+                      <Image
+                        src={qrDataUrl}
+                        alt="WhatsApp QR code"
+                        width={160}
+                        height={160}
+                        unoptimized
+                        className="h-40 w-40"
+                      />
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-6 dark:border-slate-800 dark:bg-slate-950/40">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                      Send test message
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      Confirm the bridge can deliver before bulk messaging.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    Test
+                  </span>
+                </div>
+
+                <form onSubmit={sendTestMessage} className="mt-5 space-y-3">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Recipient phone number
+                  </label>
+                  <input
+                    type="tel"
+                    value={testPhone}
+                    onChange={(event) => setTestPhone(event.target.value)}
+                    placeholder="2348012345678"
+                    required
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                  <button
+                    type="submit"
+                    disabled={testing || !connected}
+                    className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-700"
+                  >
+                    {testing ? "Sending..." : "Send test"}
+                  </button>
+                </form>
+                {message && messageContext === "test" ? (
+                  <p className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">{message}</p>
+                ) : null}
+                {error && messageContext === "test" ? (
+                  <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </SurfaceCard>
 
       <SurfaceCard className="p-6">
         <div className="flex flex-col gap-2">

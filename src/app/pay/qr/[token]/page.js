@@ -179,6 +179,8 @@ export default function QuickPayPage() {
             </label>
             <input
               type="tel"
+              autoFocus
+              inputMode="tel"
               value={form.customerPhone}
               onChange={(event) =>
                 setForm((current) => ({
@@ -195,6 +197,7 @@ export default function QuickPayPage() {
             <label className="block text-[13px] text-slate-500 dark:text-slate-400">Amount</label>
             <input
               type="number"
+              inputMode="decimal"
               min="1"
               value={form.amount}
               onChange={(event) =>

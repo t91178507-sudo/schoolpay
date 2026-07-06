@@ -16,6 +16,50 @@ function getOutstandingAmount(invoice) {
   return Math.max(total - paid, 0);
 }
 
+async function checkBridgeHealth(platformBridge = {}) {
+  if (!platformBridge.enabled || !platformBridge.bridgeBaseUrl) {
+    return {
+      configured: false,
+      online: false,
+      status: "Not configured",
+      url: platformBridge.bridgeBaseUrl || "",
+      error: "",
+    };
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const response = await fetch(`${platformBridge.bridgeBaseUrl}/health`, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => ({}));
+    const online = response.ok && data.ok === true;
+
+    return {
+      configured: true,
+      online,
+      status: online ? "Online" : "Offline",
+      url: platformBridge.bridgeBaseUrl,
+      sessions: Number(data.totalSessions || 0),
+      error: online ? "" : data.error || `HTTP ${response.status}`,
+    };
+  } catch (error) {
+    return {
+      configured: true,
+      online: false,
+      status: "Offline",
+      url: platformBridge.bridgeBaseUrl,
+      sessions: 0,
+      error: error.name === "AbortError" ? "Health check timed out" : error.message || "Health check failed",
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export async function GET(req) {
   try {
     requireAdmin(req);
@@ -70,6 +114,7 @@ export async function GET(req) {
       const gateway = user.paymentGateways?.monnify || {};
       return Boolean(gateway.enabled && gateway.apiKey && gateway.secretKey && gateway.contractCode);
     }).length;
+    const whatsappBridgeHealth = await checkBridgeHealth(platformBridge);
 
     return Response.json({
       totalBusinesses: users.length,
@@ -89,6 +134,7 @@ export async function GET(req) {
       unavailableNotificationCount,
       whatsappWebBusinesses,
       monnifyConfiguredBusinesses,
+      whatsappBridgeHealth,
     });
   } catch (error) {
     console.error("ADMIN STATS ERROR:", error);

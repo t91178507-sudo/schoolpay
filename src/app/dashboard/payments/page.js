@@ -11,7 +11,6 @@ import {
   StatGrid,
   StatusBadge,
   SurfaceCard,
-  Toolbar,
 } from "../../../components/DashboardUI";
 import { authFetch } from "../../../lib/authFetch";
 import { getCustomerLabels } from "../../../lib/businessLabels";
@@ -66,6 +65,21 @@ function formatDateTime(value) {
   })}`;
 }
 
+function formatDateInput(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function escapeCsvValue(value) {
+  const text = String(value ?? "");
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replaceAll('"', '""')}"`;
+  }
+  return text;
+}
+
 export default function Payments() {
   const session = useBusinessSession();
   const customerLabels = getCustomerLabels(session.businessType);
@@ -75,6 +89,8 @@ export default function Payments() {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [notificationFilter, setNotificationFilter] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   useEffect(() => {
     const loadPayments = async () => {
@@ -158,8 +174,22 @@ export default function Payments() {
     const matchesNotification =
       notificationFilter === "all" ||
       String(row.notificationStatus || "").toLowerCase() === notificationFilter;
+    const rowDate = row.happenedAt ? new Date(row.happenedAt) : null;
+    const matchesStart =
+      !startDate ||
+      (rowDate && rowDate >= new Date(`${startDate}T00:00:00`));
+    const matchesEnd =
+      !endDate ||
+      (rowDate && rowDate <= new Date(`${endDate}T23:59:59.999`));
 
-    return matchesSearch && matchesSource && matchesStatus && matchesNotification;
+    return (
+      matchesSearch &&
+      matchesSource &&
+      matchesStatus &&
+      matchesNotification &&
+      matchesStart &&
+      matchesEnd
+    );
   });
 
   const totalCollected = filteredRows
@@ -171,12 +201,65 @@ export default function Payments() {
   const sentNotifications = filteredRows.filter(
     (row) => normalizeNotificationStatus(row.notificationStatus) === "sent"
   ).length;
+  const latestPaymentDate = filteredRows[0]?.happenedAt
+    ? formatDateInput(filteredRows[0].happenedAt)
+    : "";
+
+  const exportPayments = () => {
+    const headers = [
+      customerLabels.singularTitle,
+      "Phone",
+      "Description",
+      "Amount",
+      "Status",
+      "Provider",
+      "Notification",
+      "Reference",
+      "Invoice Number",
+      "Source",
+      "Date",
+    ];
+    const rows = filteredRows.map((row) => [
+      row.customerName,
+      row.phone,
+      row.description,
+      row.amount,
+      row.status,
+      row.provider,
+      formatNotificationStatus(row.notificationStatus),
+      row.reference,
+      row.invoiceNumber,
+      getSourceLabel(row),
+      formatDateTime(row.happenedAt),
+    ]);
+    const csv = [headers, ...rows]
+      .map((row) => row.map(escapeCsvValue).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const rangeLabel = [startDate || "start", endDate || "end"].join("-to-");
+    link.href = url;
+    link.download = `payment-history-${rangeLabel}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <PageShell>
       <PageHeader
         title="Payment history"
         description="Track invoice payments, QR sessions, confirmation status, and notification readiness from one view."
+        actions={
+          <button
+            type="button"
+            onClick={exportPayments}
+            disabled={filteredRows.length === 0}
+            className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-blue-600 dark:hover:bg-blue-500 dark:disabled:bg-slate-700"
+          >
+            Export CSV
+          </button>
+        }
       />
 
       <StatGrid>
@@ -194,13 +277,40 @@ export default function Payments() {
         />
       </StatGrid>
 
-      <Toolbar>
-        <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <SurfaceCard className="p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+              Filter payments
+            </h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Narrow history by customer, status, notification, source, and date range.
+            </p>
+          </div>
+          <div className="text-sm text-slate-500 dark:text-slate-400">
+            {latestPaymentDate ? `Latest payment: ${latestPaymentDate}` : "No payment date yet"}
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
           <InputField
             type="text"
             placeholder={`Search ${customerLabels.singular}, phone, reference...`}
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
+            className="xl:col-span-2"
+          />
+          <InputField
+            type="date"
+            value={startDate}
+            onChange={(event) => setStartDate(event.target.value)}
+            aria-label="Start date"
+          />
+          <InputField
+            type="date"
+            value={endDate}
+            onChange={(event) => setEndDate(event.target.value)}
+            aria-label="End date"
           />
           <SelectField
             value={sourceFilter}
@@ -223,16 +333,49 @@ export default function Payments() {
           <SelectField
             value={notificationFilter}
             onChange={(event) => setNotificationFilter(event.target.value)}
+            className="md:col-span-2 xl:col-span-2"
           >
             <option value="all">All notifications</option>
             <option value="sent">Sent</option>
             <option value="pending">Pending</option>
             <option value="failed">Failed</option>
           </SelectField>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm("");
+              setSourceFilter("all");
+              setStatusFilter("all");
+              setNotificationFilter("all");
+              setStartDate("");
+              setEndDate("");
+            }}
+            className="h-11 rounded-xl border border-slate-300 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Clear filters
+          </button>
         </div>
-      </Toolbar>
+      </SurfaceCard>
 
       <SurfaceCard className="overflow-hidden">
+        <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-950/60 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+              Payment records
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Showing {filteredRows.length} filtered record{filteredRows.length === 1 ? "" : "s"}.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={exportPayments}
+            disabled={filteredRows.length === 0}
+            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Export
+          </button>
+        </div>
         {loading ? (
           <div className="py-16 text-center text-sm text-slate-500 dark:text-slate-400">Loading payment history...</div>
         ) : filteredRows.length === 0 ? (
