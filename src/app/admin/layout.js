@@ -17,6 +17,7 @@ const navItems = [
   { name: "Users", href: "/admin/users", label: "USR" },
   { name: "Invoices", href: "/admin/invoices", label: "INV" },
   { name: "Payments", href: "/admin/payments", label: "PAY" },
+  { name: "Credit Words", href: "/admin/reconciliation-words", label: "WRD" },
   { name: "Settings", href: "/admin/settings", label: "SET" },
 ];
 

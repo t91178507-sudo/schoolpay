@@ -2,6 +2,26 @@
 
 Standalone WhatsApp Web bridge for InvoiceHub.
 
+## Local Windows Start
+
+From the InvoiceHub root folder:
+
+```powershell
+npm run bridge:start
+```
+
+To confirm the bridge is up:
+
+```powershell
+npm run bridge:status
+```
+
+Default local settings for InvoiceHub:
+
+- Public bridge base URL: `http://localhost:8787`
+- Bridge port: `8787`
+- Bridge API key: `invoicehub-bridge-local`
+
 ## Environment Variables
 
 - `WHATSAPP_BRIDGE_BASE_URL`: public bridge URL, for example `https://your-bridge.example.com`

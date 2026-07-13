@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FiCheckCircle, FiMessageCircle, FiTrash2 } from "react-icons/fi";
 import {
   EmptyState,
@@ -52,6 +52,93 @@ function getNotificationTone(status) {
   if (normalized === "draft") return "blue";
   return "slate";
 }
+function normalizePhoneForWhatsApp(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+
+  if (!digits) return "";
+
+  // Nigerian local format: 08012345678 -> 2348012345678
+  if (digits.startsWith("0")) {
+    return `234${digits.slice(1)}`;
+  }
+
+  // Already international without +
+  if (digits.startsWith("234")) {
+    return digits;
+  }
+
+  // If user saved 10 digit Nigerian number like 8012345678
+  if (digits.length === 10) {
+    return `234${digits}`;
+  }
+
+  return digits;
+}
+
+function getInvoicePaymentUrl(invoice, origin) {
+  if (invoice.paymentUrl) return invoice.paymentUrl;
+  if (invoice.paymentLink) return invoice.paymentLink;
+  if (invoice.checkoutUrl) return invoice.checkoutUrl;
+
+  if (invoice.token) {
+    return `${origin}/pay/${invoice.token}`;
+  }
+
+  return origin;
+}
+
+function buildWhatsAppInvoiceMessage(invoice, origin, customerLabel = "Customer") {
+  const customerName =
+    invoice.customer ||
+    invoice.customerName ||
+    invoice.student ||
+    customerLabel;
+
+  const amount = Number(getOutstandingAmount(invoice) || invoice.amount || 0).toLocaleString();
+  const invoiceNumber = invoice.invoiceNumber || "-";
+  const description = invoice.description || invoice.category || invoice.class || "Invoice payment";
+  const paymentUrl = getInvoicePaymentUrl(invoice, origin);
+
+  return [
+    `Hello ${customerName},`,
+    "",
+    `Your invoice is ready for payment.`,
+    "",
+    `Invoice: ${invoiceNumber}`,
+    `Description: ${description}`,
+    `Amount Due: N${amount}`,
+    "",
+    `Pay here: ${paymentUrl}`,
+    "",
+    "Thank you.",
+  ].join("\n");
+}
+
+function openBrowserWhatsApp(invoice, origin, customerLabel) {
+  const phone = normalizePhoneForWhatsApp(invoice.phone);
+
+  if (!phone) {
+    alert("No valid WhatsApp phone number.");
+    return false;
+  }
+
+  const message = buildWhatsAppInvoiceMessage(invoice, origin, customerLabel);
+  const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  openExternalTab(whatsappUrl);
+
+  return true;
+}
+
+function openExternalTab(url) {
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+
+  if (!opened) {
+    alert("Your browser blocked the WhatsApp tab. Please allow pop-ups for InvoiceHub and try again.");
+    return false;
+  }
+
+  return true;
+}
 
 export default function Invoices() {
   const session = useBusinessSession();
@@ -63,6 +150,8 @@ export default function Invoices() {
   const [selectedInvoiceCategory, setSelectedInvoiceCategory] = useState("all");
   const [recurringSearch, setRecurringSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [recurringLoading, setRecurringLoading] = useState(false);
+  const [recurringLoaded, setRecurringLoaded] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
   const [showRecurringForm, setShowRecurringForm] = useState(false);
   const [savingRecurring, setSavingRecurring] = useState(false);
@@ -77,28 +166,42 @@ export default function Invoices() {
     nextRunAt: new Date().toISOString().slice(0, 10),
   });
 
-  const loadData = async () => {
+  const loadInvoices = useCallback(async () => {
     try {
-      const [invoiceRes, recurringRes] = await Promise.all([
-        authFetch("/api/invoices"),
-        authFetch("/api/recurring-invoices"),
-      ]);
+      const invoiceRes = await authFetch("/api/invoices");
       const data = invoiceRes.ok ? await invoiceRes.json() : [];
-      const recurringData = recurringRes.ok ? await recurringRes.json() : [];
       setInvoices(Array.isArray(data) ? data : []);
-      setRecurringInvoices(Array.isArray(recurringData) ? recurringData : []);
     } catch {
       setInvoices([]);
-      setRecurringInvoices([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const loadRecurringInvoices = useCallback(async () => {
+    setRecurringLoading(true);
+
+    try {
+      const recurringRes = await authFetch("/api/recurring-invoices");
+      const recurringData = recurringRes.ok ? await recurringRes.json() : [];
+      setRecurringInvoices(Array.isArray(recurringData) ? recurringData : []);
+      setRecurringLoaded(true);
+    } catch {
+      setRecurringInvoices([]);
+    } finally {
+      setRecurringLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const initialLoad = setTimeout(loadData, 0);
-    return () => clearTimeout(initialLoad);
-  }, []);
+    loadInvoices();
+  }, [loadInvoices]);
+
+  useEffect(() => {
+    if (activePage === "recurring" && !recurringLoaded && !recurringLoading) {
+      loadRecurringInvoices();
+    }
+  }, [activePage, recurringLoaded, recurringLoading, loadRecurringInvoices]);
 
   const markPaid = async (id) => {
     setInvoices((prev) =>
@@ -110,9 +213,9 @@ export default function Invoices() {
       if (!res.ok) {
         throw new Error("Update failed");
       }
-      loadData();
+      loadInvoices();
     } catch {
-      loadData();
+      loadInvoices();
     }
   };
 
@@ -136,40 +239,74 @@ export default function Invoices() {
   };
 
   const shareWhatsApp = async (invoice) => {
-    if (!invoice.phone) {
-      alert("No phone number");
+  if (!invoice.phone) {
+    alert("No phone number");
+    return;
+  }
+
+  if (!invoice.token && !invoice.paymentUrl && !invoice.paymentLink && !invoice.checkoutUrl) {
+    alert("This invoice does not have a payment link yet");
+    return;
+  }
+
+  const origin = window.location.origin;
+
+  try {
+    const res = await authFetch("/api/notifications/whatsapp/invoice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        invoiceId: String(invoice._id),
+        origin,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    /*
+      If backend returns a fallbackUrl, open WhatsApp browser immediately.
+      This covers cases where the WhatsApp bridge/provider is unavailable.
+    */
+    if (data?.delivery?.fallbackUrl) {
+      openExternalTab(data.delivery.fallbackUrl);
+
       return;
     }
 
-    if (!invoice.token) {
-      alert("This invoice does not have a payment link yet");
+    /*
+      If backend failed, automatically fall back to browser WhatsApp.
+    */
+    if (!res.ok) {
+      openBrowserWhatsApp(invoice, origin, customerLabels.singularTitle);
       return;
     }
 
-    try {
-      const res = await authFetch("/api/notifications/whatsapp/invoice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          invoiceId: String(invoice._id),
-          origin: window.location.origin,
-        }),
-      });
-      const data = await res.json();
+    /*
+      If backend succeeded but did not actually send through provider,
+      still fall back to browser WhatsApp where possible.
+    */
+    const deliveryStatus = String(
+      data?.delivery?.status ||
+        data?.delivery?.notificationStatus ||
+        data?.status ||
+        ""
+    ).toLowerCase();
 
-      if (!res.ok) {
-        throw new Error(data.error || "Unable to prepare WhatsApp message");
-      }
+    const bridgeWorked = ["sent", "delivered", "success", "prepared"].includes(deliveryStatus);
 
-      if (data?.delivery?.fallbackUrl) {
-        window.open(data.delivery.fallbackUrl, "_blank");
-      } else {
-        alert("Sent.");
-      }
-    } catch (error) {
-      alert(error.message || "Unable to share invoice");
+    if (!bridgeWorked) {
+      openBrowserWhatsApp(invoice, origin, customerLabels.singularTitle);
+      return;
     }
-  };
+
+    alert("Sent.");
+  } catch {
+    /*
+      Network/server error: automatically open browser WhatsApp.
+    */
+    openBrowserWhatsApp(invoice, origin, customerLabels.singularTitle);
+  }
+};
 
   const sendBulkReminders = async () => {
     if (actionableInvoices.length === 0) {
@@ -197,7 +334,7 @@ export default function Invoices() {
       if (Array.isArray(data.fallbackDeliveries)) {
         data.fallbackDeliveries.forEach((delivery) => {
           if (delivery.fallbackUrl) {
-            window.open(delivery.fallbackUrl, "_blank");
+            openExternalTab(delivery.fallbackUrl);
           }
         });
       }
@@ -206,7 +343,7 @@ export default function Invoices() {
         `Reminders processed: ${data.processedCount}\nSent through WhatsApp provider: ${data.sentCount}\nOpened in WhatsApp manually: ${data.fallbackCount}\nSkipped: ${data.skippedCount}\nCooldown skipped: ${data.cooldownSkippedCount || 0}\nDaily cap skipped: ${data.cappedSkippedCount || 0}`
       );
 
-      loadData();
+      loadInvoices();
     } catch (error) {
       alert(error.message || "Unable to send reminders");
     } finally {
@@ -247,7 +384,7 @@ export default function Invoices() {
         nextRunAt: new Date().toISOString().slice(0, 10),
       });
       setShowRecurringForm(false);
-      loadData();
+      await Promise.all([loadInvoices(), loadRecurringInvoices()]);
     } catch (error) {
       alert(error.message || "Unable to create recurring invoice");
     } finally {
@@ -271,7 +408,7 @@ export default function Invoices() {
       alert(
         `Recurring invoices processed: ${data.processedCount}\nGenerated: ${data.generatedCount}\nSkipped: ${data.skippedCount}`
       );
-      loadData();
+      await Promise.all([loadInvoices(), loadRecurringInvoices()]);
     } catch (error) {
       alert(error.message || "Unable to run recurring invoices");
     } finally {
@@ -295,7 +432,7 @@ export default function Invoices() {
         throw new Error(data.error || "Unable to update recurring invoice");
       }
 
-      loadData();
+      loadRecurringInvoices();
     } catch (error) {
       alert(error.message || "Unable to update recurring invoice");
     }
@@ -314,7 +451,7 @@ export default function Invoices() {
         throw new Error(data.error || "Unable to delete recurring invoice");
       }
 
-      loadData();
+      loadRecurringInvoices();
     } catch (error) {
       alert(error.message || "Unable to delete recurring invoice");
     }
@@ -547,7 +684,11 @@ export default function Invoices() {
             </div>
           </div>
           <SurfaceCard className="overflow-hidden">
-            {filteredRecurringInvoices.length === 0 ? (
+            {recurringLoading ? (
+              <div className="flex min-h-[14rem] items-center justify-center">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-r-transparent"></div>
+              </div>
+            ) : filteredRecurringInvoices.length === 0 ? (
               <EmptyState
                 title={recurringInvoices.length === 0 ? "No recurring invoices found" : "No matching recurring invoices"}
                 description={

@@ -54,7 +54,7 @@ export default function Login() {
 
         setTimeout(() => router.replace("/dashboard"), 200);
       } else {
-        setError(data.message || "Invalid credentials");
+        setError(data.error || data.message || "Invalid credentials");
       }
     } catch {
       setError("Connection error. Please try again.");

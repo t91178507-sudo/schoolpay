@@ -16,53 +16,103 @@ export async function markInvoicePaid(
     throw new Error("Invoice is required");
   }
 
-  if (
-    paymentReference &&
-    invoice.paymentReference === paymentReference &&
-    parseAmount(invoice.paidAmount || 0) > 0
-  ) {
+  const normalizedPaidAt = paidAt ? new Date(paidAt) : new Date();
+  const normalizedPaidAmount = parseAmount(paidAmount ?? invoice.amount ?? 0);
+
+  if (!normalizedPaidAmount || normalizedPaidAmount <= 0) {
+    throw new Error("Payment amount must be greater than zero.");
+  }
+
+  const existingTransactions = Array.isArray(invoice.paymentTransactions)
+    ? invoice.paymentTransactions
+    : [];
+
+  const duplicateTransaction = paymentReference
+    ? existingTransactions.some(
+        (transaction) =>
+          String(transaction.reference || transaction.paymentReference || "") ===
+          String(paymentReference)
+      )
+    : false;
+
+  if (duplicateTransaction) {
     return invoice;
   }
 
-  const normalizedPaidAt = paidAt ? new Date(paidAt) : new Date();
-  const normalizedPaidAmount = parseAmount(paidAmount ?? invoice.amount ?? 0);
-  const previousPaidAmount = parseAmount(invoice.paidAmount || 0);
-  const invoiceTotal = parseAmount(invoice.amount || 0);
-  const totalPaidAmount = Math.min(previousPaidAmount + normalizedPaidAmount, invoiceTotal);
+  const previousPaidAmount = parseAmount(
+    invoice.paidAmount || invoice.amountPaid || 0
+  );
+
+  const invoiceTotal = parseAmount(
+    invoice.amount || invoice.total || invoice.subtotal || 0
+  );
+
+  const totalPaidAmount = Math.min(
+    previousPaidAmount + normalizedPaidAmount,
+    invoiceTotal
+  );
+
   const balanceDue = Math.max(invoiceTotal - totalPaidAmount, 0);
   const isFullyPaid = balanceDue <= 0;
+
   const resolvedNotificationStatus =
     notificationStatus ||
     (isFullyPaid ? (invoice.phone ? "prepared" : "unavailable") : "draft");
+
+  const resolvedPaymentReference =
+    paymentReference ||
+    invoice.paymentReference ||
+    invoice.pendingPaymentReference ||
+    null;
+
+  const resolvedPaymentProvider =
+    paymentProvider || invoice.paymentProvider || "Monnify";
+
+  const resolvedVerificationMethod =
+    verificationMethod || invoice.paymentVerificationMethod || "system";
 
   const nextState = {
     status: isFullyPaid ? "Paid" : "Partially Paid",
     paidAt: normalizedPaidAt,
     paidAmount: totalPaidAmount,
-    paymentReference:
-      paymentReference || invoice.paymentReference || invoice.pendingPaymentReference || null,
-    paymentProvider: paymentProvider || invoice.paymentProvider || "Monnify",
-    paymentVerificationMethod:
-      verificationMethod || invoice.paymentVerificationMethod || "system",
+    amountPaid: totalPaidAmount,
+    paymentReference: resolvedPaymentReference,
+    paymentProvider: resolvedPaymentProvider,
+    paymentVerificationMethod: resolvedVerificationMethod,
     paymentStatus: isFullyPaid ? "paid" : "partial",
-    paymentConfirmedAt: isFullyPaid ? normalizedPaidAt : invoice.paymentConfirmedAt || null,
+    paymentConfirmedAt: isFullyPaid
+      ? normalizedPaidAt
+      : invoice.paymentConfirmedAt || null,
     customerNotificationStatus: resolvedNotificationStatus,
     balanceDue,
+    updatedAt: new Date(),
   };
 
   if (resolvedNotificationStatus === "prepared") {
     nextState.customerNotificationQueuedAt = normalizedPaidAt;
   }
 
+  const paymentTransaction = {
+    amount: normalizedPaidAmount,
+    reference: resolvedPaymentReference || "",
+    paymentReference: resolvedPaymentReference || "",
+    provider: resolvedPaymentProvider,
+    paymentProvider: resolvedPaymentProvider,
+    verificationMethod: resolvedVerificationMethod,
+    status: "Paid",
+    paymentStatus: "paid",
+    notificationStatus: resolvedNotificationStatus || "pending",
+    paidAt: normalizedPaidAt,
+    paymentConfirmedAt: normalizedPaidAt,
+    createdAt: new Date(),
+  };
+
   await db.collection("invoices").updateOne(
     { _id: invoice._id },
     {
       $set: nextState,
-      $unset: {
-        pendingPaymentReference: "",
-        pendingPaymentAmount: "",
-        pendingPaymentProvider: "",
-        pendingPaymentCreatedAt: "",
+      $push: {
+        paymentTransactions: paymentTransaction,
       },
     }
   );
@@ -70,6 +120,7 @@ export async function markInvoicePaid(
   return {
     ...invoice,
     ...nextState,
+    paymentTransactions: [...existingTransactions, paymentTransaction],
   };
 }
 
@@ -84,6 +135,7 @@ export async function markInvoiceNotificationPrepared(
       $set: {
         customerNotificationStatus: notificationStatus,
         customerNotificationPreparedAt: new Date(),
+        updatedAt: new Date(),
       },
     }
   );

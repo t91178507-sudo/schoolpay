@@ -50,6 +50,30 @@ export function buildWhatsAppWebSendPayload(config = {}, { phone, text }) {
   };
 }
 
+export function buildWhatsAppWebDocumentPayload(
+  config = {},
+  { phone, caption = "", attachment = {} }
+) {
+  return {
+    sessionName: config.sessionName,
+    from: toWhatsAppNumber(config.senderPhoneNumber),
+    to: toWhatsAppNumber(phone),
+    caption,
+    filename: attachment.filename,
+    fileName: attachment.filename,
+    mimetype: attachment.mimetype || "application/pdf",
+    mimeType: attachment.mimetype || "application/pdf",
+    data: attachment.base64,
+    base64: attachment.base64,
+    document: {
+      filename: attachment.filename,
+      mimetype: attachment.mimetype || "application/pdf",
+      data: attachment.base64,
+    },
+    statusWebhookUrl: config.statusWebhookUrl || "",
+  };
+}
+
 export async function sendWhatsAppWebMessage(config = {}, { phone, text }) {
   if (!isWhatsAppWebConfigured(config)) {
     throw new Error("WhatsApp Web is not configured");
@@ -88,6 +112,36 @@ export async function sendWhatsAppWebMessage(config = {}, { phone, text }) {
   }
 
   return data;
+}
+
+export async function sendWhatsAppWebDocument(
+  config = {},
+  { phone, caption = "", attachment = {} }
+) {
+  if (!isWhatsAppWebConfigured(config)) {
+    throw new Error("WhatsApp Web is not configured");
+  }
+
+  const to = toWhatsAppNumber(phone);
+
+  if (!to) {
+    throw new Error("A valid phone number is required");
+  }
+
+  if (!attachment.base64 || !attachment.filename) {
+    throw new Error("A PDF attachment is required");
+  }
+
+  const response = await fetch(`${config.bridgeBaseUrl}/api/messages/send-document`, {
+    method: "POST",
+    headers: buildBridgeHeaders(config),
+    body: JSON.stringify(
+      buildWhatsAppWebDocumentPayload(config, { phone, caption, attachment })
+    ),
+    cache: "no-store",
+  });
+
+  return parseBridgeResponse(response);
 }
 
 async function parseBridgeResponse(response) {

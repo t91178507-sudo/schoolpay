@@ -561,6 +561,14 @@ export default function CategoriesPage() {
       ]),
       phone: getImportValue(row, ["phone number", "phone", "mobile", "telephone"]),
       email: getImportValue(row, ["email", "email address"]),
+      guardianName: getImportValue(row, [
+        "guardian name",
+        "guardian",
+        "parent name",
+        "parent",
+        "father name",
+        "mother name",
+      ]),
       location: getImportValue(row, ["location", "address"]),
     }));
   };

@@ -35,10 +35,14 @@ export async function POST(req) {
     const db = await connectDB();
     const body = await req.json();
     const name = String(body.name || "").trim().toUpperCase();
+    const guardianName = String(body.guardianName || body.parentName || "")
+      .trim()
+      .toUpperCase();
 
     const result = await db.collection("customers").insertOne({
       ...body,
       name,
+      guardianName,
       ownerId: userId,
       createdAt: new Date(),
     });

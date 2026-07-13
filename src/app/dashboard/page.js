@@ -14,6 +14,19 @@ import { authFetch } from "../../lib/authFetch";
 import { getCustomerLabels } from "../../lib/businessLabels";
 import { useBusinessSession } from "../../lib/clientSession";
 
+async function readJsonSafely(response, fallback) {
+  if (!response?.ok) {
+    return fallback;
+  }
+
+  try {
+    const raw = await response.text();
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export default function Dashboard() {
   const session = useBusinessSession();
   const customerLabels = getCustomerLabels(session.businessType);
@@ -22,7 +35,7 @@ export default function Dashboard() {
     expectedRevenue: 0,
     totalRevenue: 0,
     paidInvoices: 0,
-    unpaidInvoices: 0,
+    incompleteInvoices: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -46,9 +59,9 @@ export default function Dashboard() {
           authFetch("/api/notifications/whatsapp/bridge/status").catch(() => null),
         ]);
 
-        const customers = customersRes.ok ? await customersRes.json() : [];
-        const invoices = invoicesRes.ok ? await invoicesRes.json() : [];
-        const whatsAppData = whatsAppRes?.ok ? await whatsAppRes.json() : null;
+        const customers = await readJsonSafely(customersRes, []);
+        const invoices = await readJsonSafely(invoicesRes, []);
+        const whatsAppData = await readJsonSafely(whatsAppRes, null);
         const bridgeStatus = whatsAppData?.status || {};
         const connected = whatsAppData?.bridgeReachable === true && bridgeStatus.status === "ready";
 
@@ -57,19 +70,20 @@ export default function Dashboard() {
           0
         );
 
-        const totalRevenue = invoices
-          .filter((invoice) => invoice.status === "Paid")
-          .reduce((sum, inv) => sum + Number(inv.paidAmount || inv.amount || 0), 0);
+        const totalRevenue = invoices.reduce(
+          (sum, inv) => sum + Number(inv.paidAmount || inv.amountPaid || 0),
+          0
+        );
 
         const paid = invoices.filter((inv) => inv.status === "Paid").length;
-        const unpaid = invoices.length - paid;
+        const incomplete = invoices.filter((inv) => inv.status === "Partially Paid").length;
 
         setStats({
           totalCustomers: customers.length,
           expectedRevenue,
           totalRevenue,
           paidInvoices: paid,
-          unpaidInvoices: unpaid,
+          incompleteInvoices: incomplete,
         });
         setWhatsAppStatus({
           connected,
@@ -157,7 +171,7 @@ export default function Dashboard() {
           tone="emerald"
         />
         <StatCard label="Paid Invoices" value={stats.paidInvoices} tone="emerald" />
-        <StatCard label="Pending Invoices" value={stats.unpaidInvoices} tone="orange" />
+        <StatCard label="Incomplete Invoices" value={stats.incompleteInvoices} tone="blue" />
       </StatGrid>
 
       <div className="grid gap-4 xl:grid-cols-3">
@@ -219,6 +233,7 @@ export default function Dashboard() {
             </div>
             <QuickLink href="/dashboard/invoices" label="Manage invoices" />
             <QuickLink href="/dashboard/payments" label="Open payment history" />
+            <QuickLink href="/dashboard/receipts" label="Receipt validation" />
           </div>
         </SurfaceCard>
       </div>

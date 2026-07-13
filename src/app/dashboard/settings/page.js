@@ -47,6 +47,17 @@ const GATEWAYS = [
       { key: "callbackUrl", label: "Redirect URL", type: "url" },
     ],
   },
+  {
+    key: "receiptUpload",
+    name: "Receipt Upload",
+    blurb: "Let customers transfer to your bank account and upload proof for manual validation.",
+    fields: [
+      { key: "bankName", label: "Bank Name", type: "text" },
+      { key: "accountName", label: "Account Name", type: "text" },
+      { key: "accountNumber", label: "Account Number", type: "text" },
+      { key: "paymentInstructions", label: "Payment Instructions", type: "textarea" },
+    ],
+  },
 ];
 
 const WHATSAPP_PROVIDERS = [
@@ -107,6 +118,15 @@ const EMPTY_SETTINGS = {
       merchantId: "",
       webhookUrl: "",
       callbackUrl: "",
+    },
+    receiptUpload: {
+      enabled: false,
+      environment: "manual",
+      bankName: "",
+      accountName: "",
+      accountNumber: "",
+      paymentInstructions: "",
+      autoWhatsAppAcknowledgement: true,
     },
   },
   whatsappProviders: {
@@ -328,17 +348,14 @@ export default function SettingsPage() {
     };
 
     loadBridgeStatus();
-    const interval = setInterval(() => loadBridgeStatus({ silent: true }), 10000);
 
     return () => {
       cancelled = true;
-      clearInterval(interval);
     };
   }, [
     selectedWhatsAppProvider.key,
     settings.whatsappProviders?.whatsappWeb?.bridgeBaseUrl,
-    settings.whatsappProviders?.whatsappWeb?.senderPhoneNumber,
-    pairingPhoneNumber,
+    settings.whatsappProviders?.whatsappWeb?.sessionName,
   ]);
 
   const suggestedWebhookUrls = useMemo(() => {
@@ -925,37 +942,41 @@ export default function SettingsPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => verifyGatewayConnection(selectedGateway.key)}
-                  disabled={verifyingGateway === selectedGateway.key}
-                  className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
-                >
-                  {verifyingGateway === selectedGateway.key
-                    ? "Verifying..."
-                    : "Verify connection"}
-                </button>
+                {selectedGateway.key !== "receiptUpload" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => verifyGatewayConnection(selectedGateway.key)}
+                      disabled={verifyingGateway === selectedGateway.key}
+                      className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                    >
+                      {verifyingGateway === selectedGateway.key
+                        ? "Verifying..."
+                        : "Verify connection"}
+                    </button>
 
-                <select
-                  value={
-                    settings.paymentGateways[selectedGateway.key].environment
-                  }
-                  onChange={(event) =>
-                    updateGatewayField(
-                      selectedGateway.key,
-                      "environment",
-                      event.target.value
-                    )
-                  }
-                  className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                >
-                  <option
-                    value={selectedGateway.key === "monnify" ? "sandbox" : "test"}
-                  >
-                    {selectedGateway.key === "monnify" ? "Sandbox" : "Test"}
-                  </option>
-                  <option value="live">Live</option>
-                </select>
+                    <select
+                      value={
+                        settings.paymentGateways[selectedGateway.key].environment
+                      }
+                      onChange={(event) =>
+                        updateGatewayField(
+                          selectedGateway.key,
+                          "environment",
+                          event.target.value
+                        )
+                      }
+                      className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    >
+                      <option
+                        value={selectedGateway.key === "monnify" ? "sandbox" : "test"}
+                      >
+                        {selectedGateway.key === "monnify" ? "Sandbox" : "Test"}
+                      </option>
+                      <option value="live">Live</option>
+                    </select>
+                  </>
+                ) : null}
 
                 <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
                   <input
@@ -997,7 +1018,24 @@ export default function SettingsPage() {
                           {field.label}
                         </label>
                       <div className="relative">
-                        <input
+                        {field.type === "textarea" ? (
+                          <textarea
+                            value={
+                              settings.paymentGateways[selectedGateway.key][field.key] || ""
+                            }
+                            onChange={(event) =>
+                              updateGatewayField(
+                                selectedGateway.key,
+                                field.key,
+                                event.target.value
+                              )
+                            }
+                            rows={4}
+                            placeholder={field.label}
+                            className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                          />
+                        ) : (
+                          <input
                           type={
                             isSecret && !visibleSecrets[secretKeyId]
                               ? "password"
@@ -1019,7 +1057,8 @@ export default function SettingsPage() {
                               : field.label
                           }
                           className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                        />
+                          />
+                        )}
                         {isSecret && (
                           <button
                             type="button"
@@ -1040,6 +1079,29 @@ export default function SettingsPage() {
                 })}
               </div>
 
+              {selectedGateway.key === "receiptUpload" ? (
+                <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                  When enabled, customer invoice links will show these bank details and collect receipt uploads instead of launching online checkout.
+                  <label className="mt-4 flex items-center gap-2 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={
+                        settings.paymentGateways.receiptUpload
+                          ?.autoWhatsAppAcknowledgement !== false
+                      }
+                      onChange={(event) =>
+                        updateGatewayField(
+                          "receiptUpload",
+                          "autoWhatsAppAcknowledgement",
+                          event.target.checked
+                        )
+                      }
+                      className="h-4 w-4 accent-emerald-600"
+                    />
+                    Auto WhatsApp acknowledgement
+                  </label>
+                </div>
+              ) : (
               <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
                 <p className="text-sm font-medium text-slate-900 dark:text-white">Suggested webhook URL</p>
                 <p className="mt-1 break-all text-sm text-slate-600 dark:text-slate-300">
@@ -1049,6 +1111,7 @@ export default function SettingsPage() {
                   Copy this into your {selectedGateway.name} dashboard if you want this app to receive server-side updates for that provider.
                 </p>
               </div>
+              )}
               {gatewayConnectionStatus[selectedGateway.key] && (
                 <div
                   className={`mt-5 rounded-2xl border-2 px-5 py-4 ${

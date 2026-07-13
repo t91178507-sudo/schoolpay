@@ -28,6 +28,15 @@ export const DEFAULT_PAYMENT_GATEWAYS = Object.freeze({
     webhookUrl: "",
     callbackUrl: "",
   },
+  receiptUpload: {
+    enabled: false,
+    environment: "manual",
+    bankName: "",
+    accountName: "",
+    accountNumber: "",
+    paymentInstructions: "",
+    autoWhatsAppAcknowledgement: true,
+  },
 });
 
 export const DEFAULT_WHATSAPP_PROVIDERS = Object.freeze({
@@ -319,6 +328,10 @@ export function buildSettingsPayload(user = {}, platformSettings = {}) {
       monnify: buildGatewayPayload("monnify", paymentGateways.monnify),
       payaza: buildGatewayPayload("payaza", paymentGateways.payaza),
       touchpay: buildGatewayPayload("touchpay", paymentGateways.touchpay),
+      receiptUpload: buildGatewayPayload(
+        "receiptUpload",
+        paymentGateways.receiptUpload
+      ),
     },
     whatsappProviders: {
       browser: buildWhatsAppPayload(
@@ -430,7 +443,7 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
     businessAddress: normalizeText(body.businessAddress),
     website: normalizeText(body.website),
     taxId: normalizeText(body.taxId),
-    defaultPaymentGateway: ["monnify", "payaza", "touchpay"].includes(body.defaultPaymentGateway)
+    defaultPaymentGateway: ["monnify", "payaza", "touchpay", "receiptUpload"].includes(body.defaultPaymentGateway)
       ? body.defaultPaymentGateway
       : "monnify",
     defaultWhatsAppProvider: ["browser", "whatsappWeb"].includes(body.defaultWhatsAppProvider)
@@ -440,6 +453,23 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
       monnify: normalizeGateway("monnify", "sandbox"),
       payaza: normalizeGateway("payaza", "test"),
       touchpay: normalizeGateway("touchpay", "test"),
+      receiptUpload: {
+        ...mergeGateway(
+          DEFAULT_PAYMENT_GATEWAYS.receiptUpload,
+          existingGateways.receiptUpload
+        ),
+        ...paymentGateways.receiptUpload,
+        enabled: normalizeGatewayBoolean(paymentGateways.receiptUpload?.enabled),
+        environment: "manual",
+        bankName: normalizeText(paymentGateways.receiptUpload?.bankName),
+        accountName: normalizeText(paymentGateways.receiptUpload?.accountName),
+        accountNumber: normalizeText(paymentGateways.receiptUpload?.accountNumber),
+        paymentInstructions: normalizeText(
+          paymentGateways.receiptUpload?.paymentInstructions
+        ),
+        autoWhatsAppAcknowledgement:
+          paymentGateways.receiptUpload?.autoWhatsAppAcknowledgement !== false,
+      },
     },
     whatsappProviders: {
       browser: normalizeWhatsAppProvider("browser"),

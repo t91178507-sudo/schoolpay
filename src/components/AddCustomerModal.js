@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { authFetch } from "../lib/authFetch";
-import { getCustomerLabels } from "../lib/businessLabels";
+import { getCustomerLabels, isSchoolBusinessType } from "../lib/businessLabels";
 import { useBusinessSession } from "../lib/clientSession";
 import { generateInvoiceToken } from "../lib/invoiceUtils";
 
@@ -14,8 +14,10 @@ export default function AddCustomerModal({
 }) {
   const session = useBusinessSession();
   const customerLabels = getCustomerLabels(session.businessType);
+  const isSchoolBusiness = isSchoolBusinessType(session.businessType);
   const [formData, setFormData] = useState({
     name: "",
+    guardianName: "",
     phone: "",
     email: "",
     category: defaultCategory,
@@ -71,6 +73,7 @@ export default function AddCustomerModal({
 
       setFormData({
         name: "",
+        guardianName: "",
         phone: "",
         email: "",
         category: defaultCategory,
@@ -101,6 +104,22 @@ export default function AddCustomerModal({
             <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-slate-300">{customerLabels.singularTitle} Name</label>
             <input type="text" name="name" value={formData.name} onChange={handleChange} required className="w-full px-4 py-3 border border-gray-300 rounded-2xl bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white" placeholder="John Doe" />
           </div>
+
+          {isSchoolBusiness ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-slate-300">
+                Guardian Name
+              </label>
+              <input
+                type="text"
+                name="guardianName"
+                value={formData.guardianName}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-2xl bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                placeholder="Parent or guardian name"
+              />
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>

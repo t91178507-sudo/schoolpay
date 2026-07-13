@@ -1,0 +1,41 @@
+
+> invoicehub@0.1.0 dev
+> next dev --webpack
+
+▲ Next.js 16.2.9 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://172.30.118.181:3000
+- Environments: .env.local
+✓ Ready in 1357ms
+
+○ Compiling /auth/login ...
+ GET /auth/login 200 in 17.4s (next.js: 14.1s, application-code: 3.3s)
+ GET /admin/login 200 in 17.4s (next.js: 14.1s, application-code: 3.3s)
+ GET /admin/login 200 in 322ms (next.js: 103ms, application-code: 219ms)
+ GET /auth/login 200 in 103ms (next.js: 19ms, application-code: 85ms)
+ POST /api/auth/login 401 in 11.3s (next.js: 3.6s, application-code: 7.7s)
+ GET /auth/login 200 in 301ms (next.js: 7ms, application-code: 294ms)
+ GET /admin/login 200 in 125ms (next.js: 10ms, application-code: 115ms)
+ POST /api/auth/login 200 in 380ms (next.js: 9ms, application-code: 372ms)
+ GET /dashboard 200 in 2.8s (next.js: 2.7s, application-code: 108ms)
+ GET /api/invoices 200 in 2.6s (next.js: 2.2s, application-code: 421ms)
+ GET /api/customers 200 in 3.1s (next.js: 2.2s, application-code: 855ms)
+ GET /api/invoices 200 in 606ms (next.js: 4ms, application-code: 602ms)
+ GET /api/customers 200 in 321ms (next.js: 5ms, application-code: 316ms)
+ GET /api/notifications/whatsapp/bridge/status 200 in 3.6s (next.js: 2.2s, application-code: 1388ms)
+ GET /api/notifications/whatsapp/bridge/status 200 in 387ms (next.js: 5ms, application-code: 382ms)
+ GET /api/receipts 200 in 8.9s (next.js: 2.2s, application-code: 6.7s)
+ GET /api/receipts 200 in 4.4s (next.js: 5ms, application-code: 4.4s)
+ GET /dashboard/settings 200 in 2.4s (next.js: 2.3s, application-code: 118ms)
+ GET /api/quick-pay-profiles 200 in 2.6s (next.js: 2.4s, application-code: 201ms)
+ GET /api/settings 200 in 2.9s (next.js: 2.5s, application-code: 344ms)
+ GET /api/quick-pay-profiles 200 in 169ms (next.js: 5ms, application-code: 164ms)
+ GET /api/settings 200 in 358ms (next.js: 6ms, application-code: 352ms)
+ GET /api/notifications/whatsapp/bridge/status 200 in 358ms (next.js: 13ms, application-code: 345ms)
+ GET /api/notifications/whatsapp/bridge/status 200 in 444ms (next.js: 6ms, application-code: 438ms)
+ GET /api/notifications/whatsapp/bridge/status 200 in 342ms (next.js: 4ms, application-code: 338ms)
+ GET /api/notifications/whatsapp/bridge/status 200 in 332ms (next.js: 7ms, application-code: 325ms)
+ GET /api/notifications/whatsapp/bridge/status 200 in 380ms (next.js: 3ms, application-code: 377ms)
+ GET /api/notifications/whatsapp/bridge/status 200 in 344ms (next.js: 3ms, application-code: 341ms)
+ GET /api/notifications/whatsapp/bridge/status 200 in 350ms (next.js: 5ms, application-code: 345ms)
+[?25h

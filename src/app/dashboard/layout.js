@@ -41,6 +41,7 @@ export default function DashboardLayout({ children }) {
     { name: "Invoices", href: "/dashboard/invoices", badge: "I" },
     { name: "Communication", href: "/dashboard/communication", badge: "M" },
     { name: "Payment history", href: "/dashboard/payments", badge: "P" },
+    { name: "Receipt validation", href: "/dashboard/receipts", badge: "V" },
     { name: "Settings", href: "/dashboard/settings", badge: "S" },
   ];
 

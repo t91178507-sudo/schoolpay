@@ -5,12 +5,26 @@ import {
 } from "../../../../../../lib/paymentGatewaySettings";
 
 function buildCustomerPayload(record = {}, owner = null) {
+  const activeGateway = resolveActivePaymentGateway(owner || {});
+  const receiptUpload = owner?.paymentGateways?.receiptUpload || {};
+
   return {
     name: record.customer || record.customerName || record.student || record.name,
     phone: record.phone || "",
     email: record.email || "",
-    businessName: record.businessName || "",
-    defaultPaymentGateway: resolveActivePaymentGateway(owner || {}),
+    businessName: record.businessName || owner?.businessName || "",
+    businessLogo: record.businessLogo || owner?.businessLogo || "",
+    defaultPaymentGateway: activeGateway,
+    receiptUpload:
+      activeGateway === "receiptUpload" && receiptUpload.enabled
+        ? {
+            enabled: true,
+            bankName: receiptUpload.bankName || "",
+            accountName: receiptUpload.accountName || "",
+            accountNumber: receiptUpload.accountNumber || "",
+            paymentInstructions: receiptUpload.paymentInstructions || "",
+          }
+        : { enabled: false },
     token: record.customerToken || record.token || "",
   };
 }

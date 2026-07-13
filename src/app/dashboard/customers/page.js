@@ -28,6 +28,17 @@ function formatDateTime(value) {
   })}`;
 }
 
+function getInvoicePaidAmount(invoice) {
+  return Number(invoice.paidAmount || invoice.amountPaid || 0);
+}
+
+function getInvoiceBalance(invoice) {
+  const amount = Number(invoice.amount || 0);
+  const balanceDue = Number(invoice.balanceDue || 0);
+  if (balanceDue > 0) return balanceDue;
+  return Math.max(amount - getInvoicePaidAmount(invoice), 0);
+}
+
 export default function CustomersOverview() {
   const session = useBusinessSession();
   const customerLabels = getCustomerLabels(session.businessType);
@@ -78,16 +89,21 @@ export default function CustomersOverview() {
           0
         );
 
-        const amountPaid = customerInvoices
-          .filter((inv) => inv.status === "Paid")
-          .reduce((sum, inv) => sum + Number(inv.paidAmount || inv.amount || 0), 0);
+        const amountPaid = customerInvoices.reduce(
+          (sum, inv) => sum + getInvoicePaidAmount(inv),
+          0
+        );
+        const amountPending = customerInvoices.reduce(
+          (sum, inv) => sum + getInvoiceBalance(inv),
+          0
+        );
 
         return {
           ...customer,
           invoiceCount: customerInvoices.length,
           totalAmount,
           amountPaid,
-          amountPending: totalAmount - amountPaid,
+          amountPending,
           invoices: customerInvoices.sort(
             (a, b) => new Date(b.date || 0) - new Date(a.date || 0)
           ),
@@ -307,7 +323,10 @@ export default function CustomersOverview() {
                         {invoice.description || invoice.category || "Invoice payment"}
                       </p>
                       <p className="text-sm text-slate-500">
-                        {formatCurrency(invoice.amount)} | {formatDateTime(invoice.date)}
+                        {formatCurrency(invoice.amount)} | Paid {formatCurrency(getInvoicePaidAmount(invoice))} | Balance {formatCurrency(getInvoiceBalance(invoice))}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {formatDateTime(invoice.paidAt || invoice.date)}
                       </p>
                     </div>
                     <StatusBadge tone={invoice.status === "Paid" ? "green" : "orange"}>

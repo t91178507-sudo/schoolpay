@@ -13,6 +13,9 @@ function normalizeStudent(row = {}, category = "", businessName = "") {
 
   return {
     name,
+    guardianName: clean(
+      row.guardianName || row.parentName || row.guardian || row.parent
+    ).toUpperCase(),
     phone,
     email: clean(row.email || row.emailAddress),
     location: clean(row.location || row.address),

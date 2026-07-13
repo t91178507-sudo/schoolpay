@@ -1,6 +1,7 @@
 import cors from "cors";
 import { execFile } from "child_process";
 import express from "express";
+import fsSync from "fs";
 import fs from "fs/promises";
 import path from "path";
 import { promisify } from "util";
@@ -20,11 +21,13 @@ const BASE_URL =
   process.env.WHATSAPP_BRIDGE_BASE_URL ||
   process.env.BRIDGE_PUBLIC_URL ||
   `http://localhost:${PORT}`;
-const BROWSER_PATH =
-  process.env.WHATSAPP_BRIDGE_BROWSER_PATH ||
-  (process.platform === "win32"
-    ? "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
-    : "");
+const WINDOWS_BROWSER_CANDIDATES = [
+  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+  "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+];
+const BROWSER_PATH = resolveBrowserPath();
 
 const app = express();
 app.use(cors());
@@ -123,6 +126,33 @@ function normalizeSessionName(rawSessionName) {
   return value || DEFAULT_SESSION_NAME;
 }
 
+function resolveBrowserPath() {
+  const configured = String(process.env.WHATSAPP_BRIDGE_BROWSER_PATH || "").trim();
+
+  if (configured) {
+    return configured;
+  }
+
+  if (process.platform !== "win32") {
+    return "";
+  }
+
+  return WINDOWS_BROWSER_CANDIDATES.find((candidate) => fsSync.existsSync(candidate)) || "";
+}
+
+function formatBridgeLaunchError(error) {
+  if (error?.code === "EPERM" && error?.syscall === "spawn") {
+    const browserLabel = BROWSER_PATH || "the configured browser";
+    return [
+      `Windows blocked InvoiceHub from launching ${browserLabel}.`,
+      "Allow Node.js to start Chrome or Edge, or run the bridge from an elevated terminal.",
+      "If Windows Security Controlled folder access or antivirus app control is enabled, allow node.exe and your browser executable, then restart the bridge.",
+    ].join(" ");
+  }
+
+  return error?.message || "Unable to start WhatsApp browser session";
+}
+
 function buildSessionState(sessionName) {
   return {
     sessionName,
@@ -199,7 +229,7 @@ async function stopSessionBrowserProcesses(sessionName) {
     "$ErrorActionPreference = 'SilentlyContinue'",
     `$target = '${storagePath}'`,
     "Get-CimInstance Win32_Process |",
-    "Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like ('*' + $target + '*') } |",
+    "Where-Object { @('msedge.exe','chrome.exe') -contains $_.Name -and $_.CommandLine -like ('*' + $target + '*') } |",
     "ForEach-Object { Stop-Process -Id $_.ProcessId -Force }",
   ].join("; ");
 
@@ -389,7 +419,12 @@ async function buildClient(sessionState) {
     }
   });
 
-  await nextClient.initialize();
+  try {
+    await nextClient.initialize();
+  } catch (error) {
+    throw new Error(formatBridgeLaunchError(error));
+  }
+
   sessionState.client = nextClient;
   return nextClient;
 }

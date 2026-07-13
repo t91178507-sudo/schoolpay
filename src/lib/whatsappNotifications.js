@@ -7,9 +7,11 @@ import {
   resolveBrowserWhatsAppConfig,
   resolveWhatsAppWebConfigForUser,
 } from "./paymentGatewaySettings";
+import { buildPaymentReceiptAttachment } from "./paymentReceiptPdf";
 import { markInvoiceNotificationPrepared } from "./paymentLifecycle";
 import {
   isWhatsAppWebConfigured,
+  sendWhatsAppWebDocument,
   sendWhatsAppWebMessage,
 } from "./whatsappWebBridge";
 
@@ -136,9 +138,27 @@ export async function deliverPaymentConfirmation({
   if (isWhatsAppWebConfigured(whatsAppWebConfig)) {
     try {
       await sendWhatsAppWebMessage(whatsAppWebConfig, { phone, text: message });
+      const attachment = buildPaymentReceiptAttachment({
+        invoice,
+        owner,
+        amount: amount ?? invoice.paidAmount ?? invoice.amount ?? 0,
+      });
+      let attachmentSent = false;
+
+      try {
+        await sendWhatsAppWebDocument(whatsAppWebConfig, {
+          phone,
+          caption: "Payment receipt attached.",
+          attachment,
+        });
+        attachmentSent = true;
+      } catch (attachmentError) {
+        console.error("PAYMENT RECEIPT PDF SEND ERROR:", attachmentError);
+      }
+
       await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
 
-      return { sent: true, provider: "whatsappWeb" };
+      return { sent: true, provider: "whatsappWeb", attachmentSent };
     } catch (error) {
       if (!shouldFallbackToBrowser(error)) {
         throw error;
@@ -157,5 +177,6 @@ export async function deliverPaymentConfirmation({
     provider: "browser",
     fallbackUrl: buildFallbackUrl(phone, message),
     message,
+    attachmentSent: false,
   };
 }

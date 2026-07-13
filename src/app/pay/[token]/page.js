@@ -57,6 +57,13 @@ export default function PaymentPage() {
   const [launchingPayment, setLaunchingPayment] = useState(false);
   const [payazaAccount, setPayazaAccount] = useState(null);
   const [verifyingPayaza, setVerifyingPayaza] = useState(false);
+  const [receiptFormOpen, setReceiptFormOpen] = useState(false);
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [receiptFields, setReceiptFields] = useState({
+    phoneNumber: "",
+  });
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [receiptSubmitted, setReceiptSubmitted] = useState(false);
   const [sdkReady, setSdkReady] = useState(
     () => typeof window !== "undefined" && Boolean(window.MonnifySDK)
   );
@@ -65,6 +72,8 @@ export default function PaymentPage() {
     setActiveInvoice(invoice);
     setPayAmount(getOutstandingAmount(invoice));
     setPayazaAccount(null);
+    setReceiptFormOpen(false);
+    setReceiptSubmitted(false);
   };
 
   useEffect(() => {
@@ -292,6 +301,40 @@ export default function PaymentPage() {
     setPayAmount(Math.min(nextAmount, invoiceAmount));
   };
 
+  const submitReceipt = async (event) => {
+    event.preventDefault();
+
+    if (!activeInvoice || !receiptFile) {
+      alert("Upload your payment receipt.");
+      return;
+    }
+
+    setUploadingReceipt(true);
+
+    try {
+      const body = new FormData();
+      body.append("invoiceId", activeInvoice._id);
+      body.append("receipt", receiptFile);
+      body.append("phoneNumber", receiptFields.phoneNumber);
+
+      const res = await fetch(`/api/receipts/by-token/${token}`, {
+        method: "POST",
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Unable to upload receipt");
+      }
+
+      setReceiptSubmitted(true);
+    } catch (uploadError) {
+      alert(uploadError.message || "Unable to upload receipt");
+    } finally {
+      setUploadingReceipt(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
@@ -411,6 +454,9 @@ export default function PaymentPage() {
     activeInvoice.description || activeInvoice.category || activeInvoice.class || "-";
   const outstandingAmount = getOutstandingAmount(activeInvoice);
   const paymentGateway = customer.defaultPaymentGateway === "payaza" ? "payaza" : "monnify";
+  const receiptUploadEnabled =
+    customer.defaultPaymentGateway === "receiptUpload" &&
+    customer.receiptUpload?.enabled;
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 py-16 px-4">
@@ -453,6 +499,15 @@ export default function PaymentPage() {
           </div>
 
           <div className="px-8 py-6 space-y-4">
+            {customer.businessLogo ? (
+              <div className="mb-2 flex justify-center">
+                <img
+                  src={customer.businessLogo}
+                  alt={customer.businessName || "Business logo"}
+                  className="h-16 w-16 rounded-2xl object-cover"
+                />
+              </div>
+            ) : null}
             <DetailRow label="Customer name" value={customerName} />
             <DetailRow
               label="Invoice number"
@@ -460,6 +515,14 @@ export default function PaymentPage() {
             />
             <DetailRow label="Category" value={invoiceCategory} />
             <DetailRow label="Description" value={invoiceDescription} />
+            <DetailRow
+              label="Due date"
+              value={
+                activeInvoice.dueDate
+                  ? new Date(activeInvoice.dueDate).toLocaleDateString()
+                  : "-"
+              }
+            />
             <DetailRow
               label="Invoice token"
               value={
@@ -478,6 +541,23 @@ export default function PaymentPage() {
             />
           </div>
 
+          {receiptUploadEnabled ? (
+            <div className="border-t border-slate-100 bg-slate-50/70 px-8 py-6 dark:border-slate-800 dark:bg-slate-950/60">
+              <p className="text-[12px] font-medium uppercase tracking-wide text-slate-500">
+                Bank transfer details
+              </p>
+              <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <DetailRow label="Bank" value={customer.receiptUpload.bankName || "-"} />
+                <DetailRow label="Account name" value={customer.receiptUpload.accountName || "-"} />
+                <DetailRow label="Account number" value={customer.receiptUpload.accountNumber || "-"} />
+              </div>
+              {customer.receiptUpload.paymentInstructions ? (
+                <p className="mt-3 text-sm leading-6 text-slate-500">
+                  {customer.receiptUpload.paymentInstructions}
+                </p>
+              ) : null}
+            </div>
+          ) : (
           <div className="px-8 py-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/60">
             <label className="text-[12px] font-medium text-slate-500 uppercase tracking-wide block mb-2">
               Amount to pay
@@ -500,31 +580,50 @@ export default function PaymentPage() {
               You can enter any amount up to N{outstandingAmount.toLocaleString()}.
             </p>
           </div>
+          )}
 
           <div className="px-8 pb-8 pt-2">
-            <button
-              onClick={paymentGateway === "payaza" ? payWithPayaza : payWithMonnify}
-              disabled={
-                isPaid ||
-                launchingPayment ||
-                (paymentGateway === "monnify" && !sdkReady) ||
-                parseAmount(payAmount) <= 0
-              }
-              className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-medium text-[15px] transition-colors"
-            >
-              {isPaid
-                ? "Already paid"
-                : launchingPayment
-                  ? paymentGateway === "payaza"
-                    ? "Generating account..."
-                    : "Opening Monnify..."
-                  : paymentGateway === "monnify" && !sdkReady
-                    ? "Loading Monnify..."
-                    : `Pay N${parseAmount(payAmount).toLocaleString()}`}
-            </button>
-            <p className="text-center text-[12px] text-slate-400 mt-3">
-              Secured by {paymentGateway === "payaza" ? "PayAza" : "Monnify"}
-            </p>
+            {receiptUploadEnabled ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setReceiptFormOpen(true)}
+                  disabled={receiptSubmitted}
+                  className="w-full rounded-xl bg-slate-900 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-slate-800 disabled:bg-slate-300"
+                >
+                  {receiptSubmitted ? "Receipt submitted" : "I've Made Payment"}
+                </button>
+                <p className="mt-3 text-center text-[12px] text-slate-400">
+                  Upload proof after completing your bank transfer.
+                </p>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={paymentGateway === "payaza" ? payWithPayaza : payWithMonnify}
+                  disabled={
+                    isPaid ||
+                    launchingPayment ||
+                    (paymentGateway === "monnify" && !sdkReady) ||
+                    parseAmount(payAmount) <= 0
+                  }
+                  className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-medium text-[15px] transition-colors"
+                >
+                  {isPaid
+                    ? "Already paid"
+                    : launchingPayment
+                      ? paymentGateway === "payaza"
+                        ? "Generating account..."
+                        : "Opening Monnify..."
+                      : paymentGateway === "monnify" && !sdkReady
+                        ? "Loading Monnify..."
+                        : `Pay N${parseAmount(payAmount).toLocaleString()}`}
+                </button>
+                <p className="text-center text-[12px] text-slate-400 mt-3">
+                  Secured by {paymentGateway === "payaza" ? "PayAza" : "Monnify"}
+                </p>
+              </>
+            )}
           </div>
         </div>
 
@@ -541,7 +640,139 @@ export default function PaymentPage() {
           verifying={verifyingPayaza}
         />
       )}
+      {receiptFormOpen && (
+        <ReceiptUploadModal
+          fields={receiptFields}
+          setFields={setReceiptFields}
+          receiptFile={receiptFile}
+          setReceiptFile={setReceiptFile}
+          uploading={uploadingReceipt}
+          submitted={receiptSubmitted}
+          onClose={() => setReceiptFormOpen(false)}
+          onSubmit={submitReceipt}
+        />
+      )}
     </div>
+  );
+}
+
+function ReceiptUploadModal({
+  fields,
+  setFields,
+  receiptFile,
+  setReceiptFile,
+  uploading,
+  submitted,
+  onClose,
+  onSubmit,
+}) {
+  if (submitted) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4">
+        <div className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-2xl">
+          <h2 className="text-xl font-semibold text-slate-900">Thank you.</h2>
+          <p className="mt-4 text-sm leading-6 text-slate-600">
+            Your payment receipt has been received and is awaiting verification.
+            You will receive confirmation once the business validates your payment.
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-6 w-full rounded-xl bg-slate-900 py-3 text-sm font-medium text-white"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const update = (field, value) =>
+    setFields((current) => ({ ...current, [field]: value }));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 px-4 py-6">
+      <form
+        onSubmit={onSubmit}
+        className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              Receipt upload
+            </p>
+            <h2 className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">
+              Upload proof of payment
+            </h2>
+          </div>
+          <button type="button" onClick={onClose} className="text-slate-500">
+            x
+          </button>
+        </div>
+
+        <div className="mt-5 space-y-4">
+          <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            Upload the receipt and we will read the payment details from it.
+          </p>
+
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Receipt file
+            </span>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,application/pdf"
+              onChange={(event) => setReceiptFile(event.target.files?.[0] || null)}
+              className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              required
+            />
+            <span className="mt-1 block text-xs text-slate-400">
+              JPG, PNG, or PDF. Maximum 10 MB.
+            </span>
+          </label>
+
+          <ReceiptField
+            label="Phone number"
+            value={fields.phoneNumber}
+            onChange={(value) => update("phoneNumber", value)}
+            placeholder="Optional"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={uploading || !receiptFile}
+          className="mt-6 w-full rounded-xl bg-slate-900 py-3 text-sm font-medium text-white disabled:bg-slate-300"
+        >
+          {uploading ? "Submitting..." : "Submit receipt"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function ReceiptField({
+  label,
+  value,
+  onChange,
+  type = "text",
+  placeholder = "",
+  required = false,
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+        {label}
+      </span>
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        required={required}
+        className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+      />
+    </label>
   );
 }
 
