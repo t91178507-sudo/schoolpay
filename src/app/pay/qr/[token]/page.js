@@ -279,7 +279,7 @@ function PayazaPaymentModal({
               <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
                 PayAza transfer
               </p>
-              <h2 className="mt-1 text-2xl font-semibold leading-tight text-slate-900 dark:text-slate-100 sm:text-xl">
+              <h2 className="mt-1 text-[1.85rem] font-semibold leading-tight text-slate-900 dark:text-slate-100 sm:text-xl">
                 Complete your payment
               </h2>
             </div>
@@ -302,7 +302,7 @@ function PayazaPaymentModal({
             <p className="text-xs uppercase tracking-wide text-slate-400">
               Amount to transfer
             </p>
-            <p className="mt-1 break-words text-[2rem] font-semibold leading-none tabular-nums sm:text-3xl">
+            <p className="mt-1 break-words text-[2.2rem] font-semibold leading-none tabular-nums sm:text-3xl">
               N{amountPayable.toLocaleString()}
             </p>
           </div>
@@ -324,7 +324,7 @@ function PayazaPaymentModal({
               Account number
             </span>
             <span className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <span className="break-all font-mono text-[2rem] font-black leading-none tracking-[0.18em] text-emerald-950 dark:text-emerald-50 sm:text-2xl">
+              <span className="break-all font-mono text-[1.8rem] font-black leading-none tracking-[0.14em] text-emerald-950 dark:text-emerald-50 sm:text-2xl">
                 {account.accountNumber || "-"}
               </span>
               <span className="inline-flex w-fit shrink-0 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white">
