@@ -2,9 +2,20 @@ import jwt from "jsonwebtoken";
 import { ObjectId } from "mongodb";
 
 const JWT_SECRET = process.env.JWT_SECRET;
+export const AUTH_COOKIE_NAME = "invoicehub_auth";
 
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET is missing in environment variables");
+}
+
+function readCookieValue(cookieHeader, name) {
+  if (!cookieHeader) return "";
+
+  return cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`))
+    ?.slice(name.length + 1) || "";
 }
 
 export const verifyToken = (req) => {
@@ -21,11 +32,18 @@ export const verifyToken = (req) => {
       authHeader = headers.authorization;
     }
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const cookieHeader = headers.get ? headers.get("cookie") : headers.cookie;
+    const bearerToken =
+      authHeader && authHeader.startsWith("Bearer ")
+        ? authHeader.split(" ")[1]
+        : "";
+    const cookieToken = readCookieValue(cookieHeader, AUTH_COOKIE_NAME);
+    const token = bearerToken || cookieToken;
+
+    if (!token) {
       throw new Error("Unauthorized");
     }
 
-    const token = authHeader.split(" ")[1];
     return jwt.verify(token, JWT_SECRET);
   } catch {
     const authError = new Error("Unauthorized");
@@ -36,9 +54,19 @@ export const verifyToken = (req) => {
 
 export const signToken = (userId) => {
   return jwt.sign({ userId: userId.toString() }, JWT_SECRET, {
-    expiresIn: "30d",
+    expiresIn: "12h",
   });
 };
+
+export function buildAuthCookie(token, maxAgeSeconds = 60 * 60 * 12) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${AUTH_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure}`;
+}
+
+export function clearAuthCookie() {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${AUTH_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+}
 
 export const requireAuth = (req) => {
   const decoded = verifyToken(req);

@@ -3,6 +3,10 @@ import {
   findUserById,
   resolveActivePaymentGateway,
 } from "../../../../../../lib/paymentGatewaySettings";
+import {
+  findAccessibleInvoiceGroup,
+  serializePublicInvoice,
+} from "../../../../../../lib/publicInvoiceAccess";
 
 function buildCustomerPayload(record = {}, owner = null) {
   const activeGateway = resolveActivePaymentGateway(owner || {});
@@ -25,7 +29,6 @@ function buildCustomerPayload(record = {}, owner = null) {
             paymentInstructions: receiptUpload.paymentInstructions || "",
           }
         : { enabled: false },
-    token: record.customerToken || record.token || "",
   };
 }
 
@@ -33,43 +36,17 @@ export async function GET(req, context) {
   try {
     const { token } = await context.params;
     const db = await connectDB();
+    const accessGroup = await findAccessibleInvoiceGroup(db, token);
 
-    const baseInvoice = await db.collection("invoices").findOne({ token });
-
-    if (baseInvoice) {
-      const owner = baseInvoice.ownerId ? await findUserById(db, baseInvoice.ownerId) : null;
-      const matchQuery = baseInvoice.customerToken
-        ? { customerToken: baseInvoice.customerToken }
-        : { token: baseInvoice.token };
-
-      const allInvoices = await db
-        .collection("invoices")
-        .find(matchQuery)
-        .sort({ date: -1 })
-        .toArray();
-
-      return Response.json({
-        customer: buildCustomerPayload(baseInvoice, owner),
-        invoices: allInvoices,
-      });
-    }
-
-    const customer = await db.collection("customers").findOne({ token });
-
-    if (!customer) {
+    if (!accessGroup) {
       return Response.json({ error: "Invoice not found" }, { status: 404 });
     }
-
-    const owner = customer.ownerId ? await findUserById(db, customer.ownerId) : null;
-    const allInvoices = await db
-      .collection("invoices")
-      .find({ customerToken: customer.token })
-      .sort({ date: -1 })
-      .toArray();
+    const baseRecord = accessGroup.baseInvoice || accessGroup.customer;
+    const owner = baseRecord?.ownerId ? await findUserById(db, baseRecord.ownerId) : null;
 
     return Response.json({
-      customer: buildCustomerPayload(customer, owner),
-      invoices: allInvoices,
+      customer: buildCustomerPayload(baseRecord || {}, owner),
+      invoices: (accessGroup.invoices || []).map(serializePublicInvoice),
     });
   } catch (error) {
     console.error("FETCH CUSTOMER INVOICES ERROR:", error);

@@ -2,9 +2,11 @@ import bcrypt from "bcryptjs";
 import { ObjectId } from "mongodb";
 import { requireAuth } from "../../../../lib/auth";
 import { connectDB } from "../../../../lib/mongodb";
+import { enforceRateLimit } from "../../../../lib/rateLimit";
 
 export async function PATCH(req) {
   try {
+    enforceRateLimit(req, "auth-password-change", { limit: 6, windowMs: 15 * 60 * 1000 });
     const userId = requireAuth(req);
     const body = await req.json();
     const currentPassword = String(body.currentPassword || "");

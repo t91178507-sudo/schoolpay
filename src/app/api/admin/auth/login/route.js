@@ -1,8 +1,14 @@
 import bcrypt from "bcryptjs";
-import { getAdminCredentials, signAdminToken } from "../../../../../lib/adminAuth";
+import {
+  buildAdminAuthCookie,
+  getAdminCredentials,
+  signAdminToken,
+} from "../../../../../lib/adminAuth";
+import { enforceRateLimit } from "../../../../../lib/rateLimit";
 
 export async function POST(req) {
   try {
+    enforceRateLimit(req, "admin-auth-login", { limit: 5, windowMs: 15 * 60 * 1000 });
     const body = await req.json();
     const email = body.email?.toLowerCase().trim();
 
@@ -27,13 +33,22 @@ export async function POST(req) {
 
     const token = signAdminToken();
 
-    return Response.json({
-      success: true,
-      token,
-    });
+    return Response.json(
+      {
+        success: true,
+      },
+      {
+        headers: {
+          "Set-Cookie": buildAdminAuthCookie(token),
+        },
+      }
+    );
 
   } catch (error) {
     console.error("ADMIN LOGIN ERROR:", error);
-    return Response.json({ error: "Server error" }, { status: 500 });
+    return Response.json(
+      { error: error.message || "Server error" },
+      { status: error.status || 500 }
+    );
   }
 }

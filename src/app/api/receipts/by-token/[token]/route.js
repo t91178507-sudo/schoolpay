@@ -206,6 +206,7 @@ export async function POST(req, context) {
 
     const receipt = {
       ownerId: invoice.ownerId,
+      businessId: String(invoice.businessId || ""),
       invoiceId: String(invoice._id),
       invoiceNumber: invoice.invoiceNumber || "",
       customerName: invoice.customer || invoice.customerName || invoice.student || "",

@@ -66,6 +66,7 @@ const WHATSAPP_SECRET_FIELDS = Object.freeze({
 
 const ENCRYPTED_PREFIX = "enc::";
 export const PLATFORM_SETTINGS_ID = "platform";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 function mergeGateway(defaultGateway, savedGateway = {}) {
   return {
@@ -161,13 +162,18 @@ function shouldUseDefaultWhatsAppWebQrUrl(savedQrUrl, defaultProvider) {
 }
 
 function getEncryptionSecret() {
-  return (
+  const secret =
     process.env.PAYMENT_GATEWAY_ENCRYPTION_KEY ||
     process.env.APP_SECRET ||
     process.env.JWT_SECRET ||
     process.env.NEXTAUTH_SECRET ||
-    "invoicehub-local-dev-secret-change-me"
-  );
+    "";
+
+  if (!secret && IS_PRODUCTION) {
+    throw new Error("PAYMENT_GATEWAY_ENCRYPTION_KEY is required in production.");
+  }
+
+  return secret || "invoicehub-local-dev-secret-change-me";
 }
 
 function getEncryptionKey() {
@@ -581,7 +587,7 @@ export function resolveWhatsAppWebConfig(user = {}, platformSettings = {}) {
     apiKey:
       platformBridge.apiKey ||
       decryptGatewayValue(provider, "apiKey") ||
-      "invoicehub-bridge-local",
+      (IS_PRODUCTION ? "" : "invoicehub-bridge-local"),
     qrConnectUrl:
       platformBridge.bridgeBaseUrl
         ? buildWhatsAppWebQrConnectUrl(platformBridge.bridgeBaseUrl, sessionName)

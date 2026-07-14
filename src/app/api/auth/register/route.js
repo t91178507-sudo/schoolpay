@@ -1,13 +1,16 @@
-import { connectDB } from "../../../../lib/mongodb";
 import bcrypt from "bcryptjs";
-import { signToken } from "../../../../lib/auth";
+import { connectDB } from "../../../../lib/mongodb";
+import { enforceRateLimit } from "../../../../lib/rateLimit";
 
 export async function POST(req) {
   try {
+    enforceRateLimit(req, "auth-register", { limit: 5, windowMs: 15 * 60 * 1000 });
     const db = await connectDB();
     const body = await req.json();
-
-    const email = body.email?.toLowerCase();
+    const email = String(body.email || "").trim().toLowerCase();
+    const username = String(body.username || email.split("@")[0] || "")
+      .trim()
+      .toLowerCase();
 
     if (!email || !body.password || !body.fullName) {
       return Response.json(
@@ -16,7 +19,16 @@ export async function POST(req) {
       );
     }
 
-    const existingUser = await db.collection("users").findOne({ email });
+    if (String(body.password).length < 8) {
+      return Response.json(
+        { error: "Password must be at least 8 characters." },
+        { status: 400 }
+      );
+    }
+
+    const existingUser = await db.collection("users").findOne({
+      $or: [{ email }, { username }],
+    });
 
     if (existingUser) {
       return Response.json(
@@ -30,37 +42,29 @@ export async function POST(req) {
     const result = await db.collection("users").insertOne({
       fullName: body.fullName,
       email,
+      username,
       password: hashedPassword,
       businessName: body.businessName,
       businessType: body.businessType,
-      role: body.role || "Admin",
+      role: "Owner",
+      roleKey: "owner",
+      accountType: "owner",
+      status: "active",
       createdAt: new Date(),
+      updatedAt: new Date(),
     });
-
-    // ✅ signToken expects just the userId, not a full object —
-    // it wraps it internally as { userId }.
-    const token = signToken(result.insertedId);
 
     return Response.json({
       success: true,
       message: "User created successfully",
-      token,
-      user: {
-        _id: result.insertedId,
-        fullName: body.fullName,
-        email,
-        businessName: body.businessName,
-        businessType: body.businessType,
-        role: body.role || "Admin",
-      },
+      userId: String(result.insertedId),
     });
-
   } catch (error) {
     console.error("REGISTER ERROR:", error);
 
     return Response.json(
-      { error: "Server error" },
-      { status: 500 }
+      { error: error.message || "Server error" },
+      { status: error.status || 500 }
     );
   }
 }

@@ -1,4 +1,3 @@
-import { ObjectId } from "mongodb";
 import { connectDB } from "../../../../lib/mongodb";
 import {
   parseAmount,
@@ -10,6 +9,7 @@ import {
 } from "../../../../lib/paymentGatewaySettings";
 import { markInvoicePaid } from "../../../../lib/paymentLifecycle";
 import { deliverPaymentConfirmation } from "../../../../lib/whatsappNotifications";
+import { findAccessibleInvoice } from "../../../../lib/publicInvoiceAccess";
 
 async function sendPaidConfirmation(db, invoice, owner, amount) {
   if (!invoice.phone) {
@@ -43,16 +43,10 @@ export async function POST(req) {
       );
     }
 
-    const invoice = await db.collection("invoices").findOne({
-      _id: new ObjectId(invoiceId),
-    });
+    const invoice = await findAccessibleInvoice(db, { token, invoiceId });
 
     if (!invoice) {
       return Response.json({ error: "Invoice not found" }, { status: 404 });
-    }
-
-    if (invoice.token !== token) {
-      return Response.json({ error: "Invoice token mismatch" }, { status: 409 });
     }
 
     if (

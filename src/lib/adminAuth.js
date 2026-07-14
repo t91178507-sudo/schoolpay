@@ -5,6 +5,8 @@ import jwt from "jsonwebtoken";
 // to access admin routes, and vice versa — they're signed with
 // different secrets entirely, not just a different payload shape.
 const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET;
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+export const ADMIN_AUTH_COOKIE_NAME = "invoicehub_admin";
 
 if (!ADMIN_JWT_SECRET) {
   throw new Error("❌ ADMIN_JWT_SECRET is missing in environment variables");
@@ -13,12 +15,16 @@ if (!ADMIN_JWT_SECRET) {
 // ✅ Hardcoded single admin account. Not stored in the users
 // collection — this is intentionally separate from the regular
 // business-owner accounts.
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@invoicehub.com";
-const ADMIN_PASSWORD_HASH =
-  process.env.ADMIN_PASSWORD_HASH ||
-  "$2b$10$1BR.DWJJuIWodYxBM6cLre9pqY4ZK7IEE/hGTTuQwWS3Xjtif.H6.";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || (IS_PRODUCTION ? "" : "admin@invoicehub.com");
+const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || (IS_PRODUCTION
+  ? ""
+  : "$2b$10$1BR.DWJJuIWodYxBM6cLre9pqY4ZK7IEE/hGTTuQwWS3Xjtif.H6.");
 
 export function getAdminCredentials() {
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD_HASH) {
+    throw new Error("Admin credentials are not configured.");
+  }
+
   return { email: ADMIN_EMAIL, passwordHash: ADMIN_PASSWORD_HASH };
 }
 
@@ -40,11 +46,22 @@ export function verifyAdminToken(req) {
       authHeader = headers.authorization;
     }
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const cookieHeader = headers.get ? headers.get("cookie") : headers.cookie;
+    const bearerToken =
+      authHeader && authHeader.startsWith("Bearer ")
+        ? authHeader.split(" ")[1]
+        : "";
+    const cookieToken =
+      cookieHeader
+        ?.split(";")
+        .map((part) => part.trim())
+        .find((part) => part.startsWith(`${ADMIN_AUTH_COOKIE_NAME}=`))
+        ?.slice(ADMIN_AUTH_COOKIE_NAME.length + 1) || "";
+    const token = bearerToken || cookieToken;
+
+    if (!token) {
       return null;
     }
-
-    const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, ADMIN_JWT_SECRET);
 
     if (decoded?.role !== "admin") {
@@ -69,4 +86,14 @@ export function requireAdmin(req) {
   }
 
   return decoded;
+}
+
+export function buildAdminAuthCookie(token, maxAgeSeconds = 60 * 60 * 12) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${ADMIN_AUTH_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure}`;
+}
+
+export function clearAdminAuthCookie() {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${ADMIN_AUTH_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
 }

@@ -42,6 +42,7 @@ export default function DashboardLayout({ children }) {
     { name: "Communication", href: "/dashboard/communication", badge: "M" },
     { name: "Payment history", href: "/dashboard/payments", badge: "P" },
     { name: "Receipt validation", href: "/dashboard/receipts", badge: "V" },
+    { name: "Users & Staff", href: "/dashboard/staff", badge: "U" },
     { name: "Settings", href: "/dashboard/settings", badge: "S" },
   ];
 
@@ -52,8 +53,13 @@ export default function DashboardLayout({ children }) {
 
     if (!session.isLoggedIn) {
       router.replace("/auth/login");
+      return;
     }
-  }, [isHydrated, router, session.isLoggedIn]);
+
+    if (session.accountType === "staff") {
+      router.replace("/mobile");
+    }
+  }, [isHydrated, router, session.accountType, session.isLoggedIn]);
 
   useEffect(() => {
     if (!isHydrated) {
@@ -100,8 +106,11 @@ export default function DashboardLayout({ children }) {
     }) || "";
 
   const handleLogout = useCallback(() => {
+    fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "same-origin",
+    }).catch(() => {});
     localStorage.removeItem("isLoggedIn");
-    localStorage.removeItem("authToken");
     localStorage.removeItem("userName");
     localStorage.removeItem("userEmail");
     localStorage.removeItem("businessName");
@@ -210,7 +219,7 @@ export default function DashboardLayout({ children }) {
     setPasswordError("");
   };
 
-  if (!isHydrated || !session.isLoggedIn) {
+  if (!isHydrated || !session.isLoggedIn || session.accountType === "staff") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="h-12 w-12 animate-spin rounded-full border-b-4 border-t-4 border-blue-600"></div>

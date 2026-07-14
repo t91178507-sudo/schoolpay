@@ -24,12 +24,16 @@ const navItems = [
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { adminToken } = useAdminSession();
+  const { isAdminLoggedIn } = useAdminSession();
   const isLoginPage = pathname === "/admin/login";
   const isHydrated = useHydrated();
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem("adminToken");
+    fetch("/api/admin/auth/logout", {
+      method: "POST",
+      credentials: "same-origin",
+    }).catch(() => {});
+    localStorage.removeItem("isAdminLoggedIn");
     emitSessionChange();
     router.replace("/admin/login");
   }, [router]);
@@ -39,13 +43,13 @@ export default function AdminLayout({ children }) {
       return;
     }
 
-    if (!isLoginPage && !adminToken) {
+    if (!isLoginPage && !isAdminLoggedIn) {
       router.replace("/admin/login");
     }
-  }, [adminToken, isHydrated, isLoginPage, router]);
+  }, [isAdminLoggedIn, isHydrated, isLoginPage, router]);
 
   useEffect(() => {
-    if (!isHydrated || isLoginPage || !adminToken) {
+    if (!isHydrated || isLoginPage || !isAdminLoggedIn) {
       return;
     }
 
@@ -64,13 +68,13 @@ export default function AdminLayout({ children }) {
       clearTimeout(timeoutId);
       events.forEach((eventName) => window.removeEventListener(eventName, resetTimer));
     };
-  }, [adminToken, handleLogout, isHydrated, isLoginPage]);
+  }, [isAdminLoggedIn, handleLogout, isHydrated, isLoginPage]);
 
   if (isLoginPage) {
     return children;
   }
 
-  if (!isHydrated || !adminToken) {
+  if (!isHydrated || !isAdminLoggedIn) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950">
         <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-t-2 border-slate-400"></div>

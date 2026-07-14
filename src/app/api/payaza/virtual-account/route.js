@@ -1,4 +1,3 @@
-import { ObjectId } from "mongodb";
 import { connectDB } from "../../../../lib/mongodb";
 import {
   createPayazaDynamicVirtualAccount,
@@ -8,6 +7,7 @@ import {
   findUserById,
   resolvePayazaConfig,
 } from "../../../../lib/paymentGatewaySettings";
+import { findAccessibleInvoice } from "../../../../lib/publicInvoiceAccess";
 
 function buildAccountName(invoice = {}, owner = {}) {
   const businessName = owner.businessName || invoice.businessName || "InvoiceHub";
@@ -30,16 +30,10 @@ export async function POST(req) {
       );
     }
 
-    const invoice = await db.collection("invoices").findOne({
-      _id: new ObjectId(invoiceId),
-    });
+    const invoice = await findAccessibleInvoice(db, { token, invoiceId });
 
     if (!invoice) {
       return Response.json({ error: "Invoice not found" }, { status: 404 });
-    }
-
-    if (invoice.token !== token) {
-      return Response.json({ error: "Invoice token mismatch" }, { status: 409 });
     }
 
     if (invoice.status === "Paid") {

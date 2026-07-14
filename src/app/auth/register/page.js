@@ -49,8 +49,8 @@ export default function Register() {
       setError("Passwords do not match");
       return;
     }
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (formData.password.length < 8) {
+      setError("Password must be at least 8 characters");
       return;
     }
     if (!formData.businessType) {
@@ -82,7 +82,6 @@ export default function Register() {
 
       if (res.ok && data.success) {
         localStorage.removeItem("isLoggedIn");
-        localStorage.removeItem("authToken");
         localStorage.removeItem("userName");
         localStorage.removeItem("businessName");
         localStorage.removeItem("businessType");

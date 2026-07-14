@@ -1,5 +1,12 @@
 export function generateInvoiceToken(seed = "inv") {
-  return `${seed}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+  const bytes =
+    typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function"
+      ? Array.from(crypto.getRandomValues(new Uint8Array(12)))
+          .map((byte) => byte.toString(16).padStart(2, "0"))
+          .join("")
+      : Array.from({ length: 24 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+
+  return `${seed}_${bytes}`;
 }
 
 export function generateInvoiceNumber() {

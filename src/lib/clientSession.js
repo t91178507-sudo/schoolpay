@@ -4,20 +4,41 @@ import { useSyncExternalStore } from "react";
 
 const EMPTY_BUSINESS_SESSION = Object.freeze({
   isLoggedIn: false,
-  authToken: "",
   userName: "",
   userEmail: "",
+  userPhone: "",
+  username: "",
   businessName: "",
   businessType: "",
   businessLogo: "",
+  role: "",
+  roleKey: "",
+  accountType: "owner",
+  ownerId: "",
+  assignedBusinesses: [],
+  assignedAllBusinesses: false,
+  permissions: {},
 });
 
 const EMPTY_ADMIN_SESSION = Object.freeze({
-  adminToken: "",
+  isAdminLoggedIn: false,
 });
 
 let businessSnapshotCache = EMPTY_BUSINESS_SESSION;
 let adminSnapshotCache = EMPTY_ADMIN_SESSION;
+
+function readJsonValue(key, fallback) {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 function subscribe(callback) {
   if (typeof window === "undefined") {
@@ -42,22 +63,38 @@ function getBusinessSnapshot() {
 
   const nextSnapshot = {
     isLoggedIn: localStorage.getItem("isLoggedIn") === "true",
-    authToken: localStorage.getItem("authToken") || "",
     userName: localStorage.getItem("userName") || "",
     userEmail: localStorage.getItem("userEmail") || "",
+    userPhone: localStorage.getItem("userPhone") || "",
+    username: localStorage.getItem("username") || "",
     businessName: localStorage.getItem("businessName") || "",
     businessType: localStorage.getItem("businessType") || "",
     businessLogo: localStorage.getItem("businessLogo") || "",
+    role: localStorage.getItem("role") || "",
+    roleKey: localStorage.getItem("roleKey") || "",
+    accountType: localStorage.getItem("accountType") || "owner",
+    ownerId: localStorage.getItem("ownerId") || "",
+    assignedBusinesses: readJsonValue("assignedBusinesses", []),
+    assignedAllBusinesses: localStorage.getItem("assignedAllBusinesses") === "true",
+    permissions: readJsonValue("permissions", {}),
   };
 
   if (
     businessSnapshotCache.isLoggedIn === nextSnapshot.isLoggedIn &&
-    businessSnapshotCache.authToken === nextSnapshot.authToken &&
     businessSnapshotCache.userName === nextSnapshot.userName &&
     businessSnapshotCache.userEmail === nextSnapshot.userEmail &&
+    businessSnapshotCache.userPhone === nextSnapshot.userPhone &&
+    businessSnapshotCache.username === nextSnapshot.username &&
     businessSnapshotCache.businessName === nextSnapshot.businessName &&
     businessSnapshotCache.businessType === nextSnapshot.businessType &&
-    businessSnapshotCache.businessLogo === nextSnapshot.businessLogo
+    businessSnapshotCache.businessLogo === nextSnapshot.businessLogo &&
+    businessSnapshotCache.role === nextSnapshot.role &&
+    businessSnapshotCache.roleKey === nextSnapshot.roleKey &&
+    businessSnapshotCache.accountType === nextSnapshot.accountType &&
+    businessSnapshotCache.ownerId === nextSnapshot.ownerId &&
+    JSON.stringify(businessSnapshotCache.assignedBusinesses) === JSON.stringify(nextSnapshot.assignedBusinesses) &&
+    businessSnapshotCache.assignedAllBusinesses === nextSnapshot.assignedAllBusinesses &&
+    JSON.stringify(businessSnapshotCache.permissions) === JSON.stringify(nextSnapshot.permissions)
   ) {
     return businessSnapshotCache;
   }
@@ -72,10 +109,10 @@ function getAdminSnapshot() {
   }
 
   const nextSnapshot = {
-    adminToken: localStorage.getItem("adminToken") || "",
+    isAdminLoggedIn: localStorage.getItem("isAdminLoggedIn") === "true",
   };
 
-  if (adminSnapshotCache.adminToken === nextSnapshot.adminToken) {
+  if (adminSnapshotCache.isAdminLoggedIn === nextSnapshot.isAdminLoggedIn) {
     return adminSnapshotCache;
   }
 

@@ -7,7 +7,7 @@ import { emitSessionChange } from "../../../lib/clientSession";
 
 export default function Login() {
   const [formData, setFormData] = useState({
-    email: "",
+    identifier: "",
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -44,15 +44,34 @@ export default function Login() {
 
       if (res.ok) {
         localStorage.setItem("isLoggedIn", "true");
-        localStorage.setItem("authToken", data.token || "");
         localStorage.setItem("userName", data.user?.fullName || "");
         localStorage.setItem("userEmail", data.user?.email || "");
+        localStorage.setItem("userPhone", data.user?.phoneNumber || "");
+        localStorage.setItem("username", data.user?.username || "");
         localStorage.setItem("businessName", data.user?.businessName || "");
         localStorage.setItem("businessType", data.user?.businessType || "");
         localStorage.setItem("businessLogo", data.user?.businessLogo || "");
+        localStorage.setItem("role", data.user?.role || "");
+        localStorage.setItem("roleKey", data.user?.roleKey || "");
+        localStorage.setItem("accountType", data.user?.accountType || "owner");
+        localStorage.setItem("ownerId", data.user?.ownerId || "");
+        localStorage.setItem(
+          "assignedBusinesses",
+          JSON.stringify(data.user?.assignedBusinesses || [])
+        );
+        localStorage.setItem(
+          "assignedAllBusinesses",
+          String(data.user?.assignedAllBusinesses === true)
+        );
+        localStorage.setItem(
+          "permissions",
+          JSON.stringify(data.user?.permissions || {})
+        );
         emitSessionChange();
 
-        setTimeout(() => router.replace("/dashboard"), 200);
+        const destination =
+          data.user?.accountType === "staff" ? "/mobile" : "/dashboard";
+        setTimeout(() => router.replace(destination), 200);
       } else {
         setError(data.error || data.message || "Invalid credentials");
       }
@@ -151,16 +170,16 @@ export default function Login() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address
+                  Email or Username
                 </label>
                 <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
+                  type="text"
+                  name="identifier"
+                  value={formData.identifier}
                   onChange={handleChange}
                   required
                   className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700 focus:border-transparent"
-                  placeholder="your@email.com"
+                  placeholder="your@email.com or username"
                 />
               </div>
 

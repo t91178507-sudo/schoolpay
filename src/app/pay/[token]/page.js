@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useParams } from "next/navigation";
 
 const MONNIFY_SDK_SRC = "https://sdk.monnify.com/plugin/monnify.js";
@@ -52,7 +53,6 @@ export default function PaymentPage() {
   const [error, setError] = useState(false);
   const [activeInvoice, setActiveInvoice] = useState(null);
   const [payAmount, setPayAmount] = useState(0);
-  const [copied, setCopied] = useState(false);
   const [copiedPayazaField, setCopiedPayazaField] = useState("");
   const [launchingPayment, setLaunchingPayment] = useState(false);
   const [payazaAccount, setPayazaAccount] = useState(null);
@@ -145,7 +145,7 @@ export default function PaymentPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          token: activeInvoice.token,
+          token,
           invoiceId: activeInvoice._id,
           amount: requestedAmount,
           origin: window.location.origin,
@@ -214,7 +214,7 @@ export default function PaymentPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          token: activeInvoice.token,
+          token,
           invoiceId: activeInvoice._id,
           amount: requestedAmount,
         }),
@@ -248,7 +248,7 @@ export default function PaymentPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          token: activeInvoice.token,
+          token,
           invoiceId: activeInvoice._id,
           paymentReference: payazaAccount.paymentReference,
         }),
@@ -273,13 +273,6 @@ export default function PaymentPage() {
     navigator.clipboard.writeText(String(value));
     setCopiedPayazaField(field);
     setTimeout(() => setCopiedPayazaField(""), 1500);
-  };
-
-  const copyToken = () => {
-    if (!activeInvoice?.token) return;
-    navigator.clipboard.writeText(activeInvoice.token);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
   };
 
   const handlePayAmountChange = (event) => {
@@ -501,9 +494,12 @@ export default function PaymentPage() {
           <div className="px-8 py-6 space-y-4">
             {customer.businessLogo ? (
               <div className="mb-2 flex justify-center">
-                <img
+                <Image
                   src={customer.businessLogo}
                   alt={customer.businessName || "Business logo"}
+                  width={64}
+                  height={64}
+                  unoptimized
                   className="h-16 w-16 rounded-2xl object-cover"
                 />
               </div>
@@ -522,22 +518,6 @@ export default function PaymentPage() {
                   ? new Date(activeInvoice.dueDate).toLocaleDateString()
                   : "-"
               }
-            />
-            <DetailRow
-              label="Invoice token"
-              value={
-                <button
-                  onClick={copyToken}
-                  className="font-mono text-[13px] text-slate-700 bg-slate-50 border border-slate-200 rounded-md px-2 py-1 hover:bg-slate-100 transition-colors"
-                  title="Click to copy"
-                >
-                  {activeInvoice.token}
-                  <span className="ml-2 text-slate-400">
-                    {copied ? "Copied" : "Copy"}
-                  </span>
-                </button>
-              }
-              align="top"
             />
           </div>
 
