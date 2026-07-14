@@ -784,15 +784,15 @@ function PayazaPaymentModal({
   const formattedAmount = amountPayable.toLocaleString();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-3 py-3 backdrop-blur-sm sm:px-4 sm:py-6">
       <div className="max-h-[calc(100vh-1.5rem)] w-full max-w-md overflow-hidden rounded-[28px] bg-white shadow-2xl dark:bg-slate-900 sm:max-h-[calc(100vh-3rem)]">
-        <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6 sm:py-5">
+        <div className="border-b border-slate-100 px-5 py-3 dark:border-slate-800 sm:px-6 sm:py-5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
                 PayAza transfer
               </p>
-              <h2 className="mt-1 text-[1.85rem] font-semibold leading-tight text-slate-900 dark:text-slate-100 sm:text-xl">
+              <h2 className="mt-1 text-[1.55rem] font-semibold leading-tight text-slate-900 dark:text-slate-100 sm:text-xl">
                 Complete your payment
               </h2>
             </div>
@@ -805,21 +805,21 @@ function PayazaPaymentModal({
               x
             </button>
           </div>
-          <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
+          <p className="mt-2 text-[0.95rem] leading-7 text-slate-500 dark:text-slate-400 sm:text-sm sm:leading-6">
             Transfer the exact amount to the temporary account below. PayAza will confirm the payment automatically.
           </p>
         </div>
 
-        <div className="max-h-[calc(100vh-10rem)] space-y-4 overflow-y-auto px-5 py-4 sm:max-h-[calc(100vh-12rem)] sm:px-6 sm:py-5">
-          <div className="rounded-2xl bg-slate-950 px-4 py-4 text-white sm:px-5">
+        <div className="max-h-[calc(100vh-10rem)] space-y-3 overflow-y-auto px-5 py-3 sm:max-h-[calc(100vh-12rem)] sm:px-6 sm:py-5">
+          <div className="rounded-2xl bg-slate-950 px-4 py-3 text-white sm:px-5 sm:py-4">
             <p className="text-xs uppercase tracking-wide text-slate-400">Amount to transfer</p>
-            <p className="mt-1 break-words text-[2.2rem] font-semibold leading-none tabular-nums sm:text-3xl">
+            <p className="mt-1 break-words text-[2rem] font-semibold leading-none tabular-nums sm:text-3xl">
               N{formattedAmount}
             </p>
           </div>
 
           <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <DetailRow label="Bank" value={account.bankName || "-"} align="top" />
               <DetailRow label="Account name" value={account.accountName || "-"} align="top" />
               <DetailRow label="Expires" value={`${account.expiresInMinutes || 30} minutes`} />
@@ -829,16 +829,16 @@ function PayazaPaymentModal({
           <button
             type="button"
             onClick={() => onCopy("accountNumber", account.accountNumber)}
-            className="w-full rounded-2xl border-2 border-emerald-500 bg-emerald-50 px-4 py-4 text-left shadow-sm transition hover:bg-emerald-100 dark:border-emerald-400 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/70 sm:px-5"
+            className="w-full rounded-2xl border-2 border-emerald-500 bg-emerald-50 px-4 py-3 text-left shadow-sm transition hover:bg-emerald-100 dark:border-emerald-400 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/70 sm:px-5 sm:py-4"
           >
             <span className="block text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
               Account number
             </span>
-            <span className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <span className="break-all font-mono text-[1.8rem] font-black leading-none tracking-[0.14em] text-emerald-950 dark:text-emerald-50 sm:text-2xl">
+            <span className="mt-2 flex flex-col gap-2 min-[430px]:flex-row min-[430px]:items-center min-[430px]:justify-between">
+              <span className="break-all font-mono text-[1.8rem] font-black leading-none tracking-[0.14em] text-emerald-950 dark:text-emerald-50 min-[430px]:text-[1.6rem] sm:text-2xl">
                 {account.accountNumber || "-"}
               </span>
-              <span className="inline-flex w-fit shrink-0 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white">
+              <span className="inline-flex w-fit shrink-0 self-start rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white min-[430px]:self-auto">
                 {copiedField === "accountNumber" ? "Copied" : "Copy"}
               </span>
             </span>
@@ -848,14 +848,14 @@ function PayazaPaymentModal({
             type="button"
             onClick={onVerify}
             disabled={verifying}
-            className="w-full rounded-xl bg-slate-900 py-3.5 text-[15px] font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="w-full rounded-xl bg-slate-900 py-3 text-[15px] font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 sm:py-3.5"
           >
             {verifying ? "Checking payment..." : "I have made the transfer"}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="w-full rounded-xl border border-slate-300 bg-white py-3 text-[14px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="w-full rounded-xl border border-slate-300 bg-white py-2.5 text-[14px] font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:py-3"
           >
             Back to invoice
           </button>
