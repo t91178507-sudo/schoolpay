@@ -271,22 +271,22 @@ function PayazaPaymentModal({
   const amountPayable = Number(account.amountPayable || amount || 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-6 backdrop-blur-sm">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
-        <div className="border-b border-slate-100 px-5 py-5 dark:border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
+      <div className="max-h-[calc(100vh-1.5rem)] w-full max-w-md overflow-hidden rounded-[28px] bg-white shadow-2xl dark:bg-slate-900 sm:max-h-[calc(100vh-3rem)]">
+        <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:py-5">
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
                 PayAza transfer
               </p>
-              <h2 className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">
+              <h2 className="mt-1 text-2xl font-semibold leading-tight text-slate-900 dark:text-slate-100 sm:text-xl">
                 Complete your payment
               </h2>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 text-base font-medium text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 sm:h-9 sm:w-9"
               aria-label="Close PayAza payment"
             >
               x
@@ -297,12 +297,12 @@ function PayazaPaymentModal({
           </p>
         </div>
 
-        <div className="space-y-4 px-5 py-5">
-          <div className="rounded-2xl bg-slate-950 px-5 py-4 text-white">
+        <div className="max-h-[calc(100vh-10rem)] space-y-4 overflow-y-auto px-5 py-4 sm:max-h-[calc(100vh-12rem)] sm:py-5">
+          <div className="rounded-2xl bg-slate-950 px-4 py-4 text-white sm:px-5">
             <p className="text-xs uppercase tracking-wide text-slate-400">
               Amount to transfer
             </p>
-            <p className="mt-1 text-3xl font-semibold tabular-nums">
+            <p className="mt-1 break-words text-[2rem] font-semibold leading-none tabular-nums sm:text-3xl">
               N{amountPayable.toLocaleString()}
             </p>
           </div>
@@ -318,16 +318,16 @@ function PayazaPaymentModal({
           <button
             type="button"
             onClick={() => onCopy("accountNumber", account.accountNumber)}
-            className="w-full rounded-2xl border-2 border-emerald-500 bg-emerald-50 px-5 py-4 text-left shadow-sm transition hover:bg-emerald-100 dark:border-emerald-400 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/70"
+            className="w-full rounded-2xl border-2 border-emerald-500 bg-emerald-50 px-4 py-4 text-left shadow-sm transition hover:bg-emerald-100 dark:border-emerald-400 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/70 sm:px-5"
           >
             <span className="block text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
               Account number
             </span>
-            <span className="mt-1 flex items-center justify-between gap-3">
-              <span className="break-all font-mono text-2xl font-black tracking-wide text-emerald-950 dark:text-emerald-50">
+            <span className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="break-all font-mono text-[2rem] font-black leading-none tracking-[0.18em] text-emerald-950 dark:text-emerald-50 sm:text-2xl">
                 {account.accountNumber || "-"}
               </span>
-              <span className="shrink-0 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-bold text-white">
+              <span className="inline-flex w-fit shrink-0 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white">
                 {copiedField === "accountNumber" ? "Copied" : "Copy"}
               </span>
             </span>
