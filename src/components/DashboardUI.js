@@ -3,8 +3,8 @@
 import { useRef } from "react";
 import { FiCalendar } from "react-icons/fi";
 
-export function PageShell({ children }) {
-  return <div className="space-y-8">{children}</div>;
+export function PageShell({ children, className = "" }) {
+  return <div className={`space-y-8 ${className}`.trim()}>{children}</div>;
 }
 
 export function PageHeader({ title, description, actions }) {
@@ -29,7 +29,15 @@ export function StatGrid({ children, className = "" }) {
   );
 }
 
-export function StatCard({ label, value, hint, tone = "slate" }) {
+export function StatCard({
+  label,
+  value,
+  hint,
+  tone = "slate",
+  className = "",
+  labelClassName = "",
+  valueClassName = "",
+}) {
   const toneMap = {
     slate: "text-slate-900 dark:text-white",
     emerald: "text-emerald-600",
@@ -39,9 +47,13 @@ export function StatCard({ label, value, hint, tone = "slate" }) {
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <p className="text-sm text-slate-500 dark:text-slate-400">{label}</p>
-      <p className={`mt-3 text-4xl font-semibold ${toneMap[tone] || toneMap.slate}`}>
+    <div
+      className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 ${className}`.trim()}
+    >
+      <p className={`text-sm text-slate-500 dark:text-slate-400 ${labelClassName}`.trim()}>{label}</p>
+      <p
+        className={`mt-3 text-4xl font-semibold ${toneMap[tone] || toneMap.slate} ${valueClassName}`.trim()}
+      >
         {value}
       </p>
       {hint ? <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">{hint}</p> : null}

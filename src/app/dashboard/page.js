@@ -1,10 +1,19 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  PageHeader,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
   PageShell,
   StatCard,
   StatGrid,
@@ -27,6 +36,75 @@ async function readJsonSafely(response, fallback) {
   }
 }
 
+function formatCurrency(value) {
+  return `N${Number(value || 0).toLocaleString()}`;
+}
+
+function getCurrentYearMonthlyCollections(invoices = []) {
+  const currentYear = new Date().getFullYear();
+  const monthLabels = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+
+  const totals = new Array(12).fill(0);
+
+  invoices.forEach((invoice) => {
+    const rawDate = invoice.paidAt || invoice.paymentConfirmedAt || invoice.updatedAt || invoice.date;
+    const date = rawDate ? new Date(rawDate) : null;
+
+    if (!date || Number.isNaN(date.getTime()) || date.getFullYear() !== currentYear) {
+      return;
+    }
+
+    const amount = Number(invoice.paidAmount || invoice.amountPaid || 0);
+    totals[date.getMonth()] += amount;
+  });
+
+  return monthLabels.map((label, index) => ({
+    label,
+    value: totals[index],
+  }));
+}
+
+function getLastFiveYearsCollections(invoices = []) {
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 5 }, (_, index) => currentYear - 4 + index);
+  const totals = Object.fromEntries(years.map((year) => [year, 0]));
+
+  invoices.forEach((invoice) => {
+    const rawDate = invoice.paidAt || invoice.paymentConfirmedAt || invoice.updatedAt || invoice.date;
+    const date = rawDate ? new Date(rawDate) : null;
+
+    if (!date || Number.isNaN(date.getTime())) {
+      return;
+    }
+
+    const year = date.getFullYear();
+    if (!(year in totals)) {
+      return;
+    }
+
+    const amount = Number(invoice.paidAmount || invoice.amountPaid || 0);
+    totals[year] += amount;
+  });
+
+  return years.map((year) => ({
+    label: String(year),
+    value: totals[year],
+  }));
+}
+
 export default function Dashboard() {
   const session = useBusinessSession();
   const customerLabels = getCustomerLabels(session.businessType);
@@ -37,33 +115,21 @@ export default function Dashboard() {
     paidInvoices: 0,
     incompleteInvoices: 0,
   });
+  const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentTime, setCurrentTime] = useState(null);
-  const [whatsAppStatus, setWhatsAppStatus] = useState({
-    connected: false,
-    label: "Disconnected",
-    number: "",
-    status: "",
-    qrConnectUrl: "",
-    qrDataUrl: "",
-    lastError: "",
-  });
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [customersRes, invoicesRes, whatsAppRes] = await Promise.all([
+        const [customersRes, invoicesRes] = await Promise.all([
           authFetch("/api/customers"),
           authFetch("/api/invoices"),
-          authFetch("/api/notifications/whatsapp/bridge/status").catch(() => null),
         ]);
 
         const customers = await readJsonSafely(customersRes, []);
         const invoices = await readJsonSafely(invoicesRes, []);
-        const whatsAppData = await readJsonSafely(whatsAppRes, null);
-        const bridgeStatus = whatsAppData?.status || {};
-        const connected = whatsAppData?.bridgeReachable === true && bridgeStatus.status === "ready";
 
         const expectedRevenue = invoices.reduce(
           (sum, inv) => sum + Number(inv.amount || 0),
@@ -85,15 +151,7 @@ export default function Dashboard() {
           paidInvoices: paid,
           incompleteInvoices: incomplete,
         });
-        setWhatsAppStatus({
-          connected,
-          label: connected ? "Connected" : "Disconnected",
-          number: connected ? bridgeStatus.connectedNumber || "" : "",
-          status: bridgeStatus.status || "",
-          qrConnectUrl: bridgeStatus.qrConnectUrl || "",
-          qrDataUrl: bridgeStatus.qrDataUrl || "",
-          lastError: bridgeStatus.lastError || "",
-        });
+        setInvoices(Array.isArray(invoices) ? invoices : []);
       } catch (err) {
         console.error(err);
         setError("Failed to load dashboard data");
@@ -124,6 +182,15 @@ export default function Dashboard() {
       minute: "2-digit",
     }) || "";
 
+  const monthlyCollections = useMemo(
+    () => getCurrentYearMonthlyCollections(invoices),
+    [invoices]
+  );
+  const yearlyCollections = useMemo(
+    () => getLastFiveYearsCollections(invoices),
+    [invoices]
+  );
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -152,103 +219,179 @@ export default function Dashboard() {
   }
 
   return (
-    <PageShell>
-      <PageHeader
-        title={`Welcome, ${session.businessName || "Your Business"}`}
-        description={currentTime ? `${formattedDate} | ${formattedTime}` : ""}
-      />
+    <PageShell className="flex min-h-full flex-col space-y-3">
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-white lg:text-[2rem]">
+          Welcome, {session.businessName || "Your Business"}
+        </h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          {currentTime ? `${formattedDate} | ${formattedTime}` : ""}
+        </p>
+      </div>
 
-      <StatGrid>
-        <StatCard label={`Total ${customerLabels.pluralTitle}`} value={stats.totalCustomers} tone="blue" />
+      <StatGrid className="gap-3 xl:grid-cols-5">
+        <StatCard
+          label={`Total ${customerLabels.pluralTitle}`}
+          value={stats.totalCustomers}
+          tone="blue"
+          className="p-3.5"
+          labelClassName="text-xs"
+          valueClassName="mt-2 text-3xl"
+        />
         <StatCard
           label="Expected Revenue"
           value={`N${stats.expectedRevenue.toLocaleString()}`}
           tone="violet"
+          className="p-3.5"
+          labelClassName="text-xs"
+          valueClassName="mt-2 text-3xl"
         />
         <StatCard
           label="Collected Revenue"
           value={`N${stats.totalRevenue.toLocaleString()}`}
           tone="emerald"
+          className="p-3.5"
+          labelClassName="text-xs"
+          valueClassName="mt-2 text-3xl"
         />
-        <StatCard label="Paid Invoices" value={stats.paidInvoices} tone="emerald" />
-        <StatCard label="Incomplete Invoices" value={stats.incompleteInvoices} tone="blue" />
+        <StatCard
+          label="Paid Invoices"
+          value={stats.paidInvoices}
+          tone="emerald"
+          className="p-3.5"
+          labelClassName="text-xs"
+          valueClassName="mt-2 text-3xl"
+        />
+        <StatCard
+          label="Incomplete Invoices"
+          value={stats.incompleteInvoices}
+          tone="blue"
+          className="p-3.5"
+          labelClassName="text-xs"
+          valueClassName="mt-2 text-3xl"
+        />
       </StatGrid>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <SurfaceCard className="p-6 xl:col-span-2">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Collections snapshot</h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            InvoiceHub is now tracking invoices, QR payment sessions, and confirmation states in one workflow. Use the history pages to monitor payment completion and notification readiness.
-          </p>
-          {!whatsAppStatus.connected ? (
-            <div className="mt-5">
-              {whatsAppStatus.qrDataUrl ? (
-                <div className="inline-flex overflow-hidden rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900">
-                  <Image
-                    src={whatsAppStatus.qrDataUrl}
-                    alt="WhatsApp QR code"
-                    width={160}
-                    height={160}
-                    unoptimized
-                    className="h-40 w-40"
-                  />
-                </div>
-              ) : (
-                <Link
-                  href="/dashboard/settings"
-                  className="mt-4 inline-flex rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-700"
-                >
-                  Open WhatsApp settings
-                </Link>
-              )}
+      <div className="grid flex-1 gap-3 xl:min-h-0 xl:grid-cols-2 xl:auto-rows-fr">
+        <SurfaceCard className="overflow-hidden border border-slate-200/70 bg-white/95 p-0 shadow-[0_24px_60px_-32px_rgba(15,23,42,0.35)] dark:border-slate-800 dark:bg-slate-950/80 xl:flex xl:h-full xl:flex-col">
+          <div className="border-b border-slate-200/80 bg-gradient-to-r from-slate-50 to-white px-4 py-3 dark:border-slate-800 dark:from-slate-950 dark:to-slate-900">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+              Collections overview
+            </p>
+            <div className="mt-2 flex items-end justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-950 dark:text-white lg:text-base">
+                  Current year monthly collections
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Paid invoice inflow month by month.
+                </p>
+              </div>
+              <p className="text-right text-xs font-medium text-slate-500">
+                {formatCurrency(stats.totalRevenue)}
+              </p>
             </div>
-          ) : null}
+          </div>
+          <div className="h-[240px] px-2 py-2.5 sm:px-3 xl:h-[calc(100%-78px)]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthlyCollections} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
+                <defs>
+                  <linearGradient id="monthlyRevenueFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#2563eb" stopOpacity="1" />
+                    <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.78" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="4 4" />
+                <XAxis
+                  dataKey="label"
+                    tick={{ fill: "#64748b", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval={0}
+                  />
+                <YAxis
+                  tickFormatter={(value) => Number(value).toLocaleString()}
+                  tick={{ fill: "#64748b", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={64}
+                />
+                <Tooltip
+                  cursor={{ fill: "rgba(148, 163, 184, 0.08)" }}
+                  formatter={(value) => [formatCurrency(value), "Collected"]}
+                  contentStyle={{
+                    borderRadius: 16,
+                    border: "1px solid #dbeafe",
+                    backgroundColor: "#ffffff",
+                    boxShadow: "0 20px 45px -30px rgba(15, 23, 42, 0.45)",
+                  }}
+                />
+                  <Bar dataKey="value" radius={[12, 12, 4, 4]} maxBarSize={30}>
+                  {monthlyCollections.map((entry, index) => (
+                    <Cell
+                      key={`${entry.label}-${index}`}
+                      fill={entry.value > 0 ? "url(#monthlyRevenueFill)" : "#e2e8f0"}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </SurfaceCard>
 
-        <SurfaceCard className="p-6">
-          <div className="space-y-3 text-sm">
-            <div className="rounded-xl border border-slate-200 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                WhatsApp connection
+        <SurfaceCard className="overflow-hidden border border-slate-200/70 bg-white/95 p-0 shadow-[0_24px_60px_-32px_rgba(15,23,42,0.35)] dark:border-slate-800 dark:bg-slate-950/80 xl:flex xl:h-full xl:flex-col">
+          <div className="border-b border-slate-200/80 bg-gradient-to-r from-slate-50 to-white px-4 py-3 dark:border-slate-800 dark:from-slate-950 dark:to-slate-900">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+              Trend line
+            </p>
+            <div className="mt-2">
+              <h2 className="text-sm font-semibold text-slate-950 dark:text-white lg:text-base">
+                Last five years
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Revenue trend across recent financial years.
               </p>
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <span
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-                    whatsAppStatus.connected
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-red-100 text-red-700"
-                  }`}
-                >
-                  {whatsAppStatus.label}
-                </span>
-                {whatsAppStatus.number ? (
-                  <span className="text-xs text-slate-500">{whatsAppStatus.number}</span>
-                ) : null}
-              </div>
-              {!whatsAppStatus.connected && whatsAppStatus.status ? (
-                <p className="mt-2 text-xs text-slate-500">
-                  Bridge status: {whatsAppStatus.status}
-                </p>
-              ) : null}
             </div>
-            <QuickLink href="/dashboard/invoices" label="Manage invoices" />
-            <QuickLink href="/dashboard/payments" label="Open payment history" />
-            <QuickLink href="/dashboard/receipts" label="Receipt validation" />
+          </div>
+          <div className="h-[240px] px-3 py-2.5 sm:px-3 xl:h-[calc(100%-78px)]">
+            <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={yearlyCollections} margin={{ top: 12, right: 16, left: 8, bottom: 8 }}>
+                <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="4 4" />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: "#64748b", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tickFormatter={(value) => Number(value).toLocaleString()}
+                  tick={{ fill: "#64748b", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={72}
+                />
+                <Tooltip
+                  formatter={(value) => [formatCurrency(value), "Collected"]}
+                  contentStyle={{
+                    borderRadius: 16,
+                    border: "1px solid #ccfbf1",
+                    backgroundColor: "#ffffff",
+                    boxShadow: "0 20px 45px -30px rgba(15, 23, 42, 0.45)",
+                  }}
+                />
+                <Line
+                  type="linear"
+                  dataKey="value"
+                  stroke="#0f766e"
+                  strokeWidth={2.5}
+                  dot={{ r: 3, strokeWidth: 2, fill: "#ffffff", stroke: "#0f766e" }}
+                  activeDot={{ r: 5, strokeWidth: 2, fill: "#ffffff", stroke: "#0f766e" }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </SurfaceCard>
       </div>
     </PageShell>
-  );
-}
-
-function QuickLink({ href, label }) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-    >
-      <span>{label}</span>
-      <span className="text-slate-400">Open</span>
-    </Link>
   );
 }
