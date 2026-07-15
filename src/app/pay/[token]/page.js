@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 
@@ -67,6 +67,8 @@ export default function PaymentPage() {
   const [sdkReady, setSdkReady] = useState(
     () => typeof window !== "undefined" && Boolean(window.MonnifySDK)
   );
+  const payazaVerifyInFlight = useRef(false);
+  const autoCheckingPayaza = Boolean(activeInvoice && payazaAccount?.paymentReference);
 
   const openInvoice = (invoice) => {
     setActiveInvoice(invoice);
@@ -239,9 +241,16 @@ export default function PaymentPage() {
     }
   };
 
-  const verifyPayazaPayment = async () => {
-    if (!activeInvoice || !payazaAccount?.paymentReference) return;
-    setVerifyingPayaza(true);
+  const verifyPayazaPayment = useCallback(async ({ silent = false } = {}) => {
+    if (!activeInvoice || !payazaAccount?.paymentReference || payazaVerifyInFlight.current) {
+      return false;
+    }
+
+    payazaVerifyInFlight.current = true;
+
+    if (!silent) {
+      setVerifyingPayaza(true);
+    }
 
     try {
       const res = await fetch("/api/payaza/verify", {
@@ -259,13 +268,44 @@ export default function PaymentPage() {
         throw new Error(data.error || "Payment is not complete yet");
       }
 
-      window.location.reload();
+      const params = new URLSearchParams({
+        paymentReference: payazaAccount.paymentReference,
+        invoiceId: activeInvoice._id,
+      });
+
+      window.location.href = `/pay/success/${token}?${params.toString()}`;
+      return true;
     } catch (err) {
-      alert(err.message || "Payment is not complete yet");
+      if (!silent) {
+        alert(err.message || "Payment is not complete yet");
+      }
+      return false;
     } finally {
-      setVerifyingPayaza(false);
+      payazaVerifyInFlight.current = false;
+      if (!silent) {
+        setVerifyingPayaza(false);
+      }
     }
-  };
+  }, [activeInvoice, payazaAccount, token]);
+
+  useEffect(() => {
+    if (!activeInvoice || !payazaAccount?.paymentReference) {
+      return undefined;
+    }
+
+    const firstCheck = window.setTimeout(() => {
+      verifyPayazaPayment({ silent: true });
+    }, 4000);
+
+    const intervalId = window.setInterval(() => {
+      verifyPayazaPayment({ silent: true });
+    }, 5000);
+
+    return () => {
+      window.clearTimeout(firstCheck);
+      window.clearInterval(intervalId);
+    };
+  }, [activeInvoice, payazaAccount, verifyPayazaPayment]);
 
   const copyPayazaValue = (field, value) => {
     if (!value) return;
@@ -618,6 +658,7 @@ export default function PaymentPage() {
           onCopy={copyPayazaValue}
           copiedField={copiedPayazaField}
           verifying={verifyingPayaza}
+          autoChecking={autoCheckingPayaza}
         />
       )}
       {receiptFormOpen && (
@@ -779,6 +820,7 @@ function PayazaPaymentModal({
   onCopy,
   copiedField,
   verifying,
+  autoChecking,
 }) {
   const amountPayable = Number(account.amountPayable || amount || 0);
   const formattedAmount = amountPayable.toLocaleString();
@@ -847,11 +889,18 @@ function PayazaPaymentModal({
           <button
             type="button"
             onClick={onVerify}
-            disabled={verifying}
+            disabled={verifying || autoChecking}
             className="w-full rounded-xl bg-slate-900 py-2.5 text-[14px] font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 sm:py-3.5 sm:text-[15px]"
           >
-            {verifying ? "Checking payment..." : "I have made the transfer"}
+            {verifying
+              ? "Checking payment..."
+              : autoChecking
+                ? "Waiting for automatic confirmation..."
+                : "I have made the transfer"}
           </button>
+          <p className="text-center text-[12px] leading-5 text-slate-500 dark:text-slate-400">
+            We are checking for payment automatically. This page will continue once the transfer is confirmed.
+          </p>
           <button
             type="button"
             onClick={onClose}

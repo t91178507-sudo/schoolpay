@@ -216,6 +216,123 @@ export async function fetchWhatsAppWebStatus(config = {}) {
   );
 }
 
+export async function fetchWhatsAppWebBridgeOverview(config = {}) {
+  assertReachableWhatsAppBridgeConfig(config);
+
+  return fetchBridgeJson(
+    `${config.bridgeBaseUrl}/health`,
+    {
+      method: "GET",
+      headers: buildBridgeHeaders(config),
+      cache: "no-store",
+    },
+    1500
+  );
+}
+
+export function buildLocalWhatsAppWebFallbackConfig(config = {}) {
+  const bridgeBaseUrl = "http://localhost:8787";
+  const sessionName = config.sessionName || "invoicehub-scan";
+
+  return {
+    ...config,
+    bridgeBaseUrl,
+    apiKey: config.apiKey || "invoicehub-bridge-local",
+    qrConnectUrl: `${bridgeBaseUrl}/qr?sessionName=${encodeURIComponent(sessionName)}`,
+  };
+}
+
+export function chooseBestWhatsAppWebSession(sessions = [], config = {}) {
+  if (!Array.isArray(sessions) || sessions.length === 0) {
+    return null;
+  }
+
+  const normalizedConnected = String(config.senderPhoneNumber || "").trim();
+
+  const rankSession = (session = {}) => {
+    let score = 0;
+
+    if (session.sessionName === config.sessionName) {
+      score += 100;
+    }
+
+    if (session.status === "ready") {
+      score += 60;
+    } else if (session.status === "pairing_code") {
+      score += 35;
+    } else if (session.status === "authenticated" || session.status === "loading") {
+      score += 20;
+    }
+
+    if (
+      normalizedConnected &&
+      session.connectedNumber &&
+      String(session.connectedNumber).trim() === normalizedConnected
+    ) {
+      score += 50;
+    }
+
+    if (
+      normalizedConnected &&
+      session.pairingPhoneNumber &&
+      String(session.pairingPhoneNumber).trim() === normalizedConnected
+    ) {
+      score += 25;
+    }
+
+    return score;
+  };
+
+  return [...sessions]
+    .sort((a, b) => rankSession(b) - rankSession(a))
+    .find((session) => rankSession(session) > 0) || null;
+}
+
+async function resolveBridgeConfigCandidate(config = {}) {
+  const overview = await fetchWhatsAppWebBridgeOverview(config);
+  const sessions = Array.isArray(overview?.sessions) ? overview.sessions : [];
+  const preferredSession = chooseBestWhatsAppWebSession(sessions, config);
+
+  if (!preferredSession?.sessionName || preferredSession.sessionName === config.sessionName) {
+    return config;
+  }
+
+  return {
+    ...config,
+    sessionName: preferredSession.sessionName,
+    qrConnectUrl: `${config.bridgeBaseUrl}/qr?sessionName=${encodeURIComponent(
+      preferredSession.sessionName
+    )}`,
+    senderPhoneNumber:
+      preferredSession.connectedNumber || config.senderPhoneNumber || "",
+  };
+}
+
+export async function resolveActiveWhatsAppWebConfig(config = {}) {
+  assertReachableWhatsAppBridgeConfig(config);
+
+  const candidates = [config];
+
+  if (
+    process.env.NODE_ENV !== "production" &&
+    !isLocalWhatsAppBridgeUrl(config.bridgeBaseUrl)
+  ) {
+    candidates.unshift(buildLocalWhatsAppWebFallbackConfig(config));
+  }
+
+  let lastError = null;
+
+  for (const candidate of candidates) {
+    try {
+      return await resolveBridgeConfigCandidate(candidate);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("WhatsApp Web bridge is offline");
+}
+
 export async function fetchWhatsAppWebQr(config = {}) {
   assertReachableWhatsAppBridgeConfig(config);
 

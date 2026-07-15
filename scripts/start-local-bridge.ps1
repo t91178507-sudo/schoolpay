@@ -5,6 +5,11 @@ $bridgeRoot = Join-Path $repoRoot "whatsapp-bridge"
 $healthUrl = "http://localhost:8787/health"
 $outLog = Join-Path $bridgeRoot "bridge-out.log"
 $errLog = Join-Path $bridgeRoot "bridge-err.log"
+$edgeCandidates = @(
+  "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+  "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+)
+$edgePath = $edgeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 
 function Test-BridgeHealth {
   try {
@@ -22,6 +27,10 @@ if (-not (Test-Path $bridgeRoot)) {
 if (Test-BridgeHealth) {
   Write-Output "InvoiceHub WhatsApp bridge is already running at $healthUrl"
   exit 0
+}
+
+if ($edgePath) {
+  $env:WHATSAPP_BRIDGE_BROWSER_PATH = $edgePath
 }
 
 Start-Process `

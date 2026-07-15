@@ -4,12 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import { FiCheckCircle, FiMessageCircle, FiTrash2 } from "react-icons/fi";
 import {
   EmptyState,
+  InputField,
   PageHeader,
   PageShell,
+  SelectField,
   StatCard,
   StatGrid,
   StatusBadge,
   SurfaceCard,
+  Toolbar,
 } from "../../../components/DashboardUI";
 import { authFetch } from "../../../lib/authFetch";
 import { getCustomerLabels } from "../../../lib/businessLabels";
@@ -114,26 +117,29 @@ function buildWhatsAppInvoiceMessage(invoice, origin, customerLabel = "Customer"
   ].join("\n");
 }
 
-function openBrowserWhatsApp(invoice, origin, customerLabel) {
+function openBrowserWhatsApp(invoice, origin, customerLabel, notify) {
   const phone = normalizePhoneForWhatsApp(invoice.phone);
 
   if (!phone) {
-    alert("No valid WhatsApp phone number.");
+    notify?.("error", "No valid WhatsApp phone number.");
     return false;
   }
 
   const message = buildWhatsAppInvoiceMessage(invoice, origin, customerLabel);
   const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-  openExternalTab(whatsappUrl);
+  openExternalTab(whatsappUrl, notify);
 
   return true;
 }
 
-function openExternalTab(url) {
+function openExternalTab(url, notify) {
   const opened = window.open(url, "_blank", "noopener,noreferrer");
 
   if (!opened) {
-    alert("Your browser blocked the WhatsApp tab. Please allow pop-ups for InvoiceHub and try again.");
+    notify?.(
+      "error",
+      "Your browser blocked the WhatsApp tab. Please allow pop-ups for InvoiceHub and try again."
+    );
     return false;
   }
 
@@ -146,10 +152,27 @@ export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
   const [recurringInvoices, setRecurringInvoices] = useState([]);
   const [activePage, setActivePage] = useState("invoices");
-  const [invoiceSearch, setInvoiceSearch] = useState("");
-  const [selectedInvoiceCategory, setSelectedInvoiceCategory] = useState("all");
+  const [invoiceFilterForm, setInvoiceFilterForm] = useState({
+    search: "",
+    category: "all",
+    provider: "all",
+    status: "all",
+    notification: "all",
+    dateFrom: "",
+    dateTo: "",
+  });
+  const [invoiceFilters, setInvoiceFilters] = useState({
+    search: "",
+    category: "all",
+    provider: "all",
+    status: "all",
+    notification: "all",
+    dateFrom: "",
+    dateTo: "",
+  });
   const [recurringSearch, setRecurringSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState({ tone: "", text: "" });
   const [recurringLoading, setRecurringLoading] = useState(false);
   const [recurringLoaded, setRecurringLoaded] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
@@ -203,6 +226,10 @@ export default function Invoices() {
     }
   }, [activePage, recurringLoaded, recurringLoading, loadRecurringInvoices]);
 
+  const showNotice = useCallback((tone, text) => {
+    setNotice({ tone, text });
+  }, []);
+
   const markPaid = async (id) => {
     setInvoices((prev) =>
       prev.map((inv) => (String(inv._id) === String(id) ? { ...inv, status: "Paid" } : inv))
@@ -240,12 +267,12 @@ export default function Invoices() {
 
   const shareWhatsApp = async (invoice) => {
   if (!invoice.phone) {
-    alert("No phone number");
+    showNotice("error", "No phone number.");
     return;
   }
 
   if (!invoice.token && !invoice.paymentUrl && !invoice.paymentLink && !invoice.checkoutUrl) {
-    alert("This invoice does not have a payment link yet");
+    showNotice("error", "This invoice does not have a payment link yet.");
     return;
   }
 
@@ -268,7 +295,8 @@ export default function Invoices() {
       This covers cases where the WhatsApp bridge/provider is unavailable.
     */
     if (data?.delivery?.fallbackUrl) {
-      openExternalTab(data.delivery.fallbackUrl);
+      openExternalTab(data.delivery.fallbackUrl, showNotice);
+      showNotice("info", "WhatsApp Web was unavailable, so the message was opened in a browser tab.");
 
       return;
     }
@@ -277,7 +305,7 @@ export default function Invoices() {
       If backend failed, automatically fall back to browser WhatsApp.
     */
     if (!res.ok) {
-      openBrowserWhatsApp(invoice, origin, customerLabels.singularTitle);
+      openBrowserWhatsApp(invoice, origin, customerLabels.singularTitle, showNotice);
       return;
     }
 
@@ -292,19 +320,22 @@ export default function Invoices() {
         ""
     ).toLowerCase();
 
-    const bridgeWorked = ["sent", "delivered", "success", "prepared"].includes(deliveryStatus);
+    const bridgeWorked =
+      data?.delivery?.sent === true ||
+      data?.delivery?.provider === "whatsappWeb" ||
+      ["sent", "delivered", "success", "prepared"].includes(deliveryStatus);
 
     if (!bridgeWorked) {
-      openBrowserWhatsApp(invoice, origin, customerLabels.singularTitle);
+      openBrowserWhatsApp(invoice, origin, customerLabels.singularTitle, showNotice);
       return;
     }
 
-    alert("Sent.");
+    showNotice("success", "Sent.");
   } catch {
     /*
       Network/server error: automatically open browser WhatsApp.
     */
-    openBrowserWhatsApp(invoice, origin, customerLabels.singularTitle);
+    openBrowserWhatsApp(invoice, origin, customerLabels.singularTitle, showNotice);
   }
 };
 
@@ -356,6 +387,32 @@ export default function Invoices() {
       ...current,
       [field]: value,
     }));
+  };
+
+  const updateInvoiceFilterForm = (field, value) => {
+    setInvoiceFilterForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const applyInvoiceFilters = () => {
+    setInvoiceFilters(invoiceFilterForm);
+  };
+
+  const resetInvoiceFilters = () => {
+    const defaults = {
+      search: "",
+      category: "all",
+      provider: "all",
+      status: "all",
+      notification: "all",
+      dateFrom: "",
+      dateTo: "",
+    };
+
+    setInvoiceFilterForm(defaults);
+    setInvoiceFilters(defaults);
   };
 
   const createRecurringInvoice = async (event) => {
@@ -472,13 +529,51 @@ export default function Invoices() {
       actionableInvoices.map((invoice) => invoice.category || invoice.class || "Uncategorized")
     )
   ).sort((a, b) => a.localeCompare(b));
+  const invoiceProviderOptions = Array.from(
+    new Set(
+      actionableInvoices
+        .map((invoice) => invoice.paymentProvider || invoice.pendingPaymentProvider || "Not started")
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+  const invoiceStatusOptions = Array.from(
+    new Set(actionableInvoices.map((invoice) => invoice.status || "Unpaid").filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+  const notificationStatusOptions = Array.from(
+    new Set(
+      actionableInvoices
+        .map((invoice) => normalizeNotificationStatus(invoice.customerNotificationStatus))
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
   const filteredActionableInvoices = actionableInvoices.filter((invoice) => {
     const invoiceCategory = invoice.category || invoice.class || "Uncategorized";
+    const paymentProvider =
+      invoice.paymentProvider || invoice.pendingPaymentProvider || "Not started";
+    const invoiceStatus = invoice.status || "Unpaid";
+    const notificationStatus = normalizeNotificationStatus(invoice.customerNotificationStatus);
+    const invoiceDate = invoice.date ? new Date(invoice.date) : null;
+    const dateFrom = invoiceFilters.dateFrom ? new Date(`${invoiceFilters.dateFrom}T00:00:00`) : null;
+    const dateTo = invoiceFilters.dateTo ? new Date(`${invoiceFilters.dateTo}T23:59:59`) : null;
     const matchesCategory =
-      selectedInvoiceCategory === "all" || invoiceCategory === selectedInvoiceCategory;
+      invoiceFilters.category === "all" || invoiceCategory === invoiceFilters.category;
+    const matchesProvider =
+      invoiceFilters.provider === "all" || paymentProvider === invoiceFilters.provider;
+    const matchesStatus =
+      invoiceFilters.status === "all" || invoiceStatus === invoiceFilters.status;
+    const matchesNotification =
+      invoiceFilters.notification === "all" ||
+      notificationStatus === invoiceFilters.notification;
+    const matchesDateFrom = !dateFrom || !invoiceDate || invoiceDate >= dateFrom;
+    const matchesDateTo = !dateTo || !invoiceDate || invoiceDate <= dateTo;
 
     return (
       matchesCategory &&
+      matchesProvider &&
+      matchesStatus &&
+      matchesNotification &&
+      matchesDateFrom &&
+      matchesDateTo &&
       searchMatches(
       [
         invoice.customer,
@@ -495,7 +590,7 @@ export default function Invoices() {
         normalizeNotificationStatus(invoice.customerNotificationStatus),
         getOutstandingAmount(invoice),
       ],
-      invoiceSearch
+      invoiceFilters.search
     )
     );
   });
@@ -560,6 +655,20 @@ export default function Invoices() {
         }
       />
 
+      {notice.text ? (
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            notice.tone === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
+              : notice.tone === "info"
+                ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300"
+                : "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+          }`}
+        >
+          {notice.text}
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
@@ -587,29 +696,11 @@ export default function Invoices() {
 
       <div className="max-w-8xl">
         {activePage === "invoices" ? (
-          <div className="flex flex-col gap-14 sm:flex-row sm:items-center">
-            <div className="min-w-0 flex-1">
-              <label htmlFor="invoice-search" className="sr-only">
-                Search invoices
-              </label>
-              <input
-                id="invoice-search"
-                type="search"
-                value={invoiceSearch}
-                onChange={(event) => setInvoiceSearch(event.target.value)}
-                placeholder="Search invoices"
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-800"
-              />
-            </div>
-            <div className="sm:w-64">
-              <label htmlFor="invoice-category-filter" className="sr-only">
-                Select category
-              </label>
-              <select
-                id="invoice-category-filter"
-                value={selectedInvoiceCategory}
-                onChange={(event) => setSelectedInvoiceCategory(event.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-800"
+          <Toolbar>
+            <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <SelectField
+                value={invoiceFilterForm.category}
+                onChange={(event) => updateInvoiceFilterForm("category", event.target.value)}
               >
                 <option value="all">All categories</option>
                 {invoiceCategoryOptions.map((category) => (
@@ -617,9 +708,70 @@ export default function Invoices() {
                     {category}
                   </option>
                 ))}
-              </select>
+              </SelectField>
+              <SelectField
+                value={invoiceFilterForm.provider}
+                onChange={(event) => updateInvoiceFilterForm("provider", event.target.value)}
+              >
+                <option value="all">All gateways</option>
+                {invoiceProviderOptions.map((provider) => (
+                  <option key={provider} value={provider}>
+                    {provider}
+                  </option>
+                ))}
+              </SelectField>
+              <InputField
+                type="date"
+                value={invoiceFilterForm.dateFrom}
+                onChange={(event) => updateInvoiceFilterForm("dateFrom", event.target.value)}
+              />
+              <InputField
+                type="date"
+                value={invoiceFilterForm.dateTo}
+                onChange={(event) => updateInvoiceFilterForm("dateTo", event.target.value)}
+              />
+              <SelectField
+                value={invoiceFilterForm.status}
+                onChange={(event) => updateInvoiceFilterForm("status", event.target.value)}
+              >
+                <option value="all">All statuses</option>
+                {invoiceStatusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </SelectField>
+              <SelectField
+                value={invoiceFilterForm.notification}
+                onChange={(event) => updateInvoiceFilterForm("notification", event.target.value)}
+              >
+                <option value="all">All notifications</option>
+                {notificationStatusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </SelectField>
             </div>
-          </div>
+            <div className="flex w-full flex-col gap-3 lg:w-[22rem]">
+              <InputField
+                type="search"
+                value={invoiceFilterForm.search}
+                onChange={(event) => updateInvoiceFilterForm("search", event.target.value)}
+                placeholder="Search invoice, customer, phone"
+                className="w-full"
+              />
+              <div className="grid grid-cols-1 gap-3">
+                <button
+                  type="button"
+                  onClick={applyInvoiceFilters}
+                  className="rounded-xl bg-[#4B93C8] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#3D82B7]"
+                >
+                  Filter
+                </button>
+              </div>
+            </div>
+          </Toolbar>
         ) : (
           <>
             <label htmlFor="recurring-search" className="sr-only">
@@ -1040,25 +1192,34 @@ export default function Invoices() {
             </div>
 
             <div className="hidden overflow-x-auto lg:block">
-              <table className="w-full table-fixed">
+              <table className="min-w-[1180px] w-full">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Invoice
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Invoice No
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Category
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Date
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Details
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Customer
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Payment
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Description
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Gateway
+                  </th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Amount
+                  </th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Status
+                  </th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     Notification
                   </th>
-                  <th className="w-[18%] px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     Actions
                   </th>
                 </tr>
@@ -1071,57 +1232,60 @@ export default function Invoices() {
 
                   return (
                     <tr key={invoice._id} className="hover:bg-slate-50 dark:hover:bg-slate-950/60">
-                      <td className="px-4 py-3 align-top">
+                      <td className="px-5 py-3.5 align-top">
+                        <p className="font-mono text-xs text-slate-900 dark:text-slate-100">
+                          {invoice.invoiceNumber || "-"}
+                        </p>
+                      </td>
+                      <td className="px-5 py-3.5 align-top">
+                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                          {formatDateTime(invoice.date)}
+                        </p>
+                      </td>
+                      <td className="px-5 py-3.5 align-top">
                         <div className="space-y-1">
-                          <p className="font-semibold text-slate-900 dark:text-slate-100">{customerName}</p>
-                          <p className="font-mono text-xs text-slate-500 dark:text-slate-400">
-                            {invoice.invoiceNumber || "-"}
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            {customerName}
                           </p>
-                          <p className="text-sm text-slate-500 dark:text-slate-400">{formatDateTime(invoice.date)}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{invoice.phone || "-"}</p>
                         </div>
                       </td>
-                      <td className="px-4 py-3 align-top">
-                        <StatusBadge tone="slate">{invoiceCategory}</StatusBadge>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <div className="space-y-2">
+                      <td className="px-5 py-3.5 align-top">
+                        <div className="space-y-1">
                           <p className="text-sm text-slate-700 dark:text-slate-300">
                             {invoice.description || invoice.category || invoice.class || "-"}
                           </p>
-                          <p className="text-sm text-slate-500 dark:text-slate-400">Phone: {invoice.phone || "-"}</p>
-                          <p className="font-mono text-xs text-slate-400 dark:text-slate-500">
-                            {invoice.token ? `${invoice.token.substring(0, 14)}...` : "-"}
-                          </p>
+                          <StatusBadge tone="slate">{invoiceCategory}</StatusBadge>
                         </div>
                       </td>
-                      <td className="px-4 py-3 align-top">
-                        <div className="space-y-2">
-                          <p className="font-semibold text-slate-900 dark:text-slate-100">
-                            N{Number(getOutstandingAmount(invoice) || 0).toLocaleString()}
-                          </p>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <StatusBadge tone={invoice.status === "Paid" ? "green" : "orange"}>
-                              {invoice.status || "Unpaid"}
-                            </StatusBadge>
-                            <span className="text-xs text-slate-500 dark:text-slate-400">
-                              {invoice.paymentProvider ||
-                                invoice.pendingPaymentProvider ||
-                                "Not started"}
-                            </span>
-                          </div>
-                        </div>
+                      <td className="px-5 py-3.5 align-top">
+                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                          {invoice.paymentProvider ||
+                            invoice.pendingPaymentProvider ||
+                            "Not started"}
+                        </p>
                       </td>
-                      <td className="px-4 py-3 align-top">
+                      <td className="px-5 py-3.5 align-top">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          N{Number(getOutstandingAmount(invoice) || 0).toLocaleString()}
+                        </p>
+                      </td>
+                      <td className="px-5 py-3.5 align-top">
+                        <StatusBadge tone={invoice.status === "Paid" ? "green" : "orange"}>
+                          {invoice.status || "Unpaid"}
+                        </StatusBadge>
+                      </td>
+                      <td className="px-5 py-3.5 align-top">
                         <StatusBadge tone={getNotificationTone(invoice.customerNotificationStatus)}>
                           {normalizeNotificationStatus(invoice.customerNotificationStatus)}
                         </StatusBadge>
                       </td>
-                      <td className="px-4 py-3 align-top">
-                        <div className="ml-auto grid max-w-[12rem] grid-cols-2 gap-2">
+                      <td className="px-5 py-3.5 align-top">
+                        <div className="ml-auto flex justify-end gap-2">
                           {invoice.status !== "Paid" && (
                             <button
                               onClick={() => markPaid(invoice._id)}
-                              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-green-600 px-2.5 py-2 text-xs font-medium text-white transition hover:bg-green-700"
+                              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-green-700"
                               title="Mark paid"
                             >
                               <FiCheckCircle className="h-3.5 w-3.5" />
@@ -1130,17 +1294,15 @@ export default function Invoices() {
                           )}
                           <button
                             onClick={() => shareWhatsApp(invoice)}
-                            className={`inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#25D366] px-2.5 py-2 text-xs font-medium text-white transition hover:bg-[#20BA5C] ${
-                              invoice.status === "Paid" ? "col-span-2" : ""
-                            }`}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#25D366] px-3 py-2 text-xs font-medium text-white transition hover:bg-[#20BA5C]"
                             title="Share on WhatsApp"
                           >
                             <FiMessageCircle className="h-3.5 w-3.5" />
-                            <span>WhatsApp</span>
+                            <span>Share</span>
                           </button>
                           <button
                             onClick={() => deleteInvoice(invoice._id)}
-                            className="col-span-2 inline-flex items-center justify-center gap-1.5 rounded-xl bg-red-600 px-2.5 py-2 text-xs font-medium text-white transition hover:bg-red-700"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-red-700"
                             title="Delete invoice"
                           >
                             <FiTrash2 className="h-3.5 w-3.5" />

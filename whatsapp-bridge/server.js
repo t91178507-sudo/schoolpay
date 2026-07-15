@@ -22,10 +22,10 @@ const BASE_URL =
   process.env.BRIDGE_PUBLIC_URL ||
   `http://localhost:${PORT}`;
 const WINDOWS_BROWSER_CANDIDATES = [
-  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
   "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
   "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
 ];
 const BROWSER_PATH = resolveBrowserPath();
 
@@ -274,6 +274,20 @@ function clearReadyTimeout(sessionState) {
   }
 }
 
+async function resetPairingLaunchState(sessionState) {
+  if (!sessionState.pairingPhoneNumber || sessionState.connectedNumber) {
+    return;
+  }
+
+  if (sessionState.client) {
+    await sessionState.client.destroy().catch(() => {});
+  }
+
+  sessionState.client = null;
+  sessionState.initializingPromise = null;
+  await clearStoredSession(sessionState.sessionName);
+}
+
 function armReadyTimeout(
   sessionState,
   reason = "Timed out waiting for WhatsApp Web to finish connecting"
@@ -452,6 +466,7 @@ function scheduleRestart(sessionState, reason) {
 
       sessionState.client = null;
       sessionState.initializingPromise = null;
+      await resetPairingLaunchState(sessionState);
       await ensureSession(sessionState.sessionName);
     } catch (error) {
       scheduleRestart(sessionState, error.message || "Failed to restart WhatsApp bridge");
@@ -471,6 +486,7 @@ async function restartSessionImmediately(sessionState, reason) {
 
   sessionState.client = null;
   sessionState.initializingPromise = null;
+  await resetPairingLaunchState(sessionState);
   await ensureSession(sessionState.sessionName);
 }
 

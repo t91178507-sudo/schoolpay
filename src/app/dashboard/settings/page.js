@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import QRCode from "qrcode";
 import { authFetch } from "../../../lib/authFetch";
@@ -199,12 +199,67 @@ export default function SettingsPage() {
   const [deletingWhatsAppWebSession, setDeletingWhatsAppWebSession] = useState(false);
   const [pairingPhoneNumber, setPairingPhoneNumber] = useState("");
   const [requestingPairingCode, setRequestingPairingCode] = useState(false);
+  const [editingBusinessProfile, setEditingBusinessProfile] = useState(false);
+  const [openSections, setOpenSections] = useState({
+    appearance: false,
+    gateway: false,
+    whatsapp: false,
+    compliance: false,
+    quickPay: false,
+  });
   const selectedGateway =
     GATEWAYS.find((gateway) => gateway.key === settings.defaultPaymentGateway) ||
     GATEWAYS[0];
   const selectedWhatsAppProvider =
     WHATSAPP_PROVIDERS.find((provider) => provider.key === settings.defaultWhatsAppProvider) ||
     WHATSAPP_PROVIDERS[0];
+
+  const applyResolvedWhatsAppWebState = useCallback((data = {}) => {
+    setWhatsAppWebStatus(data.status || null);
+    setWhatsAppWebLogs(Array.isArray(data.logs) ? data.logs : []);
+
+    const resolvedConfig = data.resolvedConfig || {};
+    const connectedNumber =
+      data.status?.connectedNumber || resolvedConfig.senderPhoneNumber || "";
+    const resolvedSessionName =
+      resolvedConfig.sessionName || data.status?.sessionName || "";
+    const resolvedBridgeBaseUrl = resolvedConfig.bridgeBaseUrl || "";
+    const resolvedQrConnectUrl =
+      resolvedConfig.qrConnectUrl || data.status?.qrConnectUrl || "";
+
+    setSettings((current) => {
+      const currentProvider = current.whatsappProviders?.whatsappWeb || {};
+      const nextProvider = {
+        ...currentProvider,
+        ...(connectedNumber ? { senderPhoneNumber: connectedNumber } : {}),
+        ...(resolvedSessionName ? { sessionName: resolvedSessionName } : {}),
+        ...(resolvedBridgeBaseUrl ? { bridgeBaseUrl: resolvedBridgeBaseUrl } : {}),
+        ...(resolvedQrConnectUrl ? { qrConnectUrl: resolvedQrConnectUrl } : {}),
+      };
+
+      const hasChanged =
+        nextProvider.senderPhoneNumber !== currentProvider.senderPhoneNumber ||
+        nextProvider.sessionName !== currentProvider.sessionName ||
+        nextProvider.bridgeBaseUrl !== currentProvider.bridgeBaseUrl ||
+        nextProvider.qrConnectUrl !== currentProvider.qrConnectUrl;
+
+      if (!hasChanged) {
+        return current;
+      }
+
+      return {
+        ...current,
+        whatsappProviders: {
+          ...current.whatsappProviders,
+          whatsappWeb: nextProvider,
+        },
+      };
+    });
+
+    if (!pairingPhoneNumber && (connectedNumber || data.status?.pairingPhoneNumber)) {
+      setPairingPhoneNumber(connectedNumber || data.status?.pairingPhoneNumber || "");
+    }
+  }, [pairingPhoneNumber]);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -311,29 +366,7 @@ export default function SettingsPage() {
           return;
         }
 
-        setWhatsAppWebStatus(data.status || null);
-        setWhatsAppWebLogs(Array.isArray(data.logs) ? data.logs : []);
-
-        const connectedNumber = data.status?.connectedNumber || "";
-        if (
-          connectedNumber &&
-          connectedNumber !== settings.whatsappProviders.whatsappWeb.senderPhoneNumber
-        ) {
-          setSettings((current) => ({
-            ...current,
-            whatsappProviders: {
-              ...current.whatsappProviders,
-              whatsappWeb: {
-                ...current.whatsappProviders.whatsappWeb,
-                senderPhoneNumber: connectedNumber,
-              },
-            },
-          }));
-        }
-
-        if (!pairingPhoneNumber && (connectedNumber || data.status?.pairingPhoneNumber)) {
-          setPairingPhoneNumber(connectedNumber || data.status.pairingPhoneNumber);
-        }
+        applyResolvedWhatsAppWebState(data);
       } catch (statusError) {
         if (!cancelled) {
           setWhatsAppWebStatus(null);
@@ -353,6 +386,7 @@ export default function SettingsPage() {
       cancelled = true;
     };
   }, [
+    applyResolvedWhatsAppWebState,
     selectedWhatsAppProvider.key,
     settings.whatsappProviders?.whatsappWeb?.bridgeBaseUrl,
     settings.whatsappProviders?.whatsappWeb?.sessionName,
@@ -404,6 +438,13 @@ export default function SettingsPage() {
           [field]: value,
         },
       },
+    }));
+  };
+
+  const toggleSection = (sectionKey) => {
+    setOpenSections((current) => ({
+      ...current,
+      [sectionKey]: !current[sectionKey],
     }));
   };
 
@@ -630,13 +671,7 @@ export default function SettingsPage() {
         throw new Error(data.error || "Unable to refresh WhatsApp Web status");
       }
 
-      setWhatsAppWebStatus(data.status || null);
-      setWhatsAppWebLogs(Array.isArray(data.logs) ? data.logs : []);
-
-      const connectedNumber = data.status?.connectedNumber || "";
-      if (connectedNumber) {
-        updateWhatsAppProviderField("whatsappWeb", "senderPhoneNumber", connectedNumber);
-      }
+      applyResolvedWhatsAppWebState(data);
     } catch (statusError) {
       setError(statusError.message || "Unable to refresh WhatsApp Web status");
     } finally {
@@ -669,6 +704,14 @@ export default function SettingsPage() {
       }
 
       setWhatsAppWebStatus(data || null);
+      if (data?.sessionName) {
+        updateWhatsAppProviderField("whatsappWeb", "sessionName", data.sessionName);
+        updateWhatsAppProviderField(
+          "whatsappWeb",
+          "qrConnectUrl",
+          `http://localhost:8787/qr?sessionName=${encodeURIComponent(data.sessionName)}`
+        );
+      }
       setMessage("Pairing code generated. Enter it in WhatsApp linked devices.");
     } catch (pairingError) {
       setError(pairingError.message || "Unable to request WhatsApp pairing code");
@@ -764,7 +807,7 @@ export default function SettingsPage() {
 
       <section className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div>
+          <div className="min-w-0">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Business profile</h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
               Keep the business name and logo consistent across the dashboard and public invoice pages.
@@ -788,16 +831,25 @@ export default function SettingsPage() {
             )}
 
             <div className="space-y-2">
-              <label className="inline-flex cursor-pointer items-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800">
-                Upload logo
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleLogoUpload}
-                />
-              </label>
-              {settings.businessLogo && (
+              <button
+                type="button"
+                onClick={() => setEditingBusinessProfile((current) => !current)}
+                className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                {editingBusinessProfile ? "Minimize" : "Edit profile"}
+              </button>
+              {editingBusinessProfile ? (
+                <label className="inline-flex cursor-pointer items-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800">
+                  Upload logo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleLogoUpload}
+                  />
+                </label>
+              ) : null}
+              {editingBusinessProfile && settings.businessLogo ? (
                 <button
                   type="button"
                   onClick={() => updateField("businessLogo", "")}
@@ -805,62 +857,78 @@ export default function SettingsPage() {
                 >
                   Remove logo
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-8">
-          <Field
-            label="Business name"
-            value={settings.businessName}
-            onChange={(value) => updateField("businessName", value)}
-            placeholder="InvoiceHub Limited"
-          />
-          <Field
-            label="Business type"
-            value={settings.businessType}
-            onChange={(value) => updateField("businessType", value)}
-            placeholder="Professional Service"
-          />
-          <Field
-            label="Business email"
-            type="email"
-            value={settings.businessEmail}
-            onChange={(value) => updateField("businessEmail", value)}
-            placeholder="billing@yourbusiness.com"
-          />
-          <Field
-            label="Business phone"
-            value={settings.businessPhone}
-            onChange={(value) => updateField("businessPhone", value)}
-            placeholder="+234 801 234 5678"
-          />
-          <Field
-            label="Website"
-            type="url"
-            value={settings.website}
-            onChange={(value) => updateField("website", value)}
-            placeholder="https://yourbusiness.com"
-          />
-          <Field
-            label="Tax ID"
-            value={settings.taxId}
-            onChange={(value) => updateField("taxId", value)}
-            placeholder="Optional"
-          />
-        </div>
+        {editingBusinessProfile ? (
+          <>
+            <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2">
+              <Field
+                label="Business name"
+                value={settings.businessName}
+                onChange={(value) => updateField("businessName", value)}
+                placeholder="InvoiceHub Limited"
+              />
+              <Field
+                label="Business type"
+                value={settings.businessType}
+                onChange={(value) => updateField("businessType", value)}
+                placeholder="Professional Service"
+              />
+              <Field
+                label="Business email"
+                type="email"
+                value={settings.businessEmail}
+                onChange={(value) => updateField("businessEmail", value)}
+                placeholder="billing@yourbusiness.com"
+              />
+              <Field
+                label="Business phone"
+                value={settings.businessPhone}
+                onChange={(value) => updateField("businessPhone", value)}
+                placeholder="+234 801 234 5678"
+              />
+              <Field
+                label="Website"
+                type="url"
+                value={settings.website}
+                onChange={(value) => updateField("website", value)}
+                placeholder="https://yourbusiness.com"
+              />
+              <Field
+                label="Tax ID"
+                value={settings.taxId}
+                onChange={(value) => updateField("taxId", value)}
+                placeholder="Optional"
+              />
+            </div>
 
-        <div className="mt-5">
-          <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">Business address</label>
-          <textarea
-            value={settings.businessAddress}
-            onChange={(event) => updateField("businessAddress", event.target.value)}
-            rows={3}
-            className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-            placeholder="12 Marina Road, Lagos"
-          />
-        </div>
+            <div className="mt-5">
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">Business address</label>
+              <textarea
+                value={settings.businessAddress}
+                onChange={(event) => updateField("businessAddress", event.target.value)}
+                rows={3}
+                className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                placeholder="12 Marina Road, Lagos"
+              />
+            </div>
+          </>
+        ) : (
+          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <SummaryItem label="Business name" value={settings.businessName || session.businessName || "-"} />
+            <SummaryItem label="Business type" value={settings.businessType || session.businessType || "-"} />
+            <SummaryItem label="Business email" value={settings.businessEmail || "-"} />
+            <SummaryItem label="Business phone" value={settings.businessPhone || "-"} />
+            <SummaryItem label="Website" value={settings.website || "-"} />
+            <SummaryItem label="Tax ID" value={settings.taxId || "-"} />
+            <div className="md:col-span-2 xl:col-span-3">
+              <SummaryItem label="Business address" value={settings.businessAddress || "-"} multiline />
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
@@ -874,62 +942,92 @@ export default function SettingsPage() {
 
           <button
             type="button"
-            onClick={() => setDarkModePreference(!darkMode)}
-            className={`inline-flex items-center gap-3 rounded-xl border px-4 py-2.5 text-sm font-medium transition ${
-              darkMode
-                ? "border-slate-700 bg-slate-950 text-white hover:bg-slate-900"
-                : "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
-            }`}
+            onClick={() => toggleSection("appearance")}
+            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
-            <span
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
-                darkMode ? "bg-blue-600" : "bg-slate-300"
+            {openSections.appearance ? "Minimize" : "Edit"}
+          </button>
+        </div>
+
+        {openSections.appearance ? (
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={() => setDarkModePreference(!darkMode)}
+              className={`inline-flex items-center gap-3 rounded-xl border px-4 py-2.5 text-sm font-medium transition ${
+                darkMode
+                  ? "border-slate-700 bg-slate-950 text-white hover:bg-slate-900"
+                  : "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
               }`}
             >
               <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${
-                  darkMode ? "translate-x-5" : "translate-x-1"
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+                  darkMode ? "bg-blue-600" : "bg-slate-300"
                 }`}
-              />
-            </span>
-            {darkMode ? "Dark mode enabled" : "Light mode enabled"}
-          </button>
-        </div>
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${
+                    darkMode ? "translate-x-5" : "translate-x-1"
+                  }`}
+                />
+              </span>
+              {darkMode ? "Dark mode enabled" : "Light mode enabled"}
+            </button>
+          </div>
+        ) : (
+          <div className="mt-6">
+            <SummaryItem
+              label="Current appearance"
+              value={darkMode ? "Dark mode enabled" : "Light mode enabled"}
+            />
+          </div>
+        )}
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col gap-2">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Gateway setup</h2>
-          <p className="text-sm text-gray-500 dark:text-slate-400">
-            Save your provider credentials here so each business can manage its own payment account instead of relying on one global platform key.
-          </p>
-        </div>
-
-        <div className="mt-6 max-w-xl">
-          <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
-            Preferred payment gateway
-          </label>
-          <select
-            value={settings.defaultPaymentGateway}
-            onChange={(event) => updateField("defaultPaymentGateway", event.target.value)}
-            className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Gateway setup</h2>
+            <p className="text-sm text-gray-500 dark:text-slate-400">
+              Save your provider credentials here so each business can manage its own payment account instead of relying on one global platform key.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => toggleSection("gateway")}
+            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
-            {GATEWAYS.map((gateway) => {
-              const gatewayConfig = settings.paymentGateways[gateway.key];
-
-              return (
-                <option key={gateway.key} value={gateway.key}>
-                  {gateway.name} - {gatewayConfig.enabled ? "Enabled" : "Saved only"}
-                </option>
-              );
-            })}
-          </select>
-          <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
-            {selectedGateway.blurb}
-          </p>
+            {openSections.gateway ? "Minimize" : "Edit"}
+          </button>
         </div>
 
-        <div className="space-y-6 mt-8">
+        {openSections.gateway ? (
+          <>
+            <div className="mt-6 max-w-xl">
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
+                Preferred payment gateway
+              </label>
+              <select
+                value={settings.defaultPaymentGateway}
+                onChange={(event) => updateField("defaultPaymentGateway", event.target.value)}
+                className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+              >
+                {GATEWAYS.map((gateway) => {
+                  const gatewayConfig = settings.paymentGateways[gateway.key];
+
+                  return (
+                    <option key={gateway.key} value={gateway.key}>
+                      {gateway.name} - {gatewayConfig.enabled ? "Enabled" : "Saved only"}
+                    </option>
+                  );
+                })}
+              </select>
+              <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
+                {selectedGateway.blurb}
+              </p>
+            </div>
+
+            <div className="space-y-6 mt-8">
           <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-800">
             <div className="flex items-center justify-between gap-4 border-b border-gray-200 bg-slate-50 px-6 py-5 dark:border-slate-800 dark:bg-slate-950/60 flex-wrap">
               <div>
@@ -1150,16 +1248,41 @@ export default function SettingsPage() {
         <div className="mt-6 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 text-sm text-amber-900">
           Monnify and PayAza are wired into checkout. TouchPay settings are saved here so that flow can be connected later.
         </div>
+          </>
+        ) : (
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <SummaryItem label="Preferred gateway" value={selectedGateway.name} />
+            <SummaryItem
+              label="Mode"
+              value={settings.paymentGateways[selectedGateway.key]?.environment || "-"}
+            />
+            <SummaryItem
+              label="Status"
+              value={settings.paymentGateways[selectedGateway.key]?.enabled ? "Enabled" : "Saved only"}
+            />
+          </div>
+        )}
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col gap-2">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">WhatsApp delivery</h2>
-          <p className="text-sm text-gray-500 dark:text-slate-400">
-            Choose how invoice messages and paid confirmations should be delivered to customers.
-          </p>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">WhatsApp delivery</h2>
+            <p className="text-sm text-gray-500 dark:text-slate-400">
+              Choose how invoice messages and paid confirmations should be delivered to customers.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => toggleSection("whatsapp")}
+            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            {openSections.whatsapp ? "Minimize" : "Edit"}
+          </button>
         </div>
 
+        {openSections.whatsapp ? (
+          <>
         <div className="mt-6 max-w-xl">
           <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
             WhatsApp delivery method
@@ -1492,17 +1615,50 @@ export default function SettingsPage() {
           </div>
         )}
 
+          </>
+        ) : (
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <SummaryItem label="Delivery method" value={selectedWhatsAppProvider.name} />
+            <SummaryItem
+              label="Provider status"
+              value={
+                settings.whatsappProviders?.[selectedWhatsAppProvider.key]?.enabled
+                  ? "Enabled"
+                  : "Disabled"
+              }
+            />
+            <SummaryItem
+              label="Sending number"
+              value={
+                settings.whatsappProviders?.whatsappWeb?.senderPhoneNumber ||
+                whatsAppWebStatus?.connectedNumber ||
+                "Not connected"
+              }
+            />
+          </div>
+        )}
+
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-8 space-y-5 dark:border-slate-800 dark:bg-slate-900">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Platform compliance posture</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-            InvoiceHub should be presented as invoicing software, not as the entity receiving,
-            pooling, or resettling customer funds.
-          </p>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Platform compliance posture</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+              InvoiceHub should be presented as invoicing software, not as the entity receiving,
+              pooling, or resettling customer funds.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => toggleSection("compliance")}
+            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            {openSections.compliance ? "Minimize" : "Edit"}
+          </button>
         </div>
 
+        {openSections.compliance ? (
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
             <p className="font-medium text-slate-900 dark:text-white">Operational checklist</p>
@@ -1524,16 +1680,33 @@ export default function SettingsPage() {
             </ul>
           </div>
         </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            <SummaryItem label="Operational checklist" value="4 guidance items saved" />
+            <SummaryItem label="Public notices" value="Privacy, terms, and payment disclosures active" />
+          </div>
+        )}
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-8 space-y-6 dark:border-slate-800 dark:bg-slate-900">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">QR payment setup</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-            Create reusable QR payment links. When someone scans one, they enter their phone number and amount, complete payment in Monnify, and a paid invoice is created automatically.
-          </p>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">QR payment setup</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+              Create reusable QR payment links. When someone scans one, they enter their phone number and amount, complete payment in Monnify, and a paid invoice is created automatically.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => toggleSection("quickPay")}
+            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            {openSections.quickPay ? "Minimize" : "Edit"}
+          </button>
         </div>
 
+        {openSections.quickPay ? (
+          <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <Field
             label="Description"
@@ -1629,6 +1802,17 @@ export default function SettingsPage() {
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
           This flow currently uses Monnify account transfer checkout. The scanned page asks for phone number and amount, then creates a paid invoice from the successful webhook or verify callback. When the WhatsApp bridge is configured, payment confirmations can be sent automatically from the connected session.
         </div>
+          </>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            <SummaryItem label="QR profiles" value={String(quickPayProfiles.length)} />
+            <SummaryItem
+              label="Current flow"
+              value="Customer enters phone number and amount"
+            />
+            <SummaryItem label="Gateway" value="Monnify transfer checkout" />
+          </div>
+        )}
       </section>
 
       {(error || message) && (
@@ -1668,6 +1852,22 @@ function Field({ label, value, onChange, placeholder, type = "text" }) {
         placeholder={placeholder}
         className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
       />
+    </div>
+  );
+}
+
+function SummaryItem({ label, value, multiline = false }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/60">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      <p
+        className={`mt-2 text-sm font-medium text-slate-900 dark:text-white ${
+          multiline ? "whitespace-pre-wrap break-words" : "truncate"
+        }`}
+        title={typeof value === "string" ? value : undefined}
+      >
+        {value}
+      </p>
     </div>
   );
 }

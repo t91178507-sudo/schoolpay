@@ -11,6 +11,7 @@ import { buildPaymentReceiptAttachment } from "./paymentReceiptPdf";
 import { markInvoiceNotificationPrepared } from "./paymentLifecycle";
 import {
   isWhatsAppWebConfigured,
+  resolveActiveWhatsAppWebConfig,
   sendWhatsAppWebDocument,
   sendWhatsAppWebMessage,
 } from "./whatsappWebBridge";
@@ -79,14 +80,23 @@ export async function deliverInvoiceMessage({
   });
 
   const browserConfig = resolveBrowserWhatsAppConfig(owner || {});
-  const whatsAppWebConfig = await resolveWhatsAppWebConfigForUser(db, owner || {});
+  const savedWhatsAppWebConfig = await resolveWhatsAppWebConfigForUser(db, owner || {});
+  let whatsAppWebConfig = savedWhatsAppWebConfig;
+
+  if (isWhatsAppWebConfigured(savedWhatsAppWebConfig)) {
+    try {
+      whatsAppWebConfig = await resolveActiveWhatsAppWebConfig(savedWhatsAppWebConfig);
+    } catch {
+      whatsAppWebConfig = savedWhatsAppWebConfig;
+    }
+  }
 
   if (isWhatsAppWebConfigured(whatsAppWebConfig)) {
     try {
       await sendWhatsAppWebMessage(whatsAppWebConfig, { phone, text: message });
       await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
 
-      return { sent: true, provider: "whatsappWeb" };
+      return { sent: true, status: "sent", provider: "whatsappWeb" };
     } catch (error) {
       if (!shouldFallbackToBrowser(error)) {
         throw error;
@@ -102,6 +112,7 @@ export async function deliverInvoiceMessage({
 
   return {
     sent: false,
+    status: "fallback",
     provider: "browser",
     fallbackUrl: buildFallbackUrl(phone, message),
     message,
@@ -133,7 +144,16 @@ export async function deliverPaymentConfirmation({
   });
 
   const browserConfig = resolveBrowserWhatsAppConfig(owner || {});
-  const whatsAppWebConfig = await resolveWhatsAppWebConfigForUser(db, owner || {});
+  const savedWhatsAppWebConfig = await resolveWhatsAppWebConfigForUser(db, owner || {});
+  let whatsAppWebConfig = savedWhatsAppWebConfig;
+
+  if (isWhatsAppWebConfigured(savedWhatsAppWebConfig)) {
+    try {
+      whatsAppWebConfig = await resolveActiveWhatsAppWebConfig(savedWhatsAppWebConfig);
+    } catch {
+      whatsAppWebConfig = savedWhatsAppWebConfig;
+    }
+  }
 
   if (isWhatsAppWebConfigured(whatsAppWebConfig)) {
     try {
@@ -158,7 +178,12 @@ export async function deliverPaymentConfirmation({
 
       await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
 
-      return { sent: true, provider: "whatsappWeb", attachmentSent };
+      return {
+        sent: true,
+        status: "sent",
+        provider: "whatsappWeb",
+        attachmentSent,
+      };
     } catch (error) {
       if (!shouldFallbackToBrowser(error)) {
         throw error;
@@ -174,6 +199,7 @@ export async function deliverPaymentConfirmation({
 
   return {
     sent: false,
+    status: "fallback",
     provider: "browser",
     fallbackUrl: buildFallbackUrl(phone, message),
     message,

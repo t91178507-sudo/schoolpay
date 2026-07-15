@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   EmptyState,
+  InputField,
   PageHeader,
   PageShell,
+  SelectField,
   StatCard,
   StatGrid,
   StatusBadge,
   SurfaceCard,
+  Toolbar,
 } from "../../../components/DashboardUI";
 import { authFetch } from "../../../lib/authFetch";
 import { getCustomerLabels } from "../../../lib/businessLabels";
@@ -47,7 +50,16 @@ export default function CustomersOverview() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [historyCustomer, setHistoryCustomer] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [filterForm, setFilterForm] = useState({
+    search: "",
+    category: "all",
+    balanceStatus: "all",
+  });
+  const [filters, setFilters] = useState({
+    search: "",
+    category: "all",
+    balanceStatus: "all",
+  });
 
   useEffect(() => {
     const loadData = async () => {
@@ -126,11 +138,29 @@ export default function CustomersOverview() {
     (sum, customer) => sum + Number(customer.amountPending || 0),
     0
   );
+  const customerCategoryOptions = Array.from(
+    new Set(customerRows.map((customer) => customer.category || "Uncategorized"))
+  ).sort((a, b) => a.localeCompare(b));
   const filteredCustomerRows = customerRows.filter((customer) => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-    if (!normalizedQuery) return true;
+    const normalizedQuery = filters.search.trim().toLowerCase();
+    const customerCategory = customer.category || "Uncategorized";
+    const balanceStatus =
+      customer.amountPending > 0
+        ? customer.amountPaid > 0
+          ? "partial"
+          : "pending"
+        : "settled";
 
-    return [
+    const matchesCategory =
+      filters.category === "all" || customerCategory === filters.category;
+    const matchesBalanceStatus =
+      filters.balanceStatus === "all" || balanceStatus === filters.balanceStatus;
+
+    if (!normalizedQuery) {
+      return matchesCategory && matchesBalanceStatus;
+    }
+
+    const matchesSearch = [
       customer.name,
       customer.phone,
       customer.email,
@@ -143,7 +173,26 @@ export default function CustomersOverview() {
     ]
       .filter((value) => value !== undefined && value !== null)
       .some((value) => String(value).toLowerCase().includes(normalizedQuery));
+
+    return matchesCategory && matchesBalanceStatus && matchesSearch;
   });
+
+  const customersMatchingFilters = customerRows.filter((customer) => {
+    const customerCategory = customer.category || "Uncategorized";
+    const balanceStatus =
+      customer.amountPending > 0
+        ? customer.amountPaid > 0
+          ? "partial"
+          : "pending"
+        : "settled";
+
+    return (
+      (filters.category === "all" || customerCategory === filters.category) &&
+      (filters.balanceStatus === "all" || balanceStatus === filters.balanceStatus)
+    );
+  });
+
+  const applyFilters = () => setFilters(filterForm);
 
   if (loading) {
     return (
@@ -176,22 +225,54 @@ export default function CustomersOverview() {
         description={`See each ${customerLabels.singular}'s invoice count, paid totals, and what is still outstanding.`}
       />
 
-      <div className="max-w-xl">
-        <label htmlFor="customer-overview-search" className="sr-only">
-          Search {customerLabels.plural}
-        </label>
-        <input
-          id="customer-overview-search"
-          type="search"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder={`Search ${customerLabels.plural}`}
-          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-800"
-        />
-      </div>
+      <Toolbar>
+        <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <SelectField
+            value={filterForm.category}
+            onChange={(event) =>
+              setFilterForm((current) => ({ ...current, category: event.target.value }))
+            }
+          >
+            <option value="all">All categories</option>
+            {customerCategoryOptions.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField
+            value={filterForm.balanceStatus}
+            onChange={(event) =>
+              setFilterForm((current) => ({ ...current, balanceStatus: event.target.value }))
+            }
+          >
+            <option value="all">All balances</option>
+            <option value="pending">Pending only</option>
+            <option value="partial">Partially paid</option>
+            <option value="settled">Fully paid</option>
+          </SelectField>
+          <InputField
+            type="search"
+            value={filterForm.search}
+            onChange={(event) =>
+              setFilterForm((current) => ({ ...current, search: event.target.value }))
+            }
+            placeholder={`Search ${customerLabels.plural}`}
+          />
+        </div>
+        <div className="w-full lg:w-[12rem]">
+          <button
+            type="button"
+            onClick={applyFilters}
+            className="w-full rounded-xl bg-[#4B93C8] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#3D82B7]"
+          >
+            Filter
+          </button>
+        </div>
+      </Toolbar>
 
       <StatGrid className="xl:!grid-cols-3">
-        <StatCard label={customerLabels.pluralTitle} value={customerRows.length} tone="blue" />
+        <StatCard label={customerLabels.pluralTitle} value={customersMatchingFilters.length} tone="blue" />
         <StatCard
           label="Total invoiced"
           value={formatCurrency(totalReceivables)}
@@ -204,7 +285,7 @@ export default function CustomersOverview() {
         />
       </StatGrid>
 
-      <SurfaceCard className="p-6">
+      <SurfaceCard className="overflow-hidden">
         {filteredCustomerRows.length === 0 ? (
           <EmptyState
             title={
@@ -219,71 +300,117 @@ export default function CustomersOverview() {
             }
           />
         ) : (
-          <div className="space-y-4">
-            {filteredCustomerRows.map((customer) => (
-              <div
-                key={customer._id}
-                className="rounded-2xl border border-slate-200 p-5 transition hover:border-slate-300 hover:bg-slate-50/40 dark:border-slate-800 dark:hover:border-slate-700 dark:hover:bg-slate-950/60"
-              >
-                <div className="grid gap-5 xl:grid-cols-[1.5fr_1fr_1.25fr_auto] xl:items-start">
-                  <div className="min-w-0 space-y-2">
-                    <div>
-                      <p className="text-xl font-semibold text-slate-900 dark:text-white">{customer.name}</p>
-                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{customer.phone || "-"}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <StatusBadge tone="slate">{customer.category || "Uncategorized"}</StatusBadge>
-                      <StatusBadge tone="blue">
-                        {customer.invoiceCount} invoice{customer.invoiceCount !== 1 ? "s" : ""}
-                      </StatusBadge>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                      Summary
+          <>
+            <div className="divide-y divide-slate-200 lg:hidden">
+              {filteredCustomerRows.map((customer) => (
+                <div key={customer._id} className="space-y-3 p-4">
+                  <div className="space-y-1">
+                    <p className="text-base font-semibold text-slate-900 dark:text-white">
+                      {customer.name}
                     </p>
-                    <p className="text-sm text-slate-700 dark:text-slate-300">
-                      {customer.invoiceCount === 0
-                        ? "No invoice history yet"
-                        : customer.invoiceCount === 1
-                          ? "1 invoice on record"
-                          : `${customer.invoiceCount} invoices on record`}
-                    </p>
-                    <p className="font-mono text-xs text-slate-400 break-all">
-                      {customer.token ? `${customer.token.substring(0, 18)}...` : "-"}
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      {customer.phone || "-"}
                     </p>
                   </div>
-
-                  <div className="space-y-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                      Balances
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <StatusBadge tone="green">
-                        Paid {formatCurrency(customer.amountPaid)}
-                      </StatusBadge>
-                      <StatusBadge tone="orange">
-                        Pending {formatCurrency(customer.amountPending)}
-                      </StatusBadge>
-                    </div>
-                    <p className="text-sm text-slate-500">
-                      Total: <span className="font-medium text-slate-700 dark:text-slate-300">{formatCurrency(customer.totalAmount)}</span>
-                    </p>
+                  <div className="flex flex-wrap gap-2">
+                    <StatusBadge tone="slate">{customer.category || "Uncategorized"}</StatusBadge>
+                    <StatusBadge tone="blue">
+                      {customer.invoiceCount} invoice{customer.invoiceCount !== 1 ? "s" : ""}
+                    </StatusBadge>
+                    <StatusBadge tone="green">Paid {formatCurrency(customer.amountPaid)}</StatusBadge>
+                    <StatusBadge tone="orange">Pending {formatCurrency(customer.amountPending)}</StatusBadge>
                   </div>
-
-                  <div className="xl:justify-self-end">
-                    <button
-                      onClick={() => setHistoryCustomer(customer)}
-                      className="w-full whitespace-nowrap rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 xl:w-auto"
-                    >
-                      View payment history
-                    </button>
-                  </div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Total:{" "}
+                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                      {formatCurrency(customer.totalAmount)}
+                    </span>
+                  </p>
+                  <button
+                    onClick={() => setHistoryCustomer(customer)}
+                    className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    View payment history
+                  </button>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="min-w-[1100px] w-full">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      {customerLabels.singularTitle}
+                    </th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Phone
+                    </th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Category
+                    </th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Invoices
+                    </th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Paid
+                    </th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Pending
+                    </th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Total
+                    </th>
+                    <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredCustomerRows.map((customer) => (
+                    <tr key={customer._id} className="hover:bg-slate-50 dark:hover:bg-slate-950/60">
+                      <td className="px-5 py-3.5">
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                            {customer.name}
+                          </p>
+                          <p className="font-mono text-xs text-slate-400">
+                            {customer.token ? `${customer.token.substring(0, 18)}...` : "-"}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 text-sm text-slate-600 dark:text-slate-300">
+                        {customer.phone || "-"}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <StatusBadge tone="slate">{customer.category || "Uncategorized"}</StatusBadge>
+                      </td>
+                      <td className="px-5 py-3.5 text-sm text-slate-700 dark:text-slate-200">
+                        {customer.invoiceCount}
+                      </td>
+                      <td className="px-5 py-3.5 text-sm font-medium text-emerald-600">
+                        {formatCurrency(customer.amountPaid)}
+                      </td>
+                      <td className="px-5 py-3.5 text-sm font-medium text-orange-600">
+                        {formatCurrency(customer.amountPending)}
+                      </td>
+                      <td className="px-5 py-3.5 text-sm font-medium text-slate-900 dark:text-white">
+                        {formatCurrency(customer.totalAmount)}
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        <button
+                          onClick={() => setHistoryCustomer(customer)}
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                          View history
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </SurfaceCard>
 
@@ -318,13 +445,21 @@ export default function CustomersOverview() {
                     key={invoice._id}
                     className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                       <p className="font-medium text-slate-900 dark:text-white">
                         {invoice.description || invoice.category || "Invoice payment"}
                       </p>
-                      <p className="text-sm text-slate-500">
-                        {formatCurrency(invoice.amount)} | Paid {formatCurrency(getInvoicePaidAmount(invoice))} | Balance {formatCurrency(getInvoiceBalance(invoice))}
-                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                          Amount {formatCurrency(invoice.amount)}
+                        </span>
+                        <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                          Paid {formatCurrency(getInvoicePaidAmount(invoice))}
+                        </span>
+                        <span className="inline-flex rounded-full bg-orange-100 px-3 py-1 text-sm font-medium text-orange-700 dark:bg-orange-950/50 dark:text-orange-300">
+                          Balance {formatCurrency(getInvoiceBalance(invoice))}
+                        </span>
+                      </div>
                       <p className="text-xs text-slate-400">
                         {formatDateTime(invoice.paidAt || invoice.date)}
                       </p>

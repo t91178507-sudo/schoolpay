@@ -6,6 +6,7 @@ import {
 } from "../../../../../lib/paymentGatewaySettings";
 import {
   isWhatsAppWebConfigured,
+  resolveActiveWhatsAppWebConfig,
   sendWhatsAppWebMessage,
 } from "../../../../../lib/whatsappWebBridge";
 
@@ -26,7 +27,12 @@ export async function POST(req) {
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
-    const whatsAppWebConfig = await resolveWhatsAppWebConfigForUser(db, user);
+    const savedWhatsAppWebConfig = await resolveWhatsAppWebConfigForUser(db, user);
+    const whatsAppWebConfig = isWhatsAppWebConfigured(savedWhatsAppWebConfig)
+      ? await resolveActiveWhatsAppWebConfig(savedWhatsAppWebConfig).catch(
+          () => savedWhatsAppWebConfig
+        )
+      : savedWhatsAppWebConfig;
     if (isWhatsAppWebConfigured(whatsAppWebConfig)) {
       const result = await sendWhatsAppWebMessage(whatsAppWebConfig, {
         phone,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import PublicLegalFooter from "../../../../components/PublicLegalFooter";
 
@@ -18,6 +18,8 @@ export default function QuickPayPage() {
     customerPhone: "",
     amount: "",
   });
+  const payazaVerifyInFlight = useRef(false);
+  const autoCheckingPayaza = Boolean(payazaAccount?.paymentReference && profile?.token);
 
   useEffect(() => {
     if (!token) return;
@@ -103,9 +105,16 @@ export default function QuickPayPage() {
     setTimeout(() => setCopiedPayazaField(""), 1500);
   };
 
-  const verifyPayazaPayment = async () => {
-    if (!payazaAccount?.paymentReference || !profile?.token) return;
-    setVerifyingPayaza(true);
+  const verifyPayazaPayment = useCallback(async ({ silent = false } = {}) => {
+    if (!payazaAccount?.paymentReference || !profile?.token || payazaVerifyInFlight.current) {
+      return false;
+    }
+
+    payazaVerifyInFlight.current = true;
+
+    if (!silent) {
+      setVerifyingPayaza(true);
+    }
 
     try {
       const res = await fetch("/api/payaza/qr-verify", {
@@ -125,12 +134,38 @@ export default function QuickPayPage() {
       window.location.href = `/pay/qr/success/${profile.token}?paymentReference=${encodeURIComponent(
         payazaAccount.paymentReference
       )}&provider=payaza`;
+      return true;
     } catch (verifyError) {
-      alert(verifyError.message || "Payment is not complete yet");
+      if (!silent) {
+        alert(verifyError.message || "Payment is not complete yet");
+      }
+      return false;
     } finally {
-      setVerifyingPayaza(false);
+      payazaVerifyInFlight.current = false;
+      if (!silent) {
+        setVerifyingPayaza(false);
+      }
     }
-  };
+  }, [payazaAccount, profile]);
+
+  useEffect(() => {
+    if (!payazaAccount?.paymentReference || !profile?.token) {
+      return undefined;
+    }
+
+    const firstCheck = window.setTimeout(() => {
+      verifyPayazaPayment({ silent: true });
+    }, 4000);
+
+    const intervalId = window.setInterval(() => {
+      verifyPayazaPayment({ silent: true });
+    }, 5000);
+
+    return () => {
+      window.clearTimeout(firstCheck);
+      window.clearInterval(intervalId);
+    };
+  }, [payazaAccount, profile, verifyPayazaPayment]);
 
   if (loading) {
     return (
@@ -242,6 +277,7 @@ export default function QuickPayPage() {
           onCopy={copyPayazaValue}
           copiedField={copiedPayazaField}
           verifying={verifyingPayaza}
+          autoChecking={autoCheckingPayaza}
         />
       )}
     </div>
@@ -267,6 +303,7 @@ function PayazaPaymentModal({
   onCopy,
   copiedField,
   verifying,
+  autoChecking,
 }) {
   const amountPayable = Number(account.amountPayable || amount || 0);
 
@@ -336,11 +373,18 @@ function PayazaPaymentModal({
           <button
             type="button"
             onClick={onVerify}
-            disabled={verifying}
+            disabled={verifying || autoChecking}
             className="w-full rounded-xl bg-slate-900 py-2.5 text-[14px] font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 sm:py-3.5 sm:text-[15px]"
           >
-            {verifying ? "Checking payment..." : "I have made the transfer"}
+            {verifying
+              ? "Checking payment..."
+              : autoChecking
+                ? "Waiting for automatic confirmation..."
+                : "I have made the transfer"}
           </button>
+          <p className="text-center text-[12px] leading-5 text-slate-500 dark:text-slate-400">
+            We are checking for payment automatically. This page will continue once the transfer is confirmed.
+          </p>
         </div>
       </div>
     </div>

@@ -97,6 +97,20 @@ export default function StaffManagementPage() {
   const [showCreateBusiness, setShowCreateBusiness] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [showEditPanel, setShowEditPanel] = useState(false);
+  const [resetPasswordModal, setResetPasswordModal] = useState({
+    open: false,
+    accountId: "",
+    fullName: "",
+    password: "",
+    confirmPassword: "",
+  });
+  const [deleteStaffModal, setDeleteStaffModal] = useState({
+    open: false,
+    accountId: "",
+    fullName: "",
+    username: "",
+    confirmText: "",
+  });
   const [accountDrafts, setAccountDrafts] = useState({});
   const [filters, setFilters] = useState({
     businessId: "all",
@@ -219,8 +233,10 @@ export default function StaffManagementPage() {
       if (options.closeOnSuccess) {
         setShowEditPanel(false);
       }
+      return true;
     } catch (updateError) {
       setError(updateError.message || "Unable to update staff account");
+      return false;
     } finally {
       setSaving("");
     }
@@ -243,8 +259,10 @@ export default function StaffManagementPage() {
 
       setMessage("Staff account deleted.");
       await loadAll();
+      return true;
     } catch (deleteError) {
       setError(deleteError.message || "Unable to delete staff account");
+      return false;
     } finally {
       setSaving("");
     }
@@ -302,6 +320,92 @@ export default function StaffManagementPage() {
       setError(businessError.message || "Unable to create business");
     } finally {
       setSaving("");
+    }
+  }
+
+  function openResetPasswordModal(account) {
+    setResetPasswordModal({
+      open: true,
+      accountId: account._id,
+      fullName: account.fullName || account.username || "this staff member",
+      password: "",
+      confirmPassword: "",
+    });
+  }
+
+  function closeResetPasswordModal() {
+    setResetPasswordModal({
+      open: false,
+      accountId: "",
+      fullName: "",
+      password: "",
+      confirmPassword: "",
+    });
+  }
+
+  async function submitResetPassword() {
+    if (!resetPasswordModal.password.trim()) {
+      setError("Enter a new password before saving.");
+      return;
+    }
+
+    if (!resetPasswordModal.confirmPassword.trim()) {
+      setError("Confirm the new password before saving.");
+      return;
+    }
+
+    if (resetPasswordModal.password !== resetPasswordModal.confirmPassword) {
+      setError("New password and confirm password must match.");
+      return;
+    }
+
+    const success = await updateStaff(resetPasswordModal.accountId, {
+      action: "resetPassword",
+      password: resetPasswordModal.password,
+    });
+
+    if (success) {
+      closeResetPasswordModal();
+    }
+  }
+
+  function openDeleteStaffModal(account) {
+    setDeleteStaffModal({
+      open: true,
+      accountId: account._id,
+      fullName: account.fullName || account.username || "this staff member",
+      username: account.username || "",
+      confirmText: "",
+    });
+  }
+
+  function closeDeleteStaffModal() {
+    setDeleteStaffModal({
+      open: false,
+      accountId: "",
+      fullName: "",
+      username: "",
+      confirmText: "",
+    });
+  }
+
+  async function submitDeleteStaff() {
+    const expectedValue = deleteStaffModal.username.trim();
+    const typedValue = deleteStaffModal.confirmText.trim();
+
+    if (!typedValue) {
+      setError("Enter the username to confirm deletion.");
+      return;
+    }
+
+    if (expectedValue && typedValue !== expectedValue) {
+      setError("The username does not match. Deletion was not confirmed.");
+      return;
+    }
+
+    const success = await deleteStaff(deleteStaffModal.accountId);
+    if (success) {
+      closeDeleteStaffModal();
     }
   }
 
@@ -743,23 +847,13 @@ export default function StaffManagementPage() {
                                 Edit
                               </button>
                               <button
-                                onClick={() => {
-                                  const password = window.prompt(
-                                    `New password for ${account.fullName}`
-                                  );
-                                  if (password) {
-                                    updateStaff(account._id, {
-                                      action: "resetPassword",
-                                      password,
-                                    });
-                                  }
-                                }}
+                                onClick={() => openResetPasswordModal(account)}
                                 className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 dark:border-slate-700 dark:text-slate-200"
                               >
                                 Reset
                               </button>
                               <button
-                                onClick={() => deleteStaff(account._id)}
+                                onClick={() => openDeleteStaffModal(account)}
                                 className="rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600"
                               >
                                 Delete
@@ -996,17 +1090,7 @@ export default function StaffManagementPage() {
                   Close
                 </button>
                 <button
-                  onClick={() => {
-                    const password = window.prompt(
-                      `New password for ${selectedAccount.fullName}`
-                    );
-                    if (password) {
-                      updateStaff(selectedAccountId, {
-                        action: "resetPassword",
-                        password,
-                      });
-                    }
-                  }}
+                  onClick={() => openResetPasswordModal(selectedAccount)}
                   disabled={saving === selectedAccountId}
                   className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-medium text-slate-600 dark:border-slate-700 dark:text-slate-200"
                 >
@@ -1168,6 +1252,117 @@ export default function StaffManagementPage() {
             />
           )}
         </SurfaceCard>
+      ) : null}
+
+      {resetPasswordModal.open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+            <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-800">
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+                Reset password
+              </h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Set a new password for {resetPasswordModal.fullName}.
+              </p>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              <LabeledInput
+                label="New Password"
+                type="password"
+                value={resetPasswordModal.password}
+                onChange={(event) =>
+                  setResetPasswordModal((current) => ({
+                    ...current,
+                    password: event.target.value,
+                  }))
+                }
+                placeholder="Enter new password"
+              />
+              <LabeledInput
+                label="Confirm Password"
+                type="password"
+                value={resetPasswordModal.confirmPassword}
+                onChange={(event) =>
+                  setResetPasswordModal((current) => ({
+                    ...current,
+                    confirmPassword: event.target.value,
+                  }))
+                }
+                placeholder="Confirm new password"
+              />
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeResetPasswordModal}
+                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitResetPassword}
+                  disabled={saving === resetPasswordModal.accountId}
+                  className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400 dark:bg-blue-600 dark:hover:bg-blue-500"
+                >
+                  {saving === resetPasswordModal.accountId ? "Resetting..." : "Reset password"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteStaffModal.open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+            <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-800">
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+                Delete staff account
+              </h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                To delete {deleteStaffModal.fullName}, type the username below to confirm.
+              </p>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Username required: <span className="font-semibold">{deleteStaffModal.username || "-"}</span>
+              </div>
+
+              <LabeledInput
+                label="Confirm Username"
+                value={deleteStaffModal.confirmText}
+                onChange={(event) =>
+                  setDeleteStaffModal((current) => ({
+                    ...current,
+                    confirmText: event.target.value,
+                  }))
+                }
+                placeholder="Enter username to confirm"
+              />
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeDeleteStaffModal}
+                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitDeleteStaff}
+                  disabled={saving === deleteStaffModal.accountId}
+                  className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300"
+                >
+                  {saving === deleteStaffModal.accountId ? "Deleting..." : "Delete staff"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       ) : null}
     </PageShell>
   );
