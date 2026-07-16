@@ -59,6 +59,7 @@ export default function PaymentPage() {
   const [payazaAccount, setPayazaAccount] = useState(null);
   const [verifyingPayaza, setVerifyingPayaza] = useState(false);
   const [receiptFormOpen, setReceiptFormOpen] = useState(false);
+  const [paymentDetailsOpen, setPaymentDetailsOpen] = useState(false);
   const [receiptFile, setReceiptFile] = useState(null);
   const [receiptFields, setReceiptFields] = useState({
     phoneNumber: "",
@@ -501,9 +502,9 @@ export default function PaymentPage() {
     customer.receiptUpload?.enabled;
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 py-16 px-4">
+    <div className="min-h-screen bg-[#FAFAFA] px-3 py-3 dark:bg-slate-950 sm:px-4 sm:py-16">
       <div className="max-w-md mx-auto">
-        <div className="flex items-center justify-between mb-6 px-1">
+        <div className="mb-3 flex items-center justify-between px-1 sm:mb-6">
           {showBackButton ? (
             <button
               onClick={() => setActiveInvoice(null)}
@@ -527,29 +528,29 @@ export default function PaymentPage() {
           </span>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
-          <div className="px-8 pt-8 pb-7 border-b border-slate-100 dark:border-slate-800">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-slate-900">
+          <div className="border-b border-slate-100 px-4 pb-4 pt-4 dark:border-slate-800 sm:px-8 sm:pb-7 sm:pt-8">
             <p className="text-[12px] font-medium text-slate-500 uppercase tracking-wide">
-              Invoice amount
+              Amount to pay
             </p>
-            <p className="text-[34px] font-semibold text-slate-900 dark:text-slate-100 mt-1 tabular-nums">
-              N{Number(activeInvoice.amount).toLocaleString()}
+            <p className="mt-1 text-[1.85rem] font-semibold tabular-nums text-slate-900 dark:text-slate-100 sm:text-[34px]">
+              N{outstandingAmount.toLocaleString()}
             </p>
-            <p className="mt-2 text-[13px] text-slate-500 dark:text-slate-400">
-              Outstanding balance: N{outstandingAmount.toLocaleString()}
+            <p className="mt-1 text-[12px] text-slate-500 dark:text-slate-400 sm:mt-1.5 sm:text-[13px]">
+              Full invoice amount: N{Number(activeInvoice.amount || 0).toLocaleString()}
             </p>
           </div>
 
-          <div className="px-8 py-6 space-y-4">
+          <div className="space-y-2.5 px-4 py-3 sm:px-8 sm:py-6 sm:space-y-4">
             {customer.businessLogo ? (
-              <div className="mb-2 flex justify-center">
+              <div className="mb-1 flex justify-center sm:mb-2">
                 <Image
                   src={customer.businessLogo}
                   alt={customer.businessName || "Business logo"}
                   width={64}
                   height={64}
                   unoptimized
-                  className="h-16 w-16 rounded-2xl object-cover"
+                  className="h-12 w-12 rounded-xl object-cover sm:h-16 sm:w-16 sm:rounded-2xl"
                 />
               </div>
             ) : null}
@@ -571,53 +572,30 @@ export default function PaymentPage() {
           </div>
 
           {receiptUploadEnabled ? (
-            <div className="border-t border-slate-100 bg-slate-50/70 px-8 py-6 dark:border-slate-800 dark:bg-slate-950/60">
+            <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/60 sm:px-8 sm:py-6">
               <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-slate-600">
                 Bank transfer details
               </p>
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <div className="space-y-3">
-                  <DetailRow
-                    label="Bank"
-                    value={customer.receiptUpload.bankName || "-"}
-                    emphasis="medium"
-                  />
-                  <DetailRow
-                    label="Account name"
-                    value={customer.receiptUpload.accountName || "-"}
-                    emphasis="medium"
-                  />
-                </div>
-                <div className="mt-4 rounded-2xl border-2 border-emerald-500 bg-emerald-50 px-4 py-3 dark:border-emerald-400 dark:bg-emerald-950/30">
-                  <DetailRow
-                    label="Account number"
-                    value={customer.receiptUpload.accountNumber || "-"}
-                    emphasis="strong"
-                    action={
-                      <button
-                        type="button"
-                        onClick={() =>
-                          copyReceiptValue(
-                            "accountNumber",
-                            customer.receiptUpload.accountNumber
-                          )
-                        }
-                        className="inline-flex shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700"
-                      >
-                        {copiedReceiptField === "accountNumber" ? "Copied" : "Copy"}
-                      </button>
-                    }
-                  />
-                </div>
+              <div className="mt-2.5 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:mt-4 sm:p-4">
+                <p className="text-[13px] leading-5 text-slate-600 dark:text-slate-300">
+                  Open the payment details popup to view the bank name, account name, and account number.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setPaymentDetailsOpen(true)}
+                  className="mt-3 w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800"
+                >
+                  View payment details
+                </button>
               </div>
               {customer.receiptUpload.paymentInstructions ? (
-                <p className="mt-3 text-sm leading-6 text-slate-500">
+                <p className="mt-2.5 text-[12px] leading-5 text-slate-500 sm:mt-3 sm:text-sm sm:leading-6">
                   {customer.receiptUpload.paymentInstructions}
                 </p>
               ) : null}
             </div>
           ) : (
-          <div className="px-8 py-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/60">
+          <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/60 sm:px-8 sm:py-6">
             <label className="text-[12px] font-medium text-slate-500 uppercase tracking-wide block mb-2">
               Amount to pay
             </label>
@@ -641,18 +619,18 @@ export default function PaymentPage() {
           </div>
           )}
 
-          <div className="px-8 pb-8 pt-2">
+          <div className="px-4 pb-4 pt-1.5 sm:px-8 sm:pb-8 sm:pt-2">
             {receiptUploadEnabled ? (
               <>
                 <button
                   type="button"
                   onClick={() => setReceiptFormOpen(true)}
                   disabled={receiptSubmitted}
-                  className="w-full rounded-xl bg-slate-900 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-slate-800 disabled:bg-slate-300"
+                  className="w-full rounded-xl bg-slate-900 py-2.5 text-[14px] font-medium text-white transition-colors hover:bg-slate-800 disabled:bg-slate-300 sm:py-3.5 sm:text-[15px]"
                 >
                   {receiptSubmitted ? "Receipt submitted" : "I've Made Payment"}
                 </button>
-                <p className="mt-3 text-center text-[12px] text-slate-400">
+                <p className="mt-1.5 text-center text-[11px] text-slate-400 sm:mt-2 sm:text-[12px]">
                   Upload proof after completing your bank transfer.
                 </p>
               </>
@@ -712,6 +690,72 @@ export default function PaymentPage() {
           onSubmit={submitReceipt}
         />
       )}
+      {paymentDetailsOpen && receiptUploadEnabled && (
+        <BankTransferDetailsModal
+          bankName={customer.receiptUpload.bankName}
+          accountName={customer.receiptUpload.accountName}
+          accountNumber={customer.receiptUpload.accountNumber}
+          copiedField={copiedReceiptField}
+          onCopy={copyReceiptValue}
+          onClose={() => setPaymentDetailsOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function BankTransferDetailsModal({
+  bankName,
+  accountName,
+  accountNumber,
+  copiedField,
+  onCopy,
+  onClose,
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 px-4 py-6">
+      <div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl dark:bg-slate-900 sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Bank transfer details
+            </p>
+            <h2 className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">
+              Payment details
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm font-medium text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="space-y-3">
+            <DetailRow label="Bank" value={bankName || "-"} emphasis="medium" />
+            <DetailRow label="Account name" value={accountName || "-"} emphasis="medium" />
+          </div>
+          <div className="mt-4 rounded-2xl border-2 border-emerald-500 bg-emerald-50 px-4 py-3 dark:border-emerald-400 dark:bg-emerald-950/30">
+            <DetailRow
+              label="Account number"
+              value={accountNumber || "-"}
+              emphasis="strong"
+              action={
+                <button
+                  type="button"
+                  onClick={() => onCopy("accountNumber", accountNumber)}
+                  className="inline-flex shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                >
+                  {copiedField === "accountNumber" ? "Copied" : "Copy"}
+                </button>
+              }
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -839,12 +883,12 @@ function ReceiptField({
 function DetailRow({ label, value, align = "center", emphasis = "default", action = null }) {
   return (
     <div
-      className={`flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4 ${
-        align === "top" ? "sm:items-start" : "sm:items-center"
+      className={`flex flex-col gap-0.5 md:flex-row md:justify-between md:gap-4 ${
+        align === "top" ? "md:items-start" : "md:items-center"
       }`}
     >
       <span
-        className={`text-[13px] dark:text-slate-300 ${
+        className={`text-[12px] dark:text-slate-300 sm:text-[13px] ${
           emphasis === "strong"
             ? "font-semibold text-slate-700"
             : emphasis === "medium"
@@ -854,13 +898,13 @@ function DetailRow({ label, value, align = "center", emphasis = "default", actio
       >
         {label}
       </span>
-      <div className="flex flex-col gap-2 sm:items-end">
+      <div className="flex flex-col gap-2 md:items-end">
         <span
-          className={`break-words text-[14px] font-medium text-slate-900 dark:text-slate-100 sm:text-right ${
+          className={`break-words text-[13px] font-medium text-slate-900 dark:text-slate-100 md:text-right sm:text-[14px] ${
             emphasis === "strong"
-              ? "font-mono text-[1.05rem] font-bold tracking-[0.08em] text-emerald-950 dark:text-emerald-100"
+              ? "font-mono text-[0.98rem] font-bold tracking-[0.08em] text-emerald-950 dark:text-emerald-100 sm:text-[1.05rem]"
               : emphasis === "medium"
-                ? "text-[15px] font-semibold text-slate-950 dark:text-white"
+                ? "text-[14px] font-semibold text-slate-950 dark:text-white sm:text-[15px]"
               : ""
           }`}
         >
