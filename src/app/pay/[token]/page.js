@@ -54,6 +54,7 @@ export default function PaymentPage() {
   const [activeInvoice, setActiveInvoice] = useState(null);
   const [payAmount, setPayAmount] = useState(0);
   const [copiedPayazaField, setCopiedPayazaField] = useState("");
+  const [copiedReceiptField, setCopiedReceiptField] = useState("");
   const [launchingPayment, setLaunchingPayment] = useState(false);
   const [payazaAccount, setPayazaAccount] = useState(null);
   const [verifyingPayaza, setVerifyingPayaza] = useState(false);
@@ -315,6 +316,14 @@ export default function PaymentPage() {
     setTimeout(() => setCopiedPayazaField(""), 1500);
   };
 
+  const copyReceiptValue = (field, value) => {
+    if (!value) return;
+
+    navigator.clipboard.writeText(String(value));
+    setCopiedReceiptField(field);
+    setTimeout(() => setCopiedReceiptField(""), 1500);
+  };
+
   const handlePayAmountChange = (event) => {
     const rawValue = event.target.value;
 
@@ -563,13 +572,43 @@ export default function PaymentPage() {
 
           {receiptUploadEnabled ? (
             <div className="border-t border-slate-100 bg-slate-50/70 px-8 py-6 dark:border-slate-800 dark:bg-slate-950/60">
-              <p className="text-[12px] font-medium uppercase tracking-wide text-slate-500">
+              <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-slate-600">
                 Bank transfer details
               </p>
-              <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <DetailRow label="Bank" value={customer.receiptUpload.bankName || "-"} />
-                <DetailRow label="Account name" value={customer.receiptUpload.accountName || "-"} />
-                <DetailRow label="Account number" value={customer.receiptUpload.accountNumber || "-"} />
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="space-y-3">
+                  <DetailRow
+                    label="Bank"
+                    value={customer.receiptUpload.bankName || "-"}
+                    emphasis="medium"
+                  />
+                  <DetailRow
+                    label="Account name"
+                    value={customer.receiptUpload.accountName || "-"}
+                    emphasis="medium"
+                  />
+                </div>
+                <div className="mt-4 rounded-2xl border-2 border-emerald-500 bg-emerald-50 px-4 py-3 dark:border-emerald-400 dark:bg-emerald-950/30">
+                  <DetailRow
+                    label="Account number"
+                    value={customer.receiptUpload.accountNumber || "-"}
+                    emphasis="strong"
+                    action={
+                      <button
+                        type="button"
+                        onClick={() =>
+                          copyReceiptValue(
+                            "accountNumber",
+                            customer.receiptUpload.accountNumber
+                          )
+                        }
+                        className="inline-flex shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                      >
+                        {copiedReceiptField === "accountNumber" ? "Copied" : "Copy"}
+                      </button>
+                    }
+                  />
+                </div>
               </div>
               {customer.receiptUpload.paymentInstructions ? (
                 <p className="mt-3 text-sm leading-6 text-slate-500">
@@ -797,17 +836,38 @@ function ReceiptField({
   );
 }
 
-function DetailRow({ label, value, align = "center" }) {
+function DetailRow({ label, value, align = "center", emphasis = "default", action = null }) {
   return (
     <div
       className={`flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4 ${
         align === "top" ? "sm:items-start" : "sm:items-center"
       }`}
     >
-      <span className="text-[13px] text-slate-500 dark:text-slate-400">{label}</span>
-      <span className="break-words text-[14px] font-medium text-slate-900 dark:text-slate-100 sm:text-right">
-        {value}
+      <span
+        className={`text-[13px] dark:text-slate-300 ${
+          emphasis === "strong"
+            ? "font-semibold text-slate-700"
+            : emphasis === "medium"
+              ? "font-semibold text-slate-600"
+              : "text-slate-500 dark:text-slate-400"
+        }`}
+      >
+        {label}
       </span>
+      <div className="flex flex-col gap-2 sm:items-end">
+        <span
+          className={`break-words text-[14px] font-medium text-slate-900 dark:text-slate-100 sm:text-right ${
+            emphasis === "strong"
+              ? "font-mono text-[1.05rem] font-bold tracking-[0.08em] text-emerald-950 dark:text-emerald-100"
+              : emphasis === "medium"
+                ? "text-[15px] font-semibold text-slate-950 dark:text-white"
+              : ""
+          }`}
+        >
+          {value}
+        </span>
+        {action}
+      </div>
     </div>
   );
 }

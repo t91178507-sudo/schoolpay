@@ -697,10 +697,11 @@ export default function Invoices() {
       <div className="max-w-8xl">
         {activePage === "invoices" ? (
           <Toolbar>
-            <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+            <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
               <SelectField
                 value={invoiceFilterForm.category}
                 onChange={(event) => updateInvoiceFilterForm("category", event.target.value)}
+                className="min-w-0"
               >
                 <option value="all">All categories</option>
                 {invoiceCategoryOptions.map((category) => (
@@ -712,6 +713,7 @@ export default function Invoices() {
               <SelectField
                 value={invoiceFilterForm.provider}
                 onChange={(event) => updateInvoiceFilterForm("provider", event.target.value)}
+                className="min-w-0"
               >
                 <option value="all">All gateways</option>
                 {invoiceProviderOptions.map((provider) => (
@@ -724,15 +726,18 @@ export default function Invoices() {
                 type="date"
                 value={invoiceFilterForm.dateFrom}
                 onChange={(event) => updateInvoiceFilterForm("dateFrom", event.target.value)}
+                className="min-w-0 w-full"
               />
               <InputField
                 type="date"
                 value={invoiceFilterForm.dateTo}
                 onChange={(event) => updateInvoiceFilterForm("dateTo", event.target.value)}
+                className="min-w-0 w-full"
               />
               <SelectField
                 value={invoiceFilterForm.status}
                 onChange={(event) => updateInvoiceFilterForm("status", event.target.value)}
+                className="min-w-0"
               >
                 <option value="all">All statuses</option>
                 {invoiceStatusOptions.map((status) => (
@@ -744,6 +749,7 @@ export default function Invoices() {
               <SelectField
                 value={invoiceFilterForm.notification}
                 onChange={(event) => updateInvoiceFilterForm("notification", event.target.value)}
+                className="min-w-0"
               >
                 <option value="all">All notifications</option>
                 {notificationStatusOptions.map((status) => (
@@ -752,16 +758,14 @@ export default function Invoices() {
                   </option>
                 ))}
               </SelectField>
-            </div>
-            <div className="flex w-full flex-col gap-3 lg:w-[22rem]">
-              <InputField
-                type="search"
-                value={invoiceFilterForm.search}
-                onChange={(event) => updateInvoiceFilterForm("search", event.target.value)}
-                placeholder="Search invoice, customer, phone"
-                className="w-full"
-              />
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid min-w-0 gap-3 2xl:grid-cols-1">
+                <InputField
+                  type="search"
+                  value={invoiceFilterForm.search}
+                  onChange={(event) => updateInvoiceFilterForm("search", event.target.value)}
+                  placeholder="Search invoice, customer, phone"
+                  className="w-full min-w-0"
+                />
                 <button
                   type="button"
                   onClick={applyInvoiceFilters}
