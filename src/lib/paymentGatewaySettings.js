@@ -28,6 +28,14 @@ export const DEFAULT_PAYMENT_GATEWAYS = Object.freeze({
     webhookUrl: "",
     callbackUrl: "",
   },
+  accountDetails: {
+    enabled: false,
+    environment: "manual",
+    bankName: "",
+    accountName: "",
+    accountNumber: "",
+    paymentInstructions: "",
+  },
   receiptUpload: {
     enabled: false,
     environment: "manual",
@@ -334,6 +342,10 @@ export function buildSettingsPayload(user = {}, platformSettings = {}) {
       monnify: buildGatewayPayload("monnify", paymentGateways.monnify),
       payaza: buildGatewayPayload("payaza", paymentGateways.payaza),
       touchpay: buildGatewayPayload("touchpay", paymentGateways.touchpay),
+      accountDetails: buildGatewayPayload(
+        "accountDetails",
+        paymentGateways.accountDetails
+      ),
       receiptUpload: buildGatewayPayload(
         "receiptUpload",
         paymentGateways.receiptUpload
@@ -449,7 +461,7 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
     businessAddress: normalizeText(body.businessAddress),
     website: normalizeText(body.website),
     taxId: normalizeText(body.taxId),
-    defaultPaymentGateway: ["monnify", "payaza", "touchpay", "receiptUpload"].includes(body.defaultPaymentGateway)
+    defaultPaymentGateway: ["monnify", "payaza", "touchpay", "accountDetails", "receiptUpload"].includes(body.defaultPaymentGateway)
       ? body.defaultPaymentGateway
       : "monnify",
     defaultWhatsAppProvider: ["browser", "whatsappWeb"].includes(body.defaultWhatsAppProvider)
@@ -459,6 +471,21 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
       monnify: normalizeGateway("monnify", "sandbox"),
       payaza: normalizeGateway("payaza", "test"),
       touchpay: normalizeGateway("touchpay", "test"),
+      accountDetails: {
+        ...mergeGateway(
+          DEFAULT_PAYMENT_GATEWAYS.accountDetails,
+          existingGateways.accountDetails
+        ),
+        ...paymentGateways.accountDetails,
+        enabled: normalizeGatewayBoolean(paymentGateways.accountDetails?.enabled),
+        environment: "manual",
+        bankName: normalizeText(paymentGateways.accountDetails?.bankName),
+        accountName: normalizeText(paymentGateways.accountDetails?.accountName),
+        accountNumber: normalizeText(paymentGateways.accountDetails?.accountNumber),
+        paymentInstructions: normalizeText(
+          paymentGateways.accountDetails?.paymentInstructions
+        ),
+      },
       receiptUpload: {
         ...mergeGateway(
           DEFAULT_PAYMENT_GATEWAYS.receiptUpload,
@@ -550,6 +577,10 @@ export function resolveActivePaymentGateway(user = {}) {
 
   if (gateways.touchpay?.enabled === true) {
     return "touchpay";
+  }
+
+  if (gateways.accountDetails?.enabled === true) {
+    return "accountDetails";
   }
 
   return defaultGateway;

@@ -10,6 +10,7 @@ import {
 
 function buildCustomerPayload(record = {}, owner = null) {
   const activeGateway = resolveActivePaymentGateway(owner || {});
+  const accountDetails = owner?.paymentGateways?.accountDetails || {};
   const receiptUpload = owner?.paymentGateways?.receiptUpload || {};
 
   return {
@@ -19,6 +20,16 @@ function buildCustomerPayload(record = {}, owner = null) {
     businessName: record.businessName || owner?.businessName || "",
     businessLogo: record.businessLogo || owner?.businessLogo || "",
     defaultPaymentGateway: activeGateway,
+    accountDetails:
+      activeGateway === "accountDetails" && accountDetails.enabled
+        ? {
+            enabled: true,
+            bankName: accountDetails.bankName || "",
+            accountName: accountDetails.accountName || "",
+            accountNumber: accountDetails.accountNumber || "",
+            paymentInstructions: accountDetails.paymentInstructions || "",
+          }
+        : { enabled: false },
     receiptUpload:
       activeGateway === "receiptUpload" && receiptUpload.enabled
         ? {

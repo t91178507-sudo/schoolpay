@@ -48,6 +48,17 @@ const GATEWAYS = [
     ],
   },
   {
+    key: "accountDetails",
+    name: "Account Details",
+    blurb: "Send customers to a payment page where they can view your saved bank account details.",
+    fields: [
+      { key: "bankName", label: "Bank Name", type: "text" },
+      { key: "accountName", label: "Account Name", type: "text" },
+      { key: "accountNumber", label: "Account Number", type: "text" },
+      { key: "paymentInstructions", label: "Payment Instructions", type: "textarea" },
+    ],
+  },
+  {
     key: "receiptUpload",
     name: "Receipt Upload",
     blurb: "Let customers transfer to your bank account and upload proof for manual validation.",
@@ -118,6 +129,14 @@ const EMPTY_SETTINGS = {
       merchantId: "",
       webhookUrl: "",
       callbackUrl: "",
+    },
+    accountDetails: {
+      enabled: false,
+      environment: "manual",
+      bankName: "",
+      accountName: "",
+      accountNumber: "",
+      paymentInstructions: "",
     },
     receiptUpload: {
       enabled: false,
@@ -1040,7 +1059,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                {selectedGateway.key !== "receiptUpload" ? (
+                {!["receiptUpload", "accountDetails"].includes(selectedGateway.key) ? (
                   <>
                     <button
                       type="button"
@@ -1177,27 +1196,31 @@ export default function SettingsPage() {
                 })}
               </div>
 
-              {selectedGateway.key === "receiptUpload" ? (
+              {["receiptUpload", "accountDetails"].includes(selectedGateway.key) ? (
                 <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-                  When enabled, customer invoice links will show these bank details and collect receipt uploads instead of launching online checkout.
-                  <label className="mt-4 flex items-center gap-2 font-medium">
-                    <input
-                      type="checkbox"
-                      checked={
-                        settings.paymentGateways.receiptUpload
-                          ?.autoWhatsAppAcknowledgement !== false
-                      }
-                      onChange={(event) =>
-                        updateGatewayField(
-                          "receiptUpload",
-                          "autoWhatsAppAcknowledgement",
-                          event.target.checked
-                        )
-                      }
-                      className="h-4 w-4 accent-emerald-600"
-                    />
-                    Auto WhatsApp acknowledgement
-                  </label>
+                  {selectedGateway.key === "receiptUpload"
+                    ? "When enabled, customer invoice links will show these bank details and collect receipt uploads instead of launching online checkout."
+                    : "When enabled, customer invoice links will open a payment page where they can view these saved account details instead of launching online checkout."}
+                  {selectedGateway.key === "receiptUpload" ? (
+                    <label className="mt-4 flex items-center gap-2 font-medium">
+                      <input
+                        type="checkbox"
+                        checked={
+                          settings.paymentGateways.receiptUpload
+                            ?.autoWhatsAppAcknowledgement !== false
+                        }
+                        onChange={(event) =>
+                          updateGatewayField(
+                            "receiptUpload",
+                            "autoWhatsAppAcknowledgement",
+                            event.target.checked
+                          )
+                        }
+                        className="h-4 w-4 accent-emerald-600"
+                      />
+                      Auto WhatsApp acknowledgement
+                    </label>
+                  ) : null}
                 </div>
               ) : (
               <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">

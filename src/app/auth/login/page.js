@@ -170,7 +170,7 @@ export default function Login() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email or Username
+                  Email
                 </label>
                 <input
                   type="text"
@@ -179,7 +179,7 @@ export default function Login() {
                   onChange={handleChange}
                   required
                   className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700 focus:border-transparent"
-                  placeholder="your@email.com or username"
+                  placeholder="your@email.com"
                 />
               </div>
 

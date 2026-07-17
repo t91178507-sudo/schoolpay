@@ -28,6 +28,13 @@ function formatDateTime(value) {
   })}`;
 }
 
+function formatDate(value) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString();
+}
+
 function getOutstandingAmount(invoice) {
   const amount = Number(invoice.amount || 0);
   const paidAmount = Number(invoice.paidAmount || 0);
@@ -42,6 +49,23 @@ function getOutstandingAmount(invoice) {
   }
 
   return amount;
+}
+
+function getManualPaymentLimit(invoice) {
+  const invoiceAmount = Number(invoice?.amount || 0);
+  const outstandingAmount = Number(getOutstandingAmount(invoice) || 0);
+
+  if (outstandingAmount > 0 && outstandingAmount < invoiceAmount) {
+    return {
+      limit: outstandingAmount,
+      label: "outstanding balance",
+    };
+  }
+
+  return {
+    limit: invoiceAmount,
+    label: "invoice amount",
+  };
 }
 
 function normalizeNotificationStatus(status) {
@@ -90,7 +114,12 @@ function getInvoicePaymentUrl(invoice, origin) {
   return origin;
 }
 
-function buildWhatsAppInvoiceMessage(invoice, origin, customerLabel = "Customer") {
+function buildWhatsAppInvoiceMessage(
+  invoice,
+  origin,
+  customerLabel = "Customer",
+  businessName = "InvoiceHub"
+) {
   const customerName =
     invoice.customer ||
     invoice.customerName ||
@@ -105,6 +134,8 @@ function buildWhatsAppInvoiceMessage(invoice, origin, customerLabel = "Customer"
   return [
     `Hello ${customerName},`,
     "",
+    `*${businessName || "InvoiceHub"}*`,
+    "",
     `Your invoice is ready for payment.`,
     "",
     `Invoice: ${invoiceNumber}`,
@@ -117,7 +148,7 @@ function buildWhatsAppInvoiceMessage(invoice, origin, customerLabel = "Customer"
   ].join("\n");
 }
 
-function openBrowserWhatsApp(invoice, origin, customerLabel, notify) {
+function openBrowserWhatsApp(invoice, origin, customerLabel, businessName, notify) {
   const phone = normalizePhoneForWhatsApp(invoice.phone);
 
   if (!phone) {
@@ -125,7 +156,12 @@ function openBrowserWhatsApp(invoice, origin, customerLabel, notify) {
     return false;
   }
 
-  const message = buildWhatsAppInvoiceMessage(invoice, origin, customerLabel);
+  const message = buildWhatsAppInvoiceMessage(
+    invoice,
+    origin,
+    customerLabel,
+    businessName
+  );
   const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
   openExternalTab(whatsappUrl, notify);
 
@@ -176,6 +212,12 @@ export default function Invoices() {
   const [recurringLoading, setRecurringLoading] = useState(false);
   const [recurringLoaded, setRecurringLoaded] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
+  const [manualPaymentModal, setManualPaymentModal] = useState({
+    open: false,
+    invoice: null,
+    amount: "",
+  });
+  const [savingManualPayment, setSavingManualPayment] = useState(false);
   const [showRecurringForm, setShowRecurringForm] = useState(false);
   const [savingRecurring, setSavingRecurring] = useState(false);
   const [runningRecurring, setRunningRecurring] = useState(false);
@@ -186,7 +228,8 @@ export default function Invoices() {
     description: "",
     amount: "",
     frequency: "monthly",
-    nextRunAt: new Date().toISOString().slice(0, 10),
+    startDate: new Date().toISOString().slice(0, 10),
+    endDate: "",
   });
 
   const loadInvoices = useCallback(async () => {
@@ -230,19 +273,65 @@ export default function Invoices() {
     setNotice({ tone, text });
   }, []);
 
-  const markPaid = async (id) => {
-    setInvoices((prev) =>
-      prev.map((inv) => (String(inv._id) === String(id) ? { ...inv, status: "Paid" } : inv))
-    );
+  const openManualPaymentModal = (invoice) => {
+    const { limit } = getManualPaymentLimit(invoice);
+    setManualPaymentModal({
+      open: true,
+      invoice,
+      amount: limit > 0 ? String(limit) : "",
+    });
+  };
+
+  const closeManualPaymentModal = () => {
+    if (savingManualPayment) return;
+    setManualPaymentModal({ open: false, invoice: null, amount: "" });
+  };
+
+  const markPaid = async (invoice, paidAmount) => {
+    const id = invoice?._id;
+    const { limit, label } = getManualPaymentLimit(invoice);
+    const normalizedPaidAmount = Number(paidAmount || 0);
+
+    if (!id || !Number.isFinite(normalizedPaidAmount) || normalizedPaidAmount <= 0) {
+      showNotice("error", "Enter a valid paid amount.");
+      return;
+    }
+
+    if (normalizedPaidAmount > limit) {
+      showNotice(
+        "error",
+        `Paid amount cannot be more than the ${label} of N${limit.toLocaleString()}.`
+      );
+      return;
+    }
+
+    setSavingManualPayment(true);
 
     try {
-      const res = await authFetch(`/api/invoices/${id}`, { method: "PUT" });
+      const res = await authFetch(`/api/invoices/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paidAmount: normalizedPaidAmount }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        throw new Error("Update failed");
+        throw new Error(data.error || "Update failed");
       }
-      loadInvoices();
-    } catch {
-      loadInvoices();
+
+      setManualPaymentModal({ open: false, invoice: null, amount: "" });
+      showNotice(
+        "success",
+        data.message ||
+          (normalizedPaidAmount >= limit ? "Invoice marked as paid." : "Manual payment recorded.")
+      );
+      await loadInvoices();
+    } catch (error) {
+      showNotice("error", error.message || "Unable to record payment.");
+      await loadInvoices();
+    } finally {
+      setSavingManualPayment(false);
     }
   };
 
@@ -305,7 +394,13 @@ export default function Invoices() {
       If backend failed, automatically fall back to browser WhatsApp.
     */
     if (!res.ok) {
-      openBrowserWhatsApp(invoice, origin, customerLabels.singularTitle, showNotice);
+      openBrowserWhatsApp(
+        invoice,
+        origin,
+        customerLabels.singularTitle,
+        session.businessName || invoice.businessName || "InvoiceHub",
+        showNotice
+      );
       return;
     }
 
@@ -326,7 +421,13 @@ export default function Invoices() {
       ["sent", "delivered", "success", "prepared"].includes(deliveryStatus);
 
     if (!bridgeWorked) {
-      openBrowserWhatsApp(invoice, origin, customerLabels.singularTitle, showNotice);
+      openBrowserWhatsApp(
+        invoice,
+        origin,
+        customerLabels.singularTitle,
+        session.businessName || invoice.businessName || "InvoiceHub",
+        showNotice
+      );
       return;
     }
 
@@ -335,7 +436,13 @@ export default function Invoices() {
     /*
       Network/server error: automatically open browser WhatsApp.
     */
-    openBrowserWhatsApp(invoice, origin, customerLabels.singularTitle, showNotice);
+    openBrowserWhatsApp(
+      invoice,
+      origin,
+      customerLabels.singularTitle,
+      session.businessName || invoice.businessName || "InvoiceHub",
+      showNotice
+    );
   }
 };
 
@@ -420,6 +527,14 @@ export default function Invoices() {
     setSavingRecurring(true);
 
     try {
+      if (
+        recurringForm.endDate &&
+        recurringForm.startDate &&
+        recurringForm.endDate < recurringForm.startDate
+      ) {
+        throw new Error("End date cannot be earlier than the start date");
+      }
+
       const res = await authFetch("/api/recurring-invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -438,7 +553,8 @@ export default function Invoices() {
         description: "",
         amount: "",
         frequency: "monthly",
-        nextRunAt: new Date().toISOString().slice(0, 10),
+        startDate: new Date().toISOString().slice(0, 10),
+        endDate: "",
       });
       setShowRecurringForm(false);
       await Promise.all([loadInvoices(), loadRecurringInvoices()]);
@@ -886,6 +1002,10 @@ export default function Invoices() {
                           <p className="text-sm text-slate-500 dark:text-slate-400">
                             Frequency: {schedule.frequency || "monthly"}
                           </p>
+                          <p className="text-sm text-slate-500 dark:text-slate-400">
+                            Window: {formatDate(schedule.startDate || schedule.nextRunAt)} -{" "}
+                            {schedule.endDate ? formatDate(schedule.endDate) : "No end date"}
+                          </p>
                         </div>
 
                         <div className="space-y-2">
@@ -958,6 +1078,10 @@ export default function Invoices() {
                               </p>
                               <p className="text-sm text-slate-500 dark:text-slate-400">
                                 Next: {formatDateTime(schedule.nextRunAt)}
+                              </p>
+                              <p className="text-sm text-slate-500 dark:text-slate-400">
+                                {formatDate(schedule.startDate || schedule.nextRunAt)} -{" "}
+                                {schedule.endDate ? formatDate(schedule.endDate) : "No end date"}
                               </p>
                             </div>
                           </td>
@@ -1168,7 +1292,7 @@ export default function Invoices() {
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                       {invoice.status !== "Paid" ? (
                         <button
-                          onClick={() => markPaid(invoice._id)}
+                          onClick={() => openManualPaymentModal(invoice)}
                           className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-green-700"
                         >
                           <FiCheckCircle className="h-4 w-4" />
@@ -1288,7 +1412,7 @@ export default function Invoices() {
                         <div className="ml-auto flex justify-end gap-2">
                           {invoice.status !== "Paid" && (
                             <button
-                              onClick={() => markPaid(invoice._id)}
+                              onClick={() => openManualPaymentModal(invoice)}
                               className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-green-700"
                               title="Mark paid"
                             >
@@ -1327,14 +1451,17 @@ export default function Invoices() {
 
       {showRecurringForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-slate-900">
+          <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] bg-white shadow-2xl dark:bg-slate-900">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5 dark:border-slate-800">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                  Recurring invoices
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
                   Create recurring invoice
                 </h2>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  Set the customer, amount, frequency, and next generation date.
+                  Define the customer, billing amount, and active date window for automatic invoice generation.
                 </p>
               </div>
               <button
@@ -1346,63 +1473,161 @@ export default function Invoices() {
               </button>
             </div>
 
-            <form onSubmit={createRecurringInvoice} className="grid gap-4 p-6 sm:grid-cols-2">
-              <input
-                type="text"
-                value={recurringForm.customerName}
-                onChange={(event) => updateRecurringForm("customerName", event.target.value)}
-                placeholder={`${customerLabels.singularTitle} name`}
-                required
-                className="rounded-xl border border-slate-300 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              />
-              <input
-                type="tel"
-                value={recurringForm.phone}
-                onChange={(event) => updateRecurringForm("phone", event.target.value)}
-                placeholder="Phone number"
-                required
-                className="rounded-xl border border-slate-300 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              />
-              <input
-                type="text"
-                value={recurringForm.description}
-                onChange={(event) => updateRecurringForm("description", event.target.value)}
-                placeholder="Description"
-                required
-                className="rounded-xl border border-slate-300 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:col-span-2"
-              />
-              <input
-                type="number"
-                min="1"
-                value={recurringForm.amount}
-                onChange={(event) => updateRecurringForm("amount", event.target.value)}
-                placeholder="Amount"
-                required
-                className="rounded-xl border border-slate-300 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              />
-              <select
-                value={recurringForm.frequency}
-                onChange={(event) => updateRecurringForm("frequency", event.target.value)}
-                className="rounded-xl border border-slate-300 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              >
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="yearly">Yearly</option>
-              </select>
-              <input
-                type="date"
-                value={recurringForm.nextRunAt}
-                onChange={(event) => updateRecurringForm("nextRunAt", event.target.value)}
-                className="rounded-xl border border-slate-300 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              />
-              <input
-                type="email"
-                value={recurringForm.email}
-                onChange={(event) => updateRecurringForm("email", event.target.value)}
-                placeholder="Email address (optional)"
-                className="rounded-xl border border-slate-300 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              />
-              <div className="flex gap-3 pt-2 sm:col-span-2">
+            <form onSubmit={createRecurringInvoice} className="space-y-6 p-6">
+              <div className="grid gap-4 lg:grid-cols-[1.35fr_0.9fr]">
+                <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-800 dark:bg-slate-950/40">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    Customer and invoice details
+                  </p>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <label className="space-y-2 sm:col-span-2">
+                      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                        {customerLabels.singularTitle} name
+                      </span>
+                      <input
+                        type="text"
+                        value={recurringForm.customerName}
+                        onChange={(event) => updateRecurringForm("customerName", event.target.value)}
+                        placeholder={`Enter ${customerLabels.singularTitle.toLowerCase()} name`}
+                        required
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      />
+                    </label>
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                        Phone number
+                      </span>
+                      <input
+                        type="tel"
+                        value={recurringForm.phone}
+                        onChange={(event) => updateRecurringForm("phone", event.target.value)}
+                        placeholder="Enter phone number"
+                        required
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      />
+                    </label>
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                        Email
+                      </span>
+                      <input
+                        type="email"
+                        value={recurringForm.email}
+                        onChange={(event) => updateRecurringForm("email", event.target.value)}
+                        placeholder="Email address"
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      />
+                    </label>
+                    <label className="space-y-2 sm:col-span-2">
+                      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                        Description
+                      </span>
+                      <input
+                        type="text"
+                        value={recurringForm.description}
+                        onChange={(event) => updateRecurringForm("description", event.target.value)}
+                        placeholder="What will this recurring invoice cover?"
+                        required
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-slate-900 p-5 text-white dark:border-slate-800">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    Schedule preview
+                  </p>
+                  <p className="mt-4 text-4xl font-semibold">
+                    N{Number(recurringForm.amount || 0).toLocaleString()}
+                  </p>
+                  <div className="mt-5 space-y-3 text-sm text-slate-300">
+                    <div className="flex items-center justify-between gap-4">
+                      <span>Frequency</span>
+                      <span className="font-medium capitalize text-white">
+                        {recurringForm.frequency}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span>Starts</span>
+                      <span className="font-medium text-white">
+                        {formatDate(recurringForm.startDate)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span>Ends</span>
+                      <span className="font-medium text-white">
+                        {recurringForm.endDate ? formatDate(recurringForm.endDate) : "No end date"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  Billing schedule
+                </p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                      Amount
+                    </span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={recurringForm.amount}
+                      onChange={(event) => updateRecurringForm("amount", event.target.value)}
+                      placeholder="0.00"
+                      required
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                      Frequency
+                    </span>
+                    <select
+                      value={recurringForm.frequency}
+                      onChange={(event) => updateRecurringForm("frequency", event.target.value)}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    >
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                      Start date
+                    </span>
+                    <input
+                      type="date"
+                      value={recurringForm.startDate}
+                      onChange={(event) => updateRecurringForm("startDate", event.target.value)}
+                      required
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                      End date
+                    </span>
+                    <input
+                      type="date"
+                      min={recurringForm.startDate || undefined}
+                      value={recurringForm.endDate}
+                      onChange={(event) => updateRecurringForm("endDate", event.target.value)}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                  </label>
+                </div>
+                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+                  The first invoice will be generated on the start date. Leave the end date empty to keep the schedule running.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowRecurringForm(false)}
@@ -1422,7 +1647,105 @@ export default function Invoices() {
           </div>
         </div>
       )}
+      {manualPaymentModal.open && manualPaymentModal.invoice ? (
+        <ManualPaymentModal
+          invoice={manualPaymentModal.invoice}
+          amount={manualPaymentModal.amount}
+          saving={savingManualPayment}
+          onAmountChange={(value) =>
+            setManualPaymentModal((current) => ({ ...current, amount: value }))
+          }
+          onClose={closeManualPaymentModal}
+          onConfirm={() => markPaid(manualPaymentModal.invoice, manualPaymentModal.amount)}
+        />
+      ) : null}
     </PageShell>
+  );
+}
+
+function ManualPaymentModal({
+  invoice,
+  amount,
+  saving,
+  onAmountChange,
+  onClose,
+  onConfirm,
+}) {
+  const { limit, label } = getManualPaymentLimit(invoice);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Manual payment
+            </p>
+            <h2 className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">
+              Record paid amount
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="mt-5 space-y-4">
+          <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-950/60">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              {label === "invoice amount" ? "Invoice amount" : "Outstanding balance"}
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
+              N{limit.toLocaleString()}
+            </p>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              {invoice.invoiceNumber || "Invoice"}
+            </p>
+          </div>
+
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Paid amount
+            </span>
+            <input
+              type="number"
+              min="1"
+              max={limit}
+              value={amount}
+              onChange={(event) => onAmountChange(event.target.value)}
+              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+            />
+            <span className="mt-2 block text-xs text-slate-400">
+              Enter any amount up to N{limit.toLocaleString()}.
+            </span>
+          </label>
+        </div>
+
+        <div className="mt-6 flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="flex-1 rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={saving}
+            className="flex-1 rounded-xl bg-green-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-300"
+          >
+            {saving ? "Saving..." : "Save payment"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

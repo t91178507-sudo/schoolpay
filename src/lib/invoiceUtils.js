@@ -107,6 +107,7 @@ export function buildInvoiceMessage({
   description,
   items = [],
   paymentLink,
+  paymentLinkLabel = "Payment Link",
   date = new Date(),
   isReminder = false,
 }) {
@@ -121,7 +122,7 @@ Amount: ${formatCurrency(amount)}
 Description: ${description || "Invoice payment"}
 Date: ${formatMessageDate(date)}
 ${lines ? `\nItems:\n${lines}\n` : ""}
-Payment Link:
+${paymentLinkLabel}:
 ${paymentLink}`;
 }
 

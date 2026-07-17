@@ -50,7 +50,14 @@ export function normalizeRecurringInvoiceInput(body = {}, user = {}) {
         ]
   );
   const total = calculateInvoiceTotal(items);
-  const nextRunAt = toDate(body.nextRunAt || body.startDate || new Date());
+  const startDate = toDate(body.startDate || body.nextRunAt || new Date());
+  const endDate = body.endDate ? toDate(body.endDate, null) : null;
+
+  if (endDate && endDate < startDate) {
+    const error = new Error("End date cannot be earlier than the start date");
+    error.status = 400;
+    throw error;
+  }
 
   return {
     name: String(body.name || description || "Recurring invoice").trim(),
@@ -67,8 +74,9 @@ export function normalizeRecurringInvoiceInput(body = {}, user = {}) {
     businessLogo: body.businessLogo || user.businessLogo || "",
     frequency,
     interval: Math.max(Number(body.interval || 1), 1),
-    nextRunAt,
-    endDate: body.endDate ? toDate(body.endDate, null) : null,
+    startDate,
+    nextRunAt: startDate,
+    endDate,
     active: body.active !== false,
   };
 }

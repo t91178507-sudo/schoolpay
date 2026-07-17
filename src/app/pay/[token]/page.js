@@ -51,6 +51,7 @@ export default function PaymentPage() {
   const [customerData, setCustomerData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [activeInvoice, setActiveInvoice] = useState(null);
   const [payAmount, setPayAmount] = useState(0);
   const [copiedPayazaField, setCopiedPayazaField] = useState("");
@@ -103,9 +104,20 @@ export default function PaymentPage() {
     const fetchCustomerInvoices = async () => {
       try {
         const res = await fetch(`/api/invoices/by-token/${token}/customer`);
-        const data = res.ok ? await res.json() : null;
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          setErrorMessage(
+            res.status === 404
+              ? "No invoice available on this payment link right now."
+              : data?.error || "Unable to load invoice details right now."
+          );
+          setError(true);
+          return;
+        }
 
         if (!data) {
+          setErrorMessage("No invoice available on this payment link right now.");
           setError(true);
           return;
         }
@@ -116,6 +128,7 @@ export default function PaymentPage() {
         if (pending.length === 1) openInvoice(pending[0]);
       } catch (err) {
         console.error(err);
+        setErrorMessage("Unable to load invoice details right now.");
         setError(true);
       } finally {
         setLoading(false);
@@ -390,14 +403,14 @@ export default function PaymentPage() {
     return (
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6">
         <div className="text-center max-w-sm">
-          <div className="w-12 h-12 rounded-full bg-red-50 border border-red-100 flex items-center justify-center mx-auto mb-4">
-            <span className="text-red-500 text-xl">!</span>
+          <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center mx-auto mb-4">
+            <span className="text-slate-500 text-xl">i</span>
           </div>
           <h1 className="text-lg font-semibold text-slate-900">
-            This payment link is invalid or has expired
+            No invoice available
           </h1>
           <p className="text-sm text-slate-500 mt-2">
-            Check the link or contact the sender for a new one.
+            {errorMessage || "There is no invoice available on this payment link right now."}
           </p>
         </div>
       </div>
@@ -497,6 +510,9 @@ export default function PaymentPage() {
     activeInvoice.description || activeInvoice.category || activeInvoice.class || "-";
   const outstandingAmount = getOutstandingAmount(activeInvoice);
   const paymentGateway = customer.defaultPaymentGateway === "payaza" ? "payaza" : "monnify";
+  const accountDetailsEnabled =
+    customer.defaultPaymentGateway === "accountDetails" &&
+    customer.accountDetails?.enabled;
   const receiptUploadEnabled =
     customer.defaultPaymentGateway === "receiptUpload" &&
     customer.receiptUpload?.enabled;
@@ -571,7 +587,7 @@ export default function PaymentPage() {
             />
           </div>
 
-          {receiptUploadEnabled ? (
+          {receiptUploadEnabled || accountDetailsEnabled ? (
             <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/60 sm:px-8 sm:py-6">
               <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-slate-600">
                 Bank transfer details
@@ -588,9 +604,11 @@ export default function PaymentPage() {
                   View payment details
                 </button>
               </div>
-              {customer.receiptUpload.paymentInstructions ? (
+              {(customer.receiptUpload?.paymentInstructions ||
+                customer.accountDetails?.paymentInstructions) ? (
                 <p className="mt-2.5 text-[12px] leading-5 text-slate-500 sm:mt-3 sm:text-sm sm:leading-6">
-                  {customer.receiptUpload.paymentInstructions}
+                  {customer.receiptUpload?.paymentInstructions ||
+                    customer.accountDetails?.paymentInstructions}
                 </p>
               ) : null}
             </div>
@@ -632,6 +650,19 @@ export default function PaymentPage() {
                 </button>
                 <p className="mt-1.5 text-center text-[11px] text-slate-400 sm:mt-2 sm:text-[12px]">
                   Upload proof after completing your bank transfer.
+                </p>
+              </>
+            ) : accountDetailsEnabled ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setPaymentDetailsOpen(true)}
+                  className="w-full rounded-xl bg-slate-900 py-2.5 text-[14px] font-medium text-white transition-colors hover:bg-slate-800 sm:py-3.5 sm:text-[15px]"
+                >
+                  View payment details
+                </button>
+                <p className="mt-1.5 text-center text-[11px] text-slate-400 sm:mt-2 sm:text-[12px]">
+                  Open the saved account details and transfer directly to the business.
                 </p>
               </>
             ) : (
@@ -690,11 +721,23 @@ export default function PaymentPage() {
           onSubmit={submitReceipt}
         />
       )}
-      {paymentDetailsOpen && receiptUploadEnabled && (
+      {paymentDetailsOpen && (receiptUploadEnabled || accountDetailsEnabled) && (
         <BankTransferDetailsModal
-          bankName={customer.receiptUpload.bankName}
-          accountName={customer.receiptUpload.accountName}
-          accountNumber={customer.receiptUpload.accountNumber}
+          bankName={
+            receiptUploadEnabled
+              ? customer.receiptUpload.bankName
+              : customer.accountDetails.bankName
+          }
+          accountName={
+            receiptUploadEnabled
+              ? customer.receiptUpload.accountName
+              : customer.accountDetails.accountName
+          }
+          accountNumber={
+            receiptUploadEnabled
+              ? customer.receiptUpload.accountNumber
+              : customer.accountDetails.accountNumber
+          }
           copiedField={copiedReceiptField}
           onCopy={copyReceiptValue}
           onClose={() => setPaymentDetailsOpen(false)}

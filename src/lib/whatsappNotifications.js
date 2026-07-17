@@ -5,6 +5,7 @@ import {
 } from "./invoiceUtils";
 import {
   resolveBrowserWhatsAppConfig,
+  resolveActivePaymentGateway,
   resolveWhatsAppWebConfigForUser,
 } from "./paymentGatewaySettings";
 import { buildPaymentReceiptAttachment } from "./paymentReceiptPdf";
@@ -64,6 +65,13 @@ export async function deliverInvoiceMessage({
 
   const customerName =
     invoice.customer || invoice.customerName || invoice.student || "Customer";
+  const activeGateway = resolveActivePaymentGateway(owner || {});
+  const paymentLinkLabel =
+    activeGateway === "accountDetails"
+      ? "Click to view account details"
+      : activeGateway === "receiptUpload"
+        ? "Click to view bank transfer details"
+        : "Payment Link";
   const message = buildInvoiceMessage({
     businessLogo: invoice.businessLogo || owner?.businessLogo || "",
     businessName: invoice.businessName || owner?.businessName || "",
@@ -75,6 +83,7 @@ export async function deliverInvoiceMessage({
       invoice.description || invoice.category || invoice.class || "Invoice payment",
     items: invoice.items || [],
     paymentLink: `${origin}/pay/${invoice.token}`,
+    paymentLinkLabel,
     date: invoice.date ? new Date(invoice.date) : new Date(),
     isReminder,
   });
