@@ -630,75 +630,159 @@ export default function CategoriesPage() {
     );
   }
 
+  const totalCategories = categoryList.length;
+  const uncategorizedCount = grouped.Uncategorized?.length || 0;
+  const currentViewCount = selectedCategory
+    ? visibleSelectedCustomers.length
+    : customers.length;
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 py-6 sm:py-8">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        <div className="mb-8 flex flex-col gap-4 lg:mb-10 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-gray-900 dark:text-slate-100">{customerLabels.singularTitle} categories</h1>
-            <p className="text-gray-600 dark:text-slate-400 mt-1">
-              Organize {customerLabels.singular} groups and generate invoices from one shared billing view.
-            </p>
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 py-4 sm:py-5">
+      <div className="w-full px-3 sm:px-4 lg:px-5">
+        <div className="mb-4 overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_-36px_rgba(15,23,42,0.28)] dark:border-slate-800 dark:bg-slate-900">
+          <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-blue-50/70 px-5 py-4 dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900 sm:px-6 lg:px-7">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="max-w-3xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                  Category workspace
+                </p>
+                <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-50 sm:text-3xl">
+                  {customerLabels.singularTitle} categories
+                </h1>
+                <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  Organize {customerLabels.plural} into billing groups, import records faster,
+                  and generate individual or category-wide invoices from one clean view.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2.5 sm:flex-row xl:flex-col xl:items-end">
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="inline-flex h-10 items-center justify-center rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-blue-600 dark:hover:bg-blue-500"
+                >
+                  Add new {customerLabels.singular}
+                </button>
+                <div className="rounded-2xl border border-slate-200 bg-white/85 px-4 py-2.5 text-left shadow-sm dark:border-slate-800 dark:bg-slate-950/60 xl:min-w-[11rem]">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                    Total {customerLabels.plural}
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
+                    {customers.length}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between lg:justify-end">
-            <div className="text-left sm:text-right">
-              <p className="text-sm text-gray-500 dark:text-slate-400">Total {customerLabels.plural}</p>
-              <p className="text-3xl font-semibold text-gray-900 dark:text-slate-100 sm:text-4xl">
-                {customers.length}
+          <div className="grid gap-2.5 px-5 py-3.5 sm:grid-cols-2 xl:grid-cols-4 sm:px-6 lg:px-7">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-800 dark:bg-slate-950/60">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Categories
+              </p>
+              <p className="mt-1.5 text-2xl font-semibold text-slate-950 dark:text-white">
+                {totalCategories}
               </p>
             </div>
-
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
-            >
-              + Add New {customerLabels.singularTitle}
-            </button>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-800 dark:bg-slate-950/60">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Visible now
+              </p>
+              <p className="mt-1.5 text-2xl font-semibold text-slate-950 dark:text-white">
+                {currentViewCount}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-800 dark:bg-slate-950/60">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Uncategorized
+              </p>
+              <p className="mt-1.5 text-2xl font-semibold text-slate-950 dark:text-white">
+                {uncategorizedCount}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-800 dark:bg-slate-950/60">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Current view
+              </p>
+              <p className="mt-1.5 truncate text-base font-semibold text-slate-950 dark:text-white">
+                {selectedCategory || "All categories"}
+              </p>
+            </div>
           </div>
         </div>
 
         {selectedCategory && (
           <button
             onClick={() => setSelectedCategory(null)}
-            className="mb-6 flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors dark:text-slate-400 dark:hover:text-white"
+            className="mb-4 inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
           >
             ← Back to All Categories
           </button>
         )}
 
-        <div className="mb-6 max-w-xl">
-          <label htmlFor="student-category-search" className="sr-only">
-            Search {selectedCategory ? customerLabels.plural : "categories"}
-          </label>
-          <input
-            id="student-category-search"
-            type="search"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder={
-              selectedCategory
-                ? `Search ${customerLabels.plural}`
-                : `Search categories or ${customerLabels.plural}`
-            }
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-800"
-          />
+        <div className="mb-4 rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
+          <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center">
+            <div className="min-w-0 flex-1">
+              <label htmlFor="student-category-search" className="sr-only">
+                Search {selectedCategory ? customerLabels.plural : "categories"}
+              </label>
+              <input
+                id="student-category-search"
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder={
+                  selectedCategory
+                    ? `Search ${customerLabels.plural}, phone, email, or token`
+                    : `Search categories or ${customerLabels.plural}`
+                }
+                className="w-full rounded-2xl border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-800"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
+                {visibleCategoryList.length} categories
+              </span>
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
+                {selectedCategory
+                  ? `${visibleSelectedCustomers.length} visible ${customerLabels.plural}`
+                  : `${customers.length} total ${customerLabels.plural}`}
+              </span>
+            </div>
+          </div>
         </div>
 
         {!selectedCategory ? (
           <div>
-            <h2 className="text-xl font-medium text-gray-700 dark:text-slate-300 mb-6">
+            <h2 className="mb-4 text-lg font-medium text-gray-700 dark:text-slate-300">
               All categories ({visibleCategoryList.length})
             </h2>
 
             {visibleCategoryList.length === 0 ? (
-              <div className="text-center py-20 text-gray-500 dark:text-slate-400">
-                {categoryList.length === 0
-                  ? `No ${customerLabels.plural} yet. Add your first ${customerLabels.singular} to create a category.`
-                  : "No matching categories found."}
+              <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white px-6 py-16 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-2xl font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  {customerLabels.singularTitle.slice(0, 1)}
+                </div>
+                <h3 className="mt-5 text-xl font-semibold text-slate-900 dark:text-white">
+                  {categoryList.length === 0
+                    ? `No ${customerLabels.plural} added yet`
+                    : "No matching categories found"}
+                </h3>
+                <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  {categoryList.length === 0
+                    ? `Add your first ${customerLabels.singular} and InvoiceHub will automatically group them into categories.`
+                    : "Try another search term or clear the current filter to show more category groups."}
+                </p>
+                {categoryList.length === 0 ? (
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="mt-6 inline-flex h-11 items-center justify-center rounded-2xl bg-slate-900 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-blue-600 dark:hover:bg-blue-500"
+                  >
+                    Add first {customerLabels.singular}
+                  </button>
+                ) : null}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {visibleCategoryList.map((category) => {
                   const count = grouped[category]?.length || 0;
 
@@ -706,39 +790,51 @@ export default function CategoriesPage() {
                     <div
                       key={category}
                       onClick={() => setSelectedCategory(category)}
-                      className="group cursor-pointer rounded-3xl border border-slate-200 bg-white p-6 transition-all duration-300 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 sm:p-8"
+                      className="group cursor-pointer overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white p-0 transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_20px_50px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
                     >
-                      <div className="flex items-center gap-4 mb-6">
-                        <div className="w-14 h-14 bg-slate-100 text-slate-600 rounded-2xl flex items-center justify-center text-3xl dark:bg-slate-800 dark:text-slate-300">
-                          C
+                      <div className="mb-4 flex items-center gap-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-5 py-4 dark:border-slate-800 dark:from-slate-950 dark:to-slate-900 sm:px-6">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-base font-semibold text-white dark:bg-slate-800">
+                          {category.slice(0, 1).toUpperCase()}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <h3 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                            Category
+                          </p>
+                          <h3 className="truncate text-lg font-semibold text-slate-900 dark:text-slate-100">
                             {category}
                           </h3>
                         </div>
                       </div>
 
-                      <div className="flex justify-between items-end gap-4">
+                      <div className="px-5 pb-4 sm:px-6">
+                        <div className="flex items-end justify-between gap-4">
                         <div>
                           <p className="text-sm text-slate-500 dark:text-slate-400">{customerLabels.pluralTitle}</p>
-                          <p className="mt-1 text-4xl font-bold text-slate-800 dark:text-slate-100 sm:text-5xl">
+                          <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-slate-100 sm:text-4xl">
                             {count}
                           </p>
                         </div>
-                        <div className="text-right text-slate-500 text-sm font-medium group-hover:translate-x-1 transition-transform">
+                        <div className="hidden text-right text-slate-500 text-sm font-medium group-hover:translate-x-1 transition-transform">
                           View {customerLabels.pluralTitle} →
                         </div>
                       </div>
 
-                      <div className="mt-6 flex gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+                        <div className="mt-3 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
+                          <span>Shared billing view</span>
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                            Open
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 border-t border-slate-100 px-5 py-3 dark:border-slate-800 sm:px-6">
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
                             renameCategory(category);
                           }}
-                          className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                          className="flex-1 rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
                           Rename
                         </button>
@@ -748,7 +844,7 @@ export default function CategoriesPage() {
                             event.stopPropagation();
                             deleteCategory(category);
                           }}
-                          className="flex-1 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:text-red-400 dark:hover:bg-red-950/30"
+                          className="flex-1 rounded-xl border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:text-red-400 dark:hover:bg-red-950/30"
                         >
                           Delete
                         </button>
@@ -760,15 +856,18 @@ export default function CategoriesPage() {
             )}
           </div>
         ) : (
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
-              <div className="bg-slate-800 dark:bg-slate-900 px-5 py-6 text-white sm:px-8 lg:px-10">
+            <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800 dark:bg-slate-900">
+              <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-5 py-6 text-white sm:px-8 lg:px-10">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-2xl font-semibold">
-                    C
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-2xl font-semibold">
+                    {selectedCategory.slice(0, 1).toUpperCase()}
                   </div>
                   <div>
-                      <h2 className="text-3xl font-semibold sm:text-4xl">{selectedCategory}</h2>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">
+                        Selected category
+                      </p>
+                      <h2 className="mt-2 text-3xl font-semibold sm:text-4xl">{selectedCategory}</h2>
                     <p className="text-slate-300 mt-1 text-lg">
                       {visibleSelectedCustomers.length} {visibleSelectedCustomers.length === 1 ? customerLabels.singularTitle : customerLabels.pluralTitle}
                     </p>

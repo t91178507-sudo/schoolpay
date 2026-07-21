@@ -756,7 +756,7 @@ export default function Invoices() {
     <PageShell>
       <PageHeader
         title="Invoices"
-        description={`Manage invoices, payment readiness, and ${customerLabels.singular} sharing from one compact view.`}
+        description={`Manage invoices, follow-up status, and ${customerLabels.singular} communication from one compact view.`}
         actions={
           activePage === "invoices" ? (
             <button

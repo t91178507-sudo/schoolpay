@@ -239,7 +239,7 @@ export default function Dashboard() {
           valueClassName="mt-2 text-3xl"
         />
         <StatCard
-          label="Expected Revenue"
+          label="Open invoice value"
           value={`N${stats.expectedRevenue.toLocaleString()}`}
           tone="violet"
           className="p-3.5"
@@ -247,7 +247,7 @@ export default function Dashboard() {
           valueClassName="mt-2 text-3xl"
         />
         <StatCard
-          label="Collected Revenue"
+          label="Collected so far"
           value={`N${stats.totalRevenue.toLocaleString()}`}
           tone="emerald"
           className="p-3.5"
@@ -255,7 +255,7 @@ export default function Dashboard() {
           valueClassName="mt-2 text-3xl"
         />
         <StatCard
-          label="Paid Invoices"
+          label="Closed invoices"
           value={stats.paidInvoices}
           tone="emerald"
           className="p-3.5"
@@ -263,7 +263,7 @@ export default function Dashboard() {
           valueClassName="mt-2 text-3xl"
         />
         <StatCard
-          label="Incomplete Invoices"
+          label="Needs follow-up"
           value={stats.incompleteInvoices}
           tone="blue"
           className="p-3.5"
@@ -272,19 +272,19 @@ export default function Dashboard() {
         />
       </StatGrid>
 
-      <div className="grid flex-1 gap-3 xl:min-h-0 xl:grid-cols-2 xl:auto-rows-fr">
-        <SurfaceCard className="overflow-hidden border border-slate-200/70 bg-white/95 p-0 shadow-[0_24px_60px_-32px_rgba(15,23,42,0.35)] dark:border-slate-800 dark:bg-slate-950/80 xl:flex xl:h-full xl:flex-col">
+      <div className="grid flex-1 gap-3 xl:grid-cols-2">
+        <SurfaceCard className="min-w-0 overflow-hidden border border-slate-200/70 bg-white/95 p-0 shadow-[0_24px_60px_-32px_rgba(15,23,42,0.35)] dark:border-slate-800 dark:bg-slate-950/80">
           <div className="border-b border-slate-200/80 bg-gradient-to-r from-slate-50 to-white px-4 py-3 dark:border-slate-800 dark:from-slate-950 dark:to-slate-900">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-              Collections overview
+              Collection flow
             </p>
             <div className="mt-2 flex items-end justify-between gap-4">
               <div>
                 <h2 className="text-sm font-semibold text-slate-950 dark:text-white lg:text-base">
-                  Current year monthly collections
+                  Monthly cleared invoices
                 </h2>
                 <p className="mt-1 text-xs text-slate-500">
-                  Paid invoice inflow month by month.
+                  What has already been settled this year.
                 </p>
               </div>
               <p className="text-right text-xs font-medium text-slate-500">
@@ -292,7 +292,7 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          <div className="h-[240px] px-2 py-2.5 sm:px-3 xl:h-[calc(100%-78px)]">
+          <div className="min-w-0 h-[240px] px-2 py-2.5 sm:h-[260px] sm:px-3 xl:h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyCollections} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
                 <defs>
@@ -339,21 +339,21 @@ export default function Dashboard() {
           </div>
         </SurfaceCard>
 
-        <SurfaceCard className="overflow-hidden border border-slate-200/70 bg-white/95 p-0 shadow-[0_24px_60px_-32px_rgba(15,23,42,0.35)] dark:border-slate-800 dark:bg-slate-950/80 xl:flex xl:h-full xl:flex-col">
+        <SurfaceCard className="min-w-0 overflow-hidden border border-slate-200/70 bg-white/95 p-0 shadow-[0_24px_60px_-32px_rgba(15,23,42,0.35)] dark:border-slate-800 dark:bg-slate-950/80">
           <div className="border-b border-slate-200/80 bg-gradient-to-r from-slate-50 to-white px-4 py-3 dark:border-slate-800 dark:from-slate-950 dark:to-slate-900">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-              Trend line
+              Revenue trend
             </p>
             <div className="mt-2">
               <h2 className="text-sm font-semibold text-slate-950 dark:text-white lg:text-base">
-                Last five years
+                Five-year collection view
               </h2>
               <p className="mt-1 text-xs text-slate-500">
-                Revenue trend across recent financial years.
+                A longer view of how cleared collections are moving.
               </p>
             </div>
           </div>
-          <div className="h-[240px] px-3 py-2.5 sm:px-3 xl:h-[calc(100%-78px)]">
+          <div className="min-w-0 h-[240px] px-3 py-2.5 sm:h-[260px] sm:px-3 xl:h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={yearlyCollections} margin={{ top: 12, right: 16, left: 8, bottom: 8 }}>
                 <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="4 4" />

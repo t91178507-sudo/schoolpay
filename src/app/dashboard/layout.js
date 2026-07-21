@@ -40,7 +40,7 @@ export default function DashboardLayout({ children }) {
     { name: `${customerLabels.singularTitle} overview`, href: "/dashboard/customers", badge: "C" },
     { name: "Invoices", href: "/dashboard/invoices", badge: "I" },
     { name: "Communication", href: "/dashboard/communication", badge: "M" },
-    { name: "Payment history", href: "/dashboard/payments", badge: "P" },
+    { name: "Collections history", href: "/dashboard/payments", badge: "P" },
     { name: "Receipt validation", href: "/dashboard/receipts", badge: "V" },
     { name: "Users & Staff", href: "/dashboard/staff", badge: "U" },
     { name: "Settings", href: "/dashboard/settings", badge: "S" },
@@ -266,7 +266,7 @@ export default function DashboardLayout({ children }) {
               {session.businessName || "InvoiceHub"}
             </h1>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Billing and collections workspace
+              Reconciliation and customer operations workspace
             </p>
           </div>
         </div>

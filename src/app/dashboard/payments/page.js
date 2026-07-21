@@ -92,6 +92,68 @@ function formatCurrency(value) {
   return `N${Number(value || 0).toLocaleString()}`;
 }
 
+function buildGeneratedTransactionId(seed = "", happenedAt = "", index = 0) {
+  const normalizedDate = happenedAt
+    ? formatDateInput(happenedAt).replaceAll("-", "")
+    : "00000000";
+  const normalizedSeed = String(seed || "")
+    .replace(/[^A-Za-z0-9]/g, "")
+    .slice(-8)
+    .toUpperCase();
+
+  return `TXN-${normalizedDate}-${String(index + 1).padStart(2, "0")}${
+    normalizedSeed || "AUTO"
+  }`;
+}
+
+function buildCompactDetails(row) {
+  const segments = [row.description];
+
+  if (row.invoiceNumber && row.invoiceNumber !== "-") {
+    segments.push(`Invoice ${row.invoiceNumber}`);
+  }
+
+  if (Number(row.balanceDue || 0) > 0) {
+    segments.push(`Balance ${formatCurrency(row.balanceDue)}`);
+  }
+
+  return segments.filter(Boolean).join(" • ");
+}
+
+function buildCompactCustomer(row) {
+  return [row.customerName, row.phone].filter(Boolean).join(" • ");
+}
+
+function buildCompactProvider(row) {
+  return [row.provider || "-", formatNotificationStatus(row.notificationStatus)]
+    .filter(Boolean)
+    .join(" • ");
+}
+
+function buildInlineDetails(row) {
+  const segments = [row.description];
+
+  if (row.invoiceNumber && row.invoiceNumber !== "-") {
+    segments.push(`Invoice ${row.invoiceNumber}`);
+  }
+
+  if (Number(row.balanceDue || 0) > 0) {
+    segments.push(`Balance ${formatCurrency(row.balanceDue)}`);
+  }
+
+  return segments.filter(Boolean).join(" | ");
+}
+
+function buildInlineCustomer(row) {
+  return [row.customerName, row.phone].filter(Boolean).join(" | ");
+}
+
+function buildInlineProvider(row) {
+  return [row.provider || "-", formatNotificationStatus(row.notificationStatus)]
+    .filter(Boolean)
+    .join(" | ");
+}
+
 function normalizePaymentStatus(status) {
   const normalized = String(status || "").toLowerCase();
 
@@ -297,10 +359,16 @@ export default function Payments() {
             reference,
             transactionId:
               transaction.transactionId ||
-              transaction.paymentReference ||
-              transaction.reference ||
-              reference ||
-              `${invoice.invoiceNumber || invoice._id}-${index + 1}`,
+              buildGeneratedTransactionId(
+                transaction.paymentReference ||
+                  transaction.reference ||
+                  reference ||
+                  invoice.paymentReference ||
+                  invoice.invoiceNumber ||
+                  invoice._id,
+                happenedAt,
+                index
+              ),
             happenedAt,
           };
         });
@@ -334,10 +402,18 @@ export default function Payments() {
             invoice.invoiceNumber ||
             "-",
           transactionId:
-            invoice.paymentReference ||
-            invoice.pendingPaymentReference ||
-            invoice.invoiceNumber ||
-            String(invoice._id || "-"),
+            buildGeneratedTransactionId(
+              invoice.paymentReference ||
+                invoice.pendingPaymentReference ||
+                invoice.invoiceNumber ||
+                invoice._id,
+              invoice.paidAt ||
+                invoice.paymentConfirmedAt ||
+                invoice.pendingPaymentCreatedAt ||
+                invoice.date ||
+                invoice.createdAt,
+              0
+            ),
           happenedAt:
             invoice.paidAt ||
             invoice.paymentConfirmedAt ||
@@ -479,8 +555,8 @@ export default function Payments() {
   return (
     <PageShell>
       <PageHeader
-        title="Payment history"
-        description="Track individual payment transactions, invoice payments, QR sessions, confirmation status, and notification readiness from one view."
+        title="Collections history"
+        description="Review cleared transactions, invoice activity, notification outcomes, and collection records from one place."
         actions={
           <button
             type="button"
@@ -517,10 +593,10 @@ export default function Payments() {
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                Transaction filters
+                Collection filters
               </h2>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Filter by date range, source, payment status, notification status,
+                Narrow the ledger by date, source, settlement state, notification state,
                 and customer details.
               </p>
             </div>
@@ -532,7 +608,7 @@ export default function Payments() {
               <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 dark:border-slate-700 dark:bg-slate-900">
                 {latestPaymentDate
                   ? `Latest: ${latestPaymentDate}`
-                  : "No payment date yet"}
+                  : "No activity date yet"}
               </span>
               <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 dark:border-slate-700 dark:bg-slate-900">
                 Pending: {pendingCount}
@@ -628,7 +704,7 @@ export default function Payments() {
         <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-950/60 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-              Payment transaction records
+              Collection records
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               Showing {filteredRows.length} individual transaction
@@ -668,12 +744,12 @@ export default function Payments() {
 
         {loading ? (
           <div className="py-16 text-center text-sm text-slate-500 dark:text-slate-400">
-            Loading payment history...
+            Loading collections history...
           </div>
         ) : filteredRows.length === 0 ? (
           <EmptyState
-            title="No payment history matches these filters"
-            description="Try clearing one or two filters to widen the view."
+            title="No collection records match these filters"
+            description="Try clearing one or two filters to widen the timeline."
           />
         ) : (
           <>
@@ -781,7 +857,7 @@ export default function Payments() {
                       Status
                     </th>
                     <th className="w-[10%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Provider
+                      Provider / Msg
                     </th>
                   </tr>
                 </thead>
@@ -792,80 +868,64 @@ export default function Payments() {
                       key={row.id}
                       className="hover:bg-slate-50 dark:hover:bg-slate-950/60"
                     >
-                      <td className="px-4 py-3 align-top">
-                        <p className="max-w-[12rem] break-all font-mono text-xs text-slate-600 dark:text-slate-300">
+                      <td className="px-4 py-3 align-middle">
+                        <p
+                          className="truncate whitespace-nowrap font-mono text-xs text-slate-600 dark:text-slate-300"
+                          title={row.transactionId}
+                        >
                           {row.transactionId}
-                        </p>
-                        <p className="mt-1 break-all text-xs text-slate-400 dark:text-slate-500">
-                          Ref: {row.reference || "-"}
                         </p>
                       </td>
 
-                      <td className="px-4 py-3 align-top">
-                        <p className="text-sm text-slate-800 dark:text-slate-300">
+                      <td className="px-4 py-3 align-middle">
+                        <p
+                          className="truncate whitespace-nowrap text-sm text-slate-800 dark:text-slate-300"
+                          title={formatDateTime(row.happenedAt)}
+                        >
                           {formatDateTime(row.happenedAt)}
                         </p>
                       </td>
 
-                      <td className="px-4 py-3 align-top">
-                        <div className="space-y-1">
-                          <p className="font-medium text-slate-900 dark:text-slate-100">
-                            {row.customerName}
-                          </p>
-
-                          {row.phone ? (
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                              {row.phone}
-                            </p>
-                          ) : null}
-                        </div>
+                      <td className="px-4 py-3 align-middle">
+                        <p
+                          className="truncate whitespace-nowrap font-medium text-slate-900 dark:text-slate-100"
+                          title={buildInlineCustomer(row)}
+                        >
+                          {buildInlineCustomer(row)}
+                        </p>
                       </td>
 
-                      <td className="px-4 py-3 align-top">
-                        <div className="space-y-1">
-                          <p className="text-sm text-slate-800 dark:text-slate-300">
-                            {row.description}
-                          </p>
-
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            Invoice: {row.invoiceNumber || "-"}
-                          </p>
-
-                          {Number(row.balanceDue || 0) > 0 ? (
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                              Balance: {formatCurrency(row.balanceDue)}
-                            </p>
-                          ) : null}
-                        </div>
+                      <td className="px-4 py-3 align-middle">
+                        <p
+                          className="truncate whitespace-nowrap text-sm text-slate-800 dark:text-slate-300"
+                          title={buildInlineDetails(row)}
+                        >
+                          {buildInlineDetails(row)}
+                        </p>
                       </td>
 
-                      <td className="px-4 py-3 align-top">
+                      <td className="px-4 py-3 align-middle">
                         <StatusBadge tone="slate">{row.sourceLabel}</StatusBadge>
                       </td>
 
-                      <td className="px-4 py-3 align-top">
-                        <p className="font-semibold text-slate-900 dark:text-slate-100">
+                      <td className="px-4 py-3 align-middle">
+                        <p className="truncate whitespace-nowrap font-semibold text-slate-900 dark:text-slate-100">
                           {formatCurrency(row.amount)}
                         </p>
                       </td>
 
-                      <td className="px-4 py-3 align-top">
-                        <div className="space-y-2">
-                          <StatusBadge tone={getStatusTone(row.status)}>
-                            {formatPaymentStatus(row.status)}
-                          </StatusBadge>
-
-                          <StatusBadge
-                            tone={getNotificationTone(row.notificationStatus)}
-                          >
-                            {formatNotificationStatus(row.notificationStatus)}
-                          </StatusBadge>
-                        </div>
+                      <td className="px-4 py-3 align-middle">
+                        <StatusBadge tone={getStatusTone(row.status)}>
+                          {formatPaymentStatus(row.status)}
+                        </StatusBadge>
                       </td>
 
-                      <td className="px-4 py-3 align-top">
-                        <p className="text-sm text-slate-700 dark:text-slate-300">
-                          {row.provider || "-"}
+                      <td className="px-4 py-3 align-middle">
+                        <p
+                          className="truncate whitespace-nowrap text-sm text-slate-700 dark:text-slate-300"
+                          title={`${buildInlineProvider(row)} | Ref: ${row.reference || "-"}`}
+                        >
+                          {buildInlineProvider(row)}
                         </p>
                       </td>
                     </tr>

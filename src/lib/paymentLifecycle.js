@@ -1,5 +1,15 @@
 import { parseAmount } from "./monnify";
 
+function generatePaymentTransactionId(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const time = String(date.getTime()).slice(-6);
+  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
+
+  return `TXN-${year}${month}${day}-${time}${random}`;
+}
+
 export async function markInvoicePaid(
   db,
   invoice,
@@ -93,6 +103,7 @@ export async function markInvoicePaid(
   }
 
   const paymentTransaction = {
+    transactionId: generatePaymentTransactionId(normalizedPaidAt),
     amount: normalizedPaidAmount,
     reference: resolvedPaymentReference || "",
     paymentReference: resolvedPaymentReference || "",
