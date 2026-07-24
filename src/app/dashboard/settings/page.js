@@ -211,6 +211,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [visibleSecrets, setVisibleSecrets] = useState({});
+  const [editingCredentials, setEditingCredentials] = useState({});
   const [verifyingGateway, setVerifyingGateway] = useState("");
   const [gatewayConnectionStatus, setGatewayConnectionStatus] = useState({});
   const [whatsAppWebStatus, setWhatsAppWebStatus] = useState(null);
@@ -442,6 +443,32 @@ export default function SettingsPage() {
     }));
   };
 
+  const selectPaymentGateway = (gatewayKey) => {
+    setSettings((current) => ({
+      ...current,
+      defaultPaymentGateway: gatewayKey,
+      paymentGateways: Object.fromEntries(
+        Object.entries(current.paymentGateways).map(([key, gateway]) => [
+          key,
+          { ...gateway, enabled: key === gatewayKey },
+        ])
+      ),
+    }));
+  };
+
+  const selectWhatsAppProvider = (providerKey) => {
+    setSettings((current) => ({
+      ...current,
+      defaultWhatsAppProvider: providerKey,
+      whatsappProviders: Object.fromEntries(
+        Object.entries(current.whatsappProviders).map(([key, provider]) => [
+          key,
+          { ...provider, enabled: key === providerKey },
+        ])
+      ),
+    }));
+  };
+
   const updateGatewayField = (gatewayKey, field, value) => {
     setSettings((current) => ({
       ...current,
@@ -497,6 +524,25 @@ export default function SettingsPage() {
     }));
   };
 
+  const startReplacingCredential = (key) => {
+    setEditingCredentials((current) => ({
+      ...current,
+      [key]: true,
+    }));
+  };
+
+  const cancelReplacingCredential = (gatewayKey, fieldKey, key) => {
+    updateGatewayField(gatewayKey, fieldKey, "");
+    setEditingCredentials((current) => ({
+      ...current,
+      [key]: false,
+    }));
+    setVisibleSecrets((current) => ({
+      ...current,
+      [key]: false,
+    }));
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setMessage("");
@@ -533,6 +579,8 @@ export default function SettingsPage() {
       localStorage.setItem("businessLogo", data.settings.businessLogo || "");
       emitSessionChange();
 
+      setEditingCredentials({});
+      setVisibleSecrets({});
       setMessage("Settings saved successfully.");
     } catch (saveError) {
       setError(saveError.message || "Unable to save settings");
@@ -1020,18 +1068,14 @@ export default function SettingsPage() {
               </label>
               <select
                 value={settings.defaultPaymentGateway}
-                onChange={(event) => updateField("defaultPaymentGateway", event.target.value)}
+                onChange={(event) => selectPaymentGateway(event.target.value)}
                 className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
               >
-                {GATEWAYS.map((gateway) => {
-                  const gatewayConfig = settings.paymentGateways[gateway.key];
-
-                  return (
-                    <option key={gateway.key} value={gateway.key}>
-                      {gateway.name} - {gatewayConfig.enabled ? "Enabled" : "Saved only"}
-                    </option>
-                  );
-                })}
+                {GATEWAYS.map((gateway) => (
+                  <option key={gateway.key} value={gateway.key}>
+                    {gateway.name}
+                  </option>
+                ))}
               </select>
               <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
                 {selectedGateway.blurb}
@@ -1086,22 +1130,6 @@ export default function SettingsPage() {
                     </select>
                   </>
                 ) : null}
-
-                <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={settings.paymentGateways[selectedGateway.key].enabled}
-                    onChange={(event) =>
-                      updateGatewayField(
-                        selectedGateway.key,
-                        "enabled",
-                        event.target.checked
-                      )
-                    }
-                    className="w-4 h-4 accent-blue-600"
-                  />
-                  Enabled
-                </label>
               </div>
             </div>
 
@@ -1120,68 +1148,102 @@ export default function SettingsPage() {
                   const isConfigured = Boolean(
                     settings.paymentGateways[selectedGateway.key][`${field.key}Configured`]
                   );
+                  const isReplacingCredential = Boolean(editingCredentials[secretKeyId]);
+
 
                   return (
                     <div key={field.key}>
                         <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
                           {field.label}
                         </label>
-                      <div className="relative">
-                        {field.type === "textarea" ? (
-                          <textarea
-                            value={
-                              settings.paymentGateways[selectedGateway.key][field.key] || ""
-                            }
-                            onChange={(event) =>
-                              updateGatewayField(
-                                selectedGateway.key,
-                                field.key,
-                                event.target.value
-                              )
-                            }
-                            rows={4}
-                            placeholder={field.label}
-                            className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                          />
-                        ) : (
-                          <input
-                          type={
-                            isSecret && !visibleSecrets[secretKeyId]
-                              ? "password"
-                              : field.type
-                          }
-                          value={
-                            settings.paymentGateways[selectedGateway.key][field.key] || ""
-                          }
-                          onChange={(event) =>
-                            updateGatewayField(
-                              selectedGateway.key,
-                              field.key,
-                              event.target.value
-                            )
-                          }
-                          placeholder={
-                            isSensitiveField && isConfigured
-                              ? `${field.label} saved securely`
-                              : field.label
-                          }
-                          className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                          />
-                        )}
-                        {isSecret && (
+                      {isSensitiveField && isConfigured && !isReplacingCredential ? (
+                        <div className="flex min-h-12 items-center justify-between gap-3">
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                            Saved
+                          </span>
                           <button
                             type="button"
-                            onClick={() => toggleSecretVisibility(secretKeyId)}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 dark:text-slate-400"
+                            onClick={() => startReplacingCredential(secretKeyId)}
+                            className="text-sm font-semibold text-blue-700 transition hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200"
                           >
-                            {visibleSecrets[secretKeyId] ? "Hide" : "Show"}
+                            Replace
                           </button>
-                        )}
-                      </div>
-                      {isSensitiveField && isConfigured && (
-                        <p className="mt-2 text-xs text-emerald-700">
-                          Saved securely on the server. Leave blank to keep the current value.
-                        </p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="relative">
+                            {field.type === "textarea" ? (
+                              <textarea
+                                value={
+                                  settings.paymentGateways[selectedGateway.key][field.key] || ""
+                                }
+                                onChange={(event) =>
+                                  updateGatewayField(
+                                    selectedGateway.key,
+                                    field.key,
+                                    event.target.value
+                                  )
+                                }
+                                rows={4}
+                                placeholder={field.label}
+                                className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                              />
+                            ) : (
+                              <input
+                                type={
+                                  isSecret && !visibleSecrets[secretKeyId]
+                                    ? "password"
+                                    : field.type
+                                }
+                                value={
+                                  settings.paymentGateways[selectedGateway.key][field.key] || ""
+                                }
+                                onChange={(event) =>
+                                  updateGatewayField(
+                                    selectedGateway.key,
+                                    field.key,
+                                    event.target.value
+                                  )
+                                }
+                                placeholder={
+                                  isReplacingCredential
+                                    ? `Enter new ${field.label.toLowerCase()}`
+                                    : field.label
+                                }
+                                className="w-full rounded-2xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                              />
+                            )}
+                            {isSecret && (
+                              <button
+                                type="button"
+                                onClick={() => toggleSecretVisibility(secretKeyId)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 dark:text-slate-400"
+                              >
+                                {visibleSecrets[secretKeyId] ? "Hide" : "Show"}
+                              </button>
+                            )}
+                          </div>
+                          {isSensitiveField && isConfigured && isReplacingCredential && (
+                            <div className="mt-2 flex items-center justify-between gap-3">
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                                Enter a new value to replace the saved credential.
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  cancelReplacingCredential(
+                                    selectedGateway.key,
+                                    field.key,
+                                    secretKeyId
+                                  )
+                                }
+                                className="text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   );
@@ -1191,8 +1253,8 @@ export default function SettingsPage() {
               {["receiptUpload", "accountDetails"].includes(selectedGateway.key) ? (
                 <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
                   {selectedGateway.key === "receiptUpload"
-                    ? "When enabled, customer invoice links will show these bank details and collect receipt uploads instead of launching online checkout."
-                    : "When enabled, customer invoice links will open a payment page where they can view these saved account details instead of launching online checkout."}
+                    ? "When selected, customer invoice links will show these bank details and collect receipt uploads instead of launching online checkout."
+                    : "When selected, customer invoice links will open a payment page where they can view these saved account details instead of launching online checkout."}
                   {selectedGateway.key === "receiptUpload" ? (
                     <label className="mt-4 flex items-center gap-2 font-medium">
                       <input
@@ -1273,13 +1335,13 @@ export default function SettingsPage() {
             />
             <SummaryItem
               label="Status"
-              value={settings.paymentGateways[selectedGateway.key]?.enabled ? "Enabled" : "Saved only"}
+              value="Selected"
             />
           </div>
         )}
       </section>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
+      <section id="whatsapp" className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">WhatsApp delivery</h2>
@@ -1304,20 +1366,14 @@ export default function SettingsPage() {
           </label>
           <select
             value={settings.defaultWhatsAppProvider}
-            onChange={(event) => updateField("defaultWhatsAppProvider", event.target.value)}
+            onChange={(event) => selectWhatsAppProvider(event.target.value)}
             className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
           >
-            {WHATSAPP_PROVIDERS.map((provider) => {
-              const providerConfig = settings.whatsappProviders?.[provider.key] || {
-                enabled: false,
-              };
-
-              return (
-                <option key={provider.key} value={provider.key}>
-                  {provider.name} - {providerConfig.enabled ? "Enabled" : "Disabled"}
-                </option>
-              );
-            })}
+            {WHATSAPP_PROVIDERS.map((provider) => (
+              <option key={provider.key} value={provider.key}>
+                {provider.name}
+              </option>
+            ))}
           </select>
           <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
             {selectedWhatsAppProvider.blurb}
@@ -1333,25 +1389,13 @@ export default function SettingsPage() {
                   Open a prepared WhatsApp message in the browser when you want manual sending as your delivery method.
                 </p>
               </div>
-
-              <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={settings.whatsappProviders.browser.enabled}
-                  onChange={(event) =>
-                    updateWhatsAppProviderField("browser", "enabled", event.target.checked)
-                  }
-                  className="h-4 w-4 accent-blue-600"
-                />
-                Enabled
-              </label>
             </div>
 
             <div className="p-6">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
                 <p className="text-sm font-medium text-slate-900 dark:text-white">How this behaves</p>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  When enabled, InvoiceHub can open a ready-made WhatsApp message in the browser. When disabled, Browser WhatsApp will no longer be used as the selected delivery method.
+                  When selected, InvoiceHub opens a ready-made WhatsApp message in the browser for manual sending.
                 </p>
               </div>
             </div>
@@ -1367,18 +1411,6 @@ export default function SettingsPage() {
                   Connect your own scanned WhatsApp number through a session bridge so InvoiceHub can send from that number.
                 </p>
               </div>
-
-              <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={settings.whatsappProviders.whatsappWeb.enabled}
-                  onChange={(event) =>
-                    updateWhatsAppProviderField("whatsappWeb", "enabled", event.target.checked)
-                  }
-                  className="h-4 w-4 accent-blue-600"
-                />
-                Enabled
-              </label>
             </div>
 
             <div className="p-6">
@@ -1631,11 +1663,7 @@ export default function SettingsPage() {
             <SummaryItem label="Delivery method" value={selectedWhatsAppProvider.name} />
             <SummaryItem
               label="Provider status"
-              value={
-                settings.whatsappProviders?.[selectedWhatsAppProvider.key]?.enabled
-                  ? "Enabled"
-                  : "Disabled"
-              }
+              value="Selected"
             />
             <SummaryItem
               label="Sending number"

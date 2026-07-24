@@ -91,10 +91,6 @@ function normalizeBridgeBaseUrl(value) {
   return normalizeText(value).replace(/\/+$/, "");
 }
 
-function normalizeGatewayBoolean(value) {
-  return value === true;
-}
-
 function resolveUserIdString(user = {}) {
   const raw = user?._id;
 
@@ -383,14 +379,27 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
   const existingGateways = existingUser.paymentGateways || {};
   const whatsappProviders = body.whatsappProviders || {};
   const existingWhatsAppProviders = existingUser.whatsappProviders || {};
-
+  const paymentGatewayKeys = [
+    "monnify",
+    "payaza",
+    "touchpay",
+    "accountDetails",
+    "receiptUpload",
+  ];
+  const whatsAppProviderKeys = ["browser", "whatsappWeb"];
+  const selectedPaymentGateway = paymentGatewayKeys.includes(body.defaultPaymentGateway)
+    ? body.defaultPaymentGateway
+    : "monnify";
+  const selectedWhatsAppProvider = whatsAppProviderKeys.includes(body.defaultWhatsAppProvider)
+    ? body.defaultWhatsAppProvider
+    : "browser";
   const normalizeGateway = (gatewayKey, defaultEnvironment) => {
     const currentGateway = paymentGateways[gatewayKey] || {};
     const existingGateway = existingGateways[gatewayKey] || {};
     const merged = mergeGateway(DEFAULT_PAYMENT_GATEWAYS[gatewayKey], existingGateway);
     const nextGateway = {
       ...merged,
-      enabled: normalizeGatewayBoolean(currentGateway.enabled),
+      enabled: gatewayKey === selectedPaymentGateway,
       environment: currentGateway.environment === "live" ? "live" : defaultEnvironment,
     };
 
@@ -435,7 +444,7 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
     };
     const nextProvider = {
       ...merged,
-      enabled: normalizeGatewayBoolean(currentProvider.enabled),
+      enabled: providerKey === selectedWhatsAppProvider,
     };
 
     for (const [fieldKey, fieldValue] of Object.entries(currentProvider)) {
@@ -471,12 +480,8 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
     businessAddress: normalizeText(body.businessAddress),
     website: normalizeText(body.website),
     taxId: normalizeText(body.taxId),
-    defaultPaymentGateway: ["monnify", "payaza", "touchpay", "accountDetails", "receiptUpload"].includes(body.defaultPaymentGateway)
-      ? body.defaultPaymentGateway
-      : "monnify",
-    defaultWhatsAppProvider: ["browser", "whatsappWeb"].includes(body.defaultWhatsAppProvider)
-      ? body.defaultWhatsAppProvider
-      : "browser",
+    defaultPaymentGateway: selectedPaymentGateway,
+    defaultWhatsAppProvider: selectedWhatsAppProvider,
     paymentGateways: {
       monnify: normalizeGateway("monnify", "sandbox"),
       payaza: normalizeGateway("payaza", "test"),
@@ -487,7 +492,7 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
           existingGateways.accountDetails
         ),
         ...paymentGateways.accountDetails,
-        enabled: normalizeGatewayBoolean(paymentGateways.accountDetails?.enabled),
+        enabled: selectedPaymentGateway === "accountDetails",
         environment: "manual",
         bankName: normalizeText(paymentGateways.accountDetails?.bankName),
         accountName: normalizeText(paymentGateways.accountDetails?.accountName),
@@ -502,7 +507,7 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
           existingGateways.receiptUpload
         ),
         ...paymentGateways.receiptUpload,
-        enabled: normalizeGatewayBoolean(paymentGateways.receiptUpload?.enabled),
+        enabled: selectedPaymentGateway === "receiptUpload",
         environment: "manual",
         bankName: normalizeText(paymentGateways.receiptUpload?.bankName),
         accountName: normalizeText(paymentGateways.receiptUpload?.accountName),
@@ -551,7 +556,7 @@ export function resolveMonnifyConfig(user = {}) {
       "",
     webhookUrl: normalizeText(gateway.webhookUrl),
     callbackUrl: normalizeText(gateway.callbackUrl),
-    enabled: gateway.enabled === true,
+    enabled: user.defaultPaymentGateway === "monnify",
     environment: gateway.environment === "live" ? "live" : "sandbox",
   };
 }
@@ -564,43 +569,26 @@ export function resolvePayazaConfig(user = {}) {
     secretKey: decryptGatewayValue(gateway, "secretKey") || "",
     webhookUrl: normalizeText(gateway.webhookUrl),
     callbackUrl: normalizeText(gateway.callbackUrl),
-    enabled: gateway.enabled === true,
+    enabled: user.defaultPaymentGateway === "payaza",
     environment: gateway.environment === "live" ? "live" : "test",
   };
 }
 
 export function resolveActivePaymentGateway(user = {}) {
-  const defaultGateway = normalizeText(user.defaultPaymentGateway) || "monnify";
-  const gateways = user.paymentGateways || {};
+  const selectedGateway = normalizeText(user.defaultPaymentGateway) || "monnify";
+  const supportedGateways = [
+    "monnify",
+    "payaza",
+    "touchpay",
+    "accountDetails",
+    "receiptUpload",
+  ];
 
-  if (gateways[defaultGateway]?.enabled === true) {
-    return defaultGateway;
-  }
-
-  if (gateways.payaza?.enabled === true) {
-    return "payaza";
-  }
-
-  if (gateways.monnify?.enabled === true) {
-    return "monnify";
-  }
-
-  if (gateways.touchpay?.enabled === true) {
-    return "touchpay";
-  }
-
-  if (gateways.accountDetails?.enabled === true) {
-    return "accountDetails";
-  }
-
-  return defaultGateway;
+  return supportedGateways.includes(selectedGateway) ? selectedGateway : "monnify";
 }
-
 export function resolveBrowserWhatsAppConfig(user = {}) {
-  const provider = user.whatsappProviders?.browser || {};
-
   return {
-    enabled: provider.enabled === true,
+    enabled: (normalizeText(user.defaultWhatsAppProvider) || "browser") === "browser",
   };
 }
 
@@ -620,7 +608,7 @@ export function resolveWhatsAppWebConfig(user = {}, platformSettings = {}) {
     "http://localhost:8787";
 
   return {
-    enabled: provider.enabled === true || platformBridge.enabled,
+    enabled: normalizeText(user.defaultWhatsAppProvider) === "whatsappWeb",
     senderPhoneNumber: normalizeText(provider.senderPhoneNumber),
     bridgeBaseUrl,
     bridgePort: platformBridge.bridgePort || normalizeText(provider.bridgePort),

@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { FiChevronRight, FiMessageCircle } from "react-icons/fi";
 import {
   Bar,
   BarChart,
@@ -38,6 +40,62 @@ async function readJsonSafely(response, fallback) {
 
 function formatCurrency(value) {
   return `N${Number(value || 0).toLocaleString()}`;
+}
+
+function getWhatsAppStatusView(status = {}) {
+  const normalizedStatus = String(status.status || "loading").toLowerCase();
+
+  if (normalizedStatus === "ready") {
+    return {
+      label: "Connected",
+      detail: status.connectedNumber || "Ready to send",
+      dotClassName: "bg-emerald-500",
+      iconClassName: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+    };
+  }
+
+  if (["qr", "pairing_code"].includes(normalizedStatus)) {
+    return {
+      label: normalizedStatus === "qr" ? "Scan QR code" : "Pairing code ready",
+      detail: "Open WhatsApp settings",
+      dotClassName: "bg-amber-500",
+      iconClassName: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+    };
+  }
+
+  if (["authenticated", "loading", "retrying", "connecting"].includes(normalizedStatus)) {
+    return {
+      label: "Connecting",
+      detail: "Checking WhatsApp session",
+      dotClassName: "bg-amber-500",
+      iconClassName: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+    };
+  }
+
+  if (normalizedStatus === "not_configured") {
+    return {
+      label: "Not configured",
+      detail: "Set up WhatsApp",
+      dotClassName: "bg-slate-400",
+      iconClassName: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    };
+  }
+
+  if (normalizedStatus === "loading") {
+    return {
+      label: "Checking status",
+      detail: "WhatsApp connection",
+      dotClassName: "animate-pulse bg-slate-400",
+      iconClassName: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    };
+  }
+
+  return {
+    label: "Disconnected",
+    detail: "Open settings to reconnect",
+    dotClassName: "bg-red-500",
+    iconClassName: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300",
+  };
 }
 
 function getCurrentYearMonthlyCollections(invoices = []) {
@@ -120,6 +178,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentTime, setCurrentTime] = useState(null);
+  const [whatsAppStatus, setWhatsAppStatus] = useState({ status: "loading" });
 
   useEffect(() => {
     if (!isHydrated) {
@@ -200,6 +259,49 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (!isHydrated || !session.isLoggedIn) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const loadWhatsAppStatus = async () => {
+      try {
+        const response = await authFetch("/api/notifications/whatsapp/bridge/status", {
+          cache: "no-store",
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!response.ok) {
+          setWhatsAppStatus({
+            status: response.status === 400 ? "not_configured" : "offline",
+            lastError: data.error || "Unable to check WhatsApp status",
+          });
+          return;
+        }
+
+        setWhatsAppStatus(data.status || { status: "offline" });
+      } catch {
+        if (!cancelled) {
+          setWhatsAppStatus({ status: "offline" });
+        }
+      }
+    };
+
+    loadWhatsAppStatus();
+    const statusPoll = setInterval(loadWhatsAppStatus, 8000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(statusPoll);
+    };
+  }, [isHydrated, session.isLoggedIn]);
+
   const formattedDate =
     currentTime?.toLocaleDateString(undefined, {
       weekday: "long",
@@ -222,6 +324,8 @@ export default function Dashboard() {
     () => getLastFiveYearsCollections(invoices),
     [invoices]
   );
+  const whatsAppStatusView = getWhatsAppStatusView(whatsAppStatus);
+
 
   if (loading) {
     return (
@@ -252,13 +356,38 @@ export default function Dashboard() {
 
   return (
     <PageShell className="flex min-h-full flex-col space-y-3">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-white lg:text-[2rem]">
-          Welcome, {session.businessName || "Your Business"}
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          {currentTime ? `${formattedDate} | ${formattedTime}` : ""}
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-white lg:text-[2rem]">
+            Welcome, {session.businessName || "Your Business"}
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {currentTime ? `${formattedDate} | ${formattedTime}` : ""}
+          </p>
+        </div>
+
+        <Link
+          href="/dashboard/settings#whatsapp"
+          className="group flex min-h-16 w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:w-[235px] dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-800"
+          aria-label={`WhatsApp status: ${whatsAppStatusView.label}`}
+        >
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${whatsAppStatusView.iconClassName}`}>
+            <FiMessageCircle className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <span className={`h-2 w-2 shrink-0 rounded-full ${whatsAppStatusView.dotClassName}`} />
+              WhatsApp
+            </span>
+            <span className="mt-0.5 block truncate text-sm font-semibold text-slate-900 dark:text-white">
+              {whatsAppStatusView.label}
+            </span>
+            <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+              {whatsAppStatusView.detail}
+            </span>
+          </span>
+          <FiChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5" />
+        </Link>
       </div>
 
       <StatGrid className="gap-3 xl:grid-cols-5">

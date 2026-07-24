@@ -2,6 +2,7 @@ import { connectDB } from "../../../lib/mongodb";
 import { requireAuth } from "../../../lib/auth";
 import {
   calculateInvoiceTotal,
+  generateInvoiceNumber,
   generateInvoiceToken,
   sanitizeInvoiceItems,
 } from "../../../lib/invoiceUtils";
@@ -71,9 +72,11 @@ export async function POST(req) {
     const owner = await findUserById(db, userId);
     const normalizedBody = normalizeInvoiceForBusiness(body, owner || {});
     const invoiceToken = body.token || generateInvoiceToken("inv");
+    const invoiceNumber = normalizedBody.invoiceNumber || generateInvoiceNumber();
 
     const result = await db.collection("invoices").insertOne({
       ...normalizedBody,
+      invoiceNumber,
       token: invoiceToken,
       customerToken: normalizedBody.customerToken || invoiceToken,
       ownerId: userId,
@@ -92,6 +95,7 @@ export async function POST(req) {
     return Response.json({
       success: true,
       insertedId: result.insertedId,
+      invoiceNumber,
       token: invoiceToken,
     });
   } catch (error) {

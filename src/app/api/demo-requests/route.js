@@ -1,4 +1,31 @@
+import { ObjectId } from "mongodb";
 import { connectDB } from "../../../lib/mongodb";
+import { getPlatformWhatsAppBridgeSettings } from "../../../lib/paymentGatewaySettings";
+import { sendWhatsAppWebMessage } from "../../../lib/whatsappWebBridge";
+
+const DEMO_ALERT_PHONE = "08103902471";
+const DEMO_ALERT_SESSION = "invoicehub-6a3edef73dabe1e960b6e27d";
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function buildDemoRequestMessage(request = {}) {
+  return [
+    "*New InvoiceHub demo request*",
+    "",
+    `Name: ${request.fullName}`,
+    `Email: ${request.email}`,
+    `Phone: ${request.phone}`,
+    `Business: ${request.businessName}`,
+    `Business type: ${request.businessType}`,
+    `Team size: ${request.teamSize}`,
+    `Submitted: ${request.createdAt.toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}`,
+    "",
+    "What they would like to see:",
+    request.message || "No additional message provided.",
+  ].join("\n");
+}
 
 export async function POST(req) {
   try {
@@ -20,7 +47,15 @@ export async function POST(req) {
       );
     }
 
-    await db.collection("demo_requests").insertOne({
+    if (!isValidEmail(email)) {
+      return Response.json(
+        { error: "Enter a valid email address." },
+        { status: 400 }
+      );
+    }
+
+    const createdAt = new Date();
+    const requestRecord = {
       fullName,
       email,
       phone,
@@ -29,8 +64,60 @@ export async function POST(req) {
       teamSize,
       message,
       status: "new",
-      createdAt: new Date(),
-    });
+      whatsappDelivery: {
+        status: "pending",
+        recipient: DEMO_ALERT_PHONE,
+        sessionName: DEMO_ALERT_SESSION,
+      },
+      createdAt,
+    };
+    const result = await db.collection("demo_requests").insertOne(requestRecord);
+
+    try {
+      const platformBridge = await getPlatformWhatsAppBridgeSettings(db);
+      const bridgeConfig = {
+        ...platformBridge,
+        enabled: platformBridge.enabled === true,
+        sessionName: DEMO_ALERT_SESSION,
+      };
+      const delivery = await sendWhatsAppWebMessage(bridgeConfig, {
+        phone: DEMO_ALERT_PHONE,
+        text: buildDemoRequestMessage(requestRecord),
+      });
+
+      await db.collection("demo_requests").updateOne(
+        { _id: new ObjectId(result.insertedId) },
+        {
+          $set: {
+            "whatsappDelivery.status": "sent",
+            "whatsappDelivery.messageId":
+              delivery?.messageId || delivery?.id || delivery?.key?.id || "",
+            "whatsappDelivery.sentAt": new Date(),
+          },
+        }
+      );
+    } catch (deliveryError) {
+      console.error("DEMO REQUEST WHATSAPP ERROR:", deliveryError);
+      await db.collection("demo_requests").updateOne(
+        { _id: new ObjectId(result.insertedId) },
+        {
+          $set: {
+            "whatsappDelivery.status": "failed",
+            "whatsappDelivery.error":
+              deliveryError.message || "WhatsApp delivery failed",
+            "whatsappDelivery.failedAt": new Date(),
+          },
+        }
+      );
+
+      return Response.json(
+        {
+          error: "Your request was saved, but the WhatsApp notification could not be sent.",
+          saved: true,
+        },
+        { status: deliveryError.status || 502 }
+      );
+    }
 
     return Response.json({
       success: true,

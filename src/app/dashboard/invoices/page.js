@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { FiCheckCircle, FiMessageCircle, FiTrash2 } from "react-icons/fi";
+import { FiCheckCircle, FiMessageCircle, FiPlus, FiTrash2 } from "react-icons/fi";
 import {
   EmptyState,
   InputField,
@@ -18,6 +18,7 @@ import { authFetch } from "../../../lib/authFetch";
 import { getCustomerLabels } from "../../../lib/businessLabels";
 import { useBusinessSession } from "../../../lib/clientSession";
 import { useConfirm } from "../../../components/AppFeedback";
+import CreateInvoiceModal from "../../../components/CreateInvoiceModal";
 
 function formatDateTime(value) {
   if (!value) return "-";
@@ -80,95 +81,6 @@ function getNotificationTone(status) {
   if (normalized === "draft") return "blue";
   return "slate";
 }
-function normalizePhoneForWhatsApp(phone) {
-  const digits = String(phone || "").replace(/\D/g, "");
-
-  if (!digits) return "";
-
-  // Nigerian local format: 08012345678 -> 2348012345678
-  if (digits.startsWith("0")) {
-    return `234${digits.slice(1)}`;
-  }
-
-  // Already international without +
-  if (digits.startsWith("234")) {
-    return digits;
-  }
-
-  // If user saved 10 digit Nigerian number like 8012345678
-  if (digits.length === 10) {
-    return `234${digits}`;
-  }
-
-  return digits;
-}
-
-function getInvoicePaymentUrl(invoice, origin) {
-  if (invoice.paymentUrl) return invoice.paymentUrl;
-  if (invoice.paymentLink) return invoice.paymentLink;
-  if (invoice.checkoutUrl) return invoice.checkoutUrl;
-
-  if (invoice.token) {
-    return `${origin}/pay/${invoice.token}`;
-  }
-
-  return origin;
-}
-
-function buildWhatsAppInvoiceMessage(
-  invoice,
-  origin,
-  customerLabel = "Customer",
-  businessName = "InvoiceHub"
-) {
-  const customerName =
-    invoice.customer ||
-    invoice.customerName ||
-    invoice.student ||
-    customerLabel;
-
-  const amount = Number(getOutstandingAmount(invoice) || invoice.amount || 0).toLocaleString();
-  const invoiceNumber = invoice.invoiceNumber || "-";
-  const description = invoice.description || invoice.category || invoice.class || "Invoice payment";
-  const paymentUrl = getInvoicePaymentUrl(invoice, origin);
-
-  return [
-    `Hello ${customerName},`,
-    "",
-    `*${businessName || "InvoiceHub"}*`,
-    "",
-    `Your invoice is ready for payment.`,
-    "",
-    `Invoice: ${invoiceNumber}`,
-    `Description: ${description}`,
-    `Amount Due: N${amount}`,
-    "",
-    `Pay here: ${paymentUrl}`,
-    "",
-    "Thank you.",
-  ].join("\n");
-}
-
-function openBrowserWhatsApp(invoice, origin, customerLabel, businessName, notify) {
-  const phone = normalizePhoneForWhatsApp(invoice.phone);
-
-  if (!phone) {
-    notify?.("error", "No valid WhatsApp phone number.");
-    return false;
-  }
-
-  const message = buildWhatsAppInvoiceMessage(
-    invoice,
-    origin,
-    customerLabel,
-    businessName
-  );
-  const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-  openExternalTab(whatsappUrl, notify);
-
-  return true;
-}
-
 function openExternalTab(url, notify) {
   const opened = window.open(url, "_blank", "noopener,noreferrer");
 
@@ -188,6 +100,7 @@ export default function Invoices() {
   const session = useBusinessSession();
   const customerLabels = getCustomerLabels(session.businessType);
   const [invoices, setInvoices] = useState([]);
+  const [showCreateInvoice, setShowCreateInvoice] = useState(false);
   const [recurringInvoices, setRecurringInvoices] = useState([]);
   const [activePage, setActivePage] = useState("invoices");
   const [invoiceFilterForm, setInvoiceFilterForm] = useState({
@@ -370,97 +283,55 @@ export default function Invoices() {
   };
 
   const shareWhatsApp = async (invoice) => {
-  if (!invoice.phone) {
-    showNotice("error", "No phone number.");
-    return;
-  }
-
-  if (!invoice.token && !invoice.paymentUrl && !invoice.paymentLink && !invoice.checkoutUrl) {
-    showNotice("error", "This invoice does not have a payment link yet.");
-    return;
-  }
-
-  const origin = window.location.origin;
-
-  try {
-    const res = await authFetch("/api/notifications/whatsapp/invoice", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        invoiceId: String(invoice._id),
-        origin,
-      }),
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    /*
-      If backend returns a fallbackUrl, open WhatsApp browser immediately.
-      This covers cases where the WhatsApp bridge/provider is unavailable.
-    */
-    if (data?.delivery?.fallbackUrl) {
-      openExternalTab(data.delivery.fallbackUrl, showNotice);
-      showNotice("info", "WhatsApp Web was unavailable, so the message was opened in a browser tab.");
-
+    if (!invoice.phone) {
+      showNotice("error", "No phone number.");
       return;
     }
 
-    /*
-      If backend failed, automatically fall back to browser WhatsApp.
-    */
-    if (!res.ok) {
-      openBrowserWhatsApp(
-        invoice,
-        origin,
-        customerLabels.singularTitle,
-        session.businessName || invoice.businessName || "InvoiceHub",
-        showNotice
-      );
+    if (!invoice.token && !invoice.paymentUrl && !invoice.paymentLink && !invoice.checkoutUrl) {
+      showNotice("error", "This invoice does not have a payment link yet.");
       return;
     }
 
-    /*
-      If backend succeeded but did not actually send through provider,
-      still fall back to browser WhatsApp where possible.
-    */
-    const deliveryStatus = String(
-      data?.delivery?.status ||
-        data?.delivery?.notificationStatus ||
-        data?.status ||
-        ""
-    ).toLowerCase();
+    try {
+      const res = await authFetch("/api/notifications/whatsapp/invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoiceId: String(invoice._id),
+          origin: window.location.origin,
+        }),
+      });
 
-    const bridgeWorked =
-      data?.delivery?.sent === true ||
-      data?.delivery?.provider === "whatsappWeb" ||
-      ["sent", "delivered", "success", "prepared"].includes(deliveryStatus);
+      const data = await res.json().catch(() => ({}));
 
-    if (!bridgeWorked) {
-      openBrowserWhatsApp(
-        invoice,
-        origin,
-        customerLabels.singularTitle,
-        session.businessName || invoice.businessName || "InvoiceHub",
-        showNotice
-      );
-      return;
+      if (!res.ok) {
+        showNotice("error", data.error || "Unable to send through the connected WhatsApp session.");
+        return;
+      }
+
+      if (data?.delivery?.queued) {
+        showNotice("info", "Message queued and will be sent through the connected WhatsApp session.");
+        return;
+      }
+
+      const sentThroughBridge =
+        data?.delivery?.sent === true &&
+        data?.delivery?.provider === "whatsappWeb";
+
+      if (!sentThroughBridge) {
+        showNotice(
+          "error",
+          "The connected WhatsApp session is unavailable. Check the connection in Settings and try again."
+        );
+        return;
+      }
+
+      showNotice("success", "Sent through the connected WhatsApp session.");
+    } catch {
+      showNotice("error", "Unable to reach the WhatsApp service. Please try again.");
     }
-
-    showNotice("success", "Sent.");
-  } catch {
-    /*
-      Network/server error: automatically open browser WhatsApp.
-    */
-    openBrowserWhatsApp(
-      invoice,
-      origin,
-      customerLabels.singularTitle,
-      session.businessName || invoice.businessName || "InvoiceHub",
-      showNotice
-    );
-  }
-};
-
+  };
   const sendBulkReminders = async () => {
     if (actionableInvoices.length === 0) {
       showNotice("info", "There are no unpaid invoices to remind.");
@@ -760,14 +631,24 @@ export default function Invoices() {
         description={`Manage invoices, follow-up status, and ${customerLabels.singular} communication from one compact view.`}
         actions={
           activePage === "invoices" ? (
-            <button
-              type="button"
-              onClick={sendBulkReminders}
-              disabled={sendingReminders || actionableInvoices.length === 0}
-              className="rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#20BA5C] disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              {sendingReminders ? "Sending reminders..." : "Remind all unpaid"}
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCreateInvoice(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+              >
+                <FiPlus className="h-4 w-4" />
+                Create invoice
+              </button>
+              <button
+                type="button"
+                onClick={sendBulkReminders}
+                disabled={sendingReminders || actionableInvoices.length === 0}
+                className="rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#20BA5C] disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {sendingReminders ? "Sending reminders..." : "Remind all unpaid"}
+              </button>
+            </div>
           ) : null
         }
       />
@@ -1648,8 +1529,12 @@ export default function Invoices() {
           </div>
         </div>
       )}
-      {manualPaymentModal.open && manualPaymentModal.invoice ? (
-        <ManualPaymentModal
+      <CreateInvoiceModal
+        isOpen={showCreateInvoice}
+        onClose={() => setShowCreateInvoice(false)}
+        onInvoiceAdded={loadInvoices}
+      />
+      {manualPaymentModal.open && manualPaymentModal.invoice ? (        <ManualPaymentModal
           invoice={manualPaymentModal.invoice}
           amount={manualPaymentModal.amount}
           saving={savingManualPayment}
