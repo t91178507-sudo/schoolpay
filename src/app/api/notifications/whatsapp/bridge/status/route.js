@@ -25,72 +25,13 @@ function buildLocalFallbackConfig(config = {}) {
   };
 }
 
-function chooseBestSession(sessions = [], config = {}) {
-  if (!Array.isArray(sessions) || sessions.length === 0) {
-    return null;
-  }
-
-  const normalizedConnected = String(config.senderPhoneNumber || "").trim();
-
-  const rankSession = (session = {}) => {
-    let score = 0;
-
-    if (session.sessionName === config.sessionName) {
-      score += 100;
-    }
-
-    if (session.status === "ready") {
-      score += 60;
-    } else if (session.status === "pairing_code") {
-      score += 35;
-    } else if (session.status === "authenticated" || session.status === "loading") {
-      score += 20;
-    }
-
-    if (
-      normalizedConnected &&
-      session.connectedNumber &&
-      String(session.connectedNumber).trim() === normalizedConnected
-    ) {
-      score += 50;
-    }
-
-    if (
-      normalizedConnected &&
-      session.pairingPhoneNumber &&
-      String(session.pairingPhoneNumber).trim() === normalizedConnected
-    ) {
-      score += 25;
-    }
-
-    return score;
-  };
-
-  return [...sessions]
-    .sort((a, b) => rankSession(b) - rankSession(a))
-    .find((session) => rankSession(session) > 0) || null;
-}
-
 async function loadBridgeSnapshot(config = {}) {
-  const overview = await fetchWhatsAppWebBridgeOverview(config);
-  const sessions = Array.isArray(overview?.sessions) ? overview.sessions : [];
-  const preferredSession = chooseBestSession(sessions, config);
-  const effectiveConfig =
-    preferredSession?.sessionName && preferredSession.sessionName !== config.sessionName
-      ? {
-          ...config,
-          sessionName: preferredSession.sessionName,
-          qrConnectUrl: `${config.bridgeBaseUrl}/qr?sessionName=${encodeURIComponent(
-            preferredSession.sessionName
-          )}`,
-        }
-      : config;
-
-  const status = await fetchWhatsAppWebStatus(effectiveConfig);
-  const logs = await fetchWhatsAppWebLogs(effectiveConfig).catch(() => ({ logs: [] }));
+  await fetchWhatsAppWebBridgeOverview(config);
+  const status = await fetchWhatsAppWebStatus(config);
+  const logs = await fetchWhatsAppWebLogs(config).catch(() => ({ logs: [] }));
   const qr =
     status?.qrAvailable || status?.status === "qr"
-      ? await fetchWhatsAppWebQr(effectiveConfig).catch(() => null)
+      ? await fetchWhatsAppWebQr(config).catch(() => null)
       : null;
 
   return {
@@ -101,15 +42,14 @@ async function loadBridgeSnapshot(config = {}) {
     },
     logs: Array.isArray(logs.logs) ? logs.logs : [],
     resolvedConfig: {
-      bridgeBaseUrl: effectiveConfig.bridgeBaseUrl,
-      sessionName: effectiveConfig.sessionName,
-      qrConnectUrl: effectiveConfig.qrConnectUrl,
+      bridgeBaseUrl: config.bridgeBaseUrl,
+      sessionName: config.sessionName,
+      qrConnectUrl: config.qrConnectUrl,
       senderPhoneNumber:
         status?.connectedNumber ||
-        preferredSession?.connectedNumber ||
         config.senderPhoneNumber ||
         "",
-      apiKeyConfigured: Boolean(effectiveConfig.apiKey),
+      apiKeyConfigured: Boolean(config.apiKey),
     },
   };
 }
@@ -233,3 +173,5 @@ export async function POST(req) {
     );
   }
 }
+
+

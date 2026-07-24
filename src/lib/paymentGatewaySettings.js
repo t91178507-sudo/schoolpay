@@ -147,10 +147,20 @@ function normalizePlatformWhatsAppBridge(platformSettings = {}) {
 }
 
 function shouldUseDefaultWhatsAppWebSession(savedSessionName, defaultProvider) {
-  return (
-    !savedSessionName ||
+  if (!savedSessionName) {
+    return true;
+  }
+
+  if (
     savedSessionName === DEFAULT_WHATSAPP_PROVIDERS.whatsappWeb.sessionName ||
     savedSessionName === defaultProvider.sessionName
+  ) {
+    return true;
+  }
+
+  return (
+    savedSessionName.startsWith("invoicehub-") &&
+    savedSessionName !== defaultProvider.sessionName
   );
 }
 
@@ -635,3 +645,4 @@ export async function resolveWhatsAppWebConfigForUser(db, user = {}) {
     await getPlatformWhatsAppBridgeSettings(db)
   );
 }
+

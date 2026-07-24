@@ -289,23 +289,8 @@ export function chooseBestWhatsAppWebSession(sessions = [], config = {}) {
 }
 
 async function resolveBridgeConfigCandidate(config = {}) {
-  const overview = await fetchWhatsAppWebBridgeOverview(config);
-  const sessions = Array.isArray(overview?.sessions) ? overview.sessions : [];
-  const preferredSession = chooseBestWhatsAppWebSession(sessions, config);
-
-  if (!preferredSession?.sessionName || preferredSession.sessionName === config.sessionName) {
-    return config;
-  }
-
-  return {
-    ...config,
-    sessionName: preferredSession.sessionName,
-    qrConnectUrl: `${config.bridgeBaseUrl}/qr?sessionName=${encodeURIComponent(
-      preferredSession.sessionName
-    )}`,
-    senderPhoneNumber:
-      preferredSession.connectedNumber || config.senderPhoneNumber || "",
-  };
+  await fetchWhatsAppWebBridgeOverview(config);
+  return config;
 }
 
 export async function resolveActiveWhatsAppWebConfig(config = {}) {
@@ -412,3 +397,4 @@ export async function deleteWhatsAppWebSession(config = {}) {
 
   return parseBridgeResponse(response);
 }
+
