@@ -84,6 +84,7 @@ export async function POST(req) {
         apiKey: monnifyConfig.apiKey,
         secretKey: monnifyConfig.secretKey,
         paymentReference,
+        environment: monnifyConfig.environment,
       });
     } catch (verificationError) {
       const pendingReferenceMatches =
@@ -190,3 +191,4 @@ export async function POST(req) {
     );
   }
 }
+

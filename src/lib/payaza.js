@@ -15,6 +15,17 @@ export function buildPayazaAuthHeader(publicKey = "") {
   return `Payaza ${Buffer.from(normalizePayazaKey(publicKey)).toString("base64")}`;
 }
 
+export function getPayazaTenant(environment = "test") {
+  return environment === "live" ? "live" : "test";
+}
+
+export function buildPayazaHeaders(publicKey = "", environment = "test", extraHeaders = {}) {
+  return {
+    Authorization: buildPayazaAuthHeader(publicKey),
+    "X-TenantID": getPayazaTenant(environment),
+    ...extraHeaders,
+  };
+}
 export function parseAmount(value) {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : 0;
@@ -50,16 +61,16 @@ export async function createPayazaDynamicVirtualAccount({
   bankCode = "1067",
   expiresInMinutes = 30,
   baseUrl = PAYAZA_DEFAULT_BASE_URL,
+  environment = "test",
 }) {
   const { firstName, lastName } = splitCustomerName(customerName);
   const response = await fetch(
     `${baseUrl}/merchant-collection/merchant/virtual_account/generate_virtual_account`,
     {
       method: "POST",
-      headers: {
-        Authorization: buildPayazaAuthHeader(publicKey),
+      headers: buildPayazaHeaders(publicKey, environment, {
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify({
         account_name: accountName,
         account_type: "Dynamic",
@@ -82,7 +93,20 @@ export async function createPayazaDynamicVirtualAccount({
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok || data?.success !== true) {
-    throw new Error(data?.message || "PayAza virtual account creation failed");
+    const error = new Error(data?.message || "PayAza virtual account creation failed");
+    const providerMessage = data?.message || "PayAza virtual account creation failed";
+    error.status =
+      response.status === 401 ||
+      response.status === 403 ||
+      String(providerMessage).toLowerCase().includes("authorization")
+        ? 401
+        : 502;
+    error.code = "PAYAZA_VIRTUAL_ACCOUNT_FAILED";
+    error.details = {
+      providerMessage,
+      responseStatus: response.status,
+    };
+    throw error;
   }
 
   return data.data || {};
@@ -92,13 +116,12 @@ export async function verifyPayazaDynamicTransaction({
   publicKey,
   transactionReference,
   baseUrl = PAYAZA_DEFAULT_BASE_URL,
+  environment = "test",
 }) {
   const response = await fetch(
     `${baseUrl}/merchant-collection/transfer_notification_controller/transaction-query?transaction_reference=${encodeURIComponent(transactionReference)}`,
     {
-      headers: {
-        Authorization: buildPayazaAuthHeader(publicKey),
-      },
+      headers: buildPayazaHeaders(publicKey, environment),
       cache: "no-store",
     }
   );
@@ -111,3 +134,4 @@ export async function verifyPayazaDynamicTransaction({
 
   return data.data || {};
 }
+

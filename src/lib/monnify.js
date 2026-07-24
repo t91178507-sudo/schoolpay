@@ -1,4 +1,25 @@
-export function getMonnifyBaseUrl(apiKey = "") {
+export class MonnifyAuthError extends Error {
+  constructor(message, details = {}) {
+    super(message);
+    this.name = "MonnifyAuthError";
+    this.status = 401;
+    this.code = "MONNIFY_AUTH_FAILED";
+    this.details = details;
+  }
+}
+
+function getMonnifyEnvironmentLabel(environment = "sandbox") {
+  return environment === "live" ? "Live" : "Sandbox";
+}
+export function getMonnifyBaseUrl(apiKey = "", environment = "sandbox") {
+  if (environment === "live") {
+    return "https://api.monnify.com";
+  }
+
+  if (environment === "sandbox") {
+    return "https://sandbox.monnify.com";
+  }
+
   return apiKey.includes("_TEST_")
     ? "https://sandbox.monnify.com"
     : "https://api.monnify.com";
@@ -12,6 +33,7 @@ export async function getMonnifyAccessToken({
   apiKey,
   secretKey,
   baseUrl,
+  environment = "sandbox",
 }) {
   const authString = buildMonnifyBasicAuth(apiKey, secretKey);
 
@@ -23,11 +45,21 @@ export async function getMonnifyAccessToken({
     },
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
 
   if (!response.ok || !data?.requestSuccessful) {
-    throw new Error(
-      data?.responseMessage || data?.responseBody?.message || "Monnify auth failed"
+    const providerMessage =
+      data?.responseMessage || data?.responseBody?.message || "Monnify auth failed";
+    const environmentLabel = getMonnifyEnvironmentLabel(environment);
+
+    throw new MonnifyAuthError(
+      `Monnify rejected the ${environmentLabel} API key or secret key. Re-enter the matching Monnify ${environmentLabel} credentials in Settings > Payment Gateway, then click Verify connection.`,
+      {
+        providerMessage,
+        environment,
+        baseUrl,
+        responseStatus: response.status,
+      }
     );
   }
 
@@ -38,12 +70,14 @@ export async function verifyMonnifyTransaction({
   apiKey,
   secretKey,
   paymentReference,
+  environment = "sandbox",
 }) {
-  const baseUrl = getMonnifyBaseUrl(apiKey);
+  const baseUrl = getMonnifyBaseUrl(apiKey, environment);
   const accessToken = await getMonnifyAccessToken({
     apiKey,
     secretKey,
     baseUrl,
+    environment,
   });
 
   const response = await fetch(
@@ -76,12 +110,14 @@ export async function initializeMonnifyTransaction({
   paymentDescription,
   contractCode,
   redirectUrl,
+  environment = "sandbox",
 }) {
-  const baseUrl = getMonnifyBaseUrl(apiKey);
+  const baseUrl = getMonnifyBaseUrl(apiKey, environment);
   const accessToken = await getMonnifyAccessToken({
     apiKey,
     secretKey,
     baseUrl,
+    environment,
   });
 
   const response = await fetch(`${baseUrl}/api/v1/merchant/transactions/init-transaction`, {
@@ -141,3 +177,4 @@ export function parseAmount(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
+

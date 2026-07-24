@@ -52,6 +52,7 @@ export async function POST(req) {
       apiKey: monnifyConfig.apiKey,
       secretKey: monnifyConfig.secretKey,
       paymentReference,
+      environment: monnifyConfig.environment,
     });
 
     const amountPaid = parseAmount(verification.amountPaid);
@@ -146,3 +147,4 @@ export async function POST(req) {
     );
   }
 }
+

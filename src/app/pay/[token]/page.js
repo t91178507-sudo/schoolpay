@@ -164,7 +164,7 @@ export default function PaymentPage() {
         body: JSON.stringify({
           token,
           invoiceId: activeInvoice._id,
-        provider: "payaza",
+          provider: "payaza",
           amount: requestedAmount,
           origin: window.location.origin,
         }),
@@ -233,7 +233,7 @@ export default function PaymentPage() {
         body: JSON.stringify({
           token,
           invoiceId: activeInvoice._id,
-        provider: "payaza",
+          provider: "payaza",
           amount: requestedAmount,
         }),
       });
@@ -247,7 +247,7 @@ export default function PaymentPage() {
       setPayazaAccount({
         ...data.virtualAccount,
         invoiceId: data.invoiceId,
-            provider: "monnify",
+        provider: "payaza",
         paymentReference: data.paymentReference,
       });
     } catch (err) {
@@ -1064,7 +1064,4 @@ function PayazaPaymentModal({
     </div>
   );
 }
-
-
-
 

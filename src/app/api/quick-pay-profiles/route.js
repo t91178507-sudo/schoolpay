@@ -1,6 +1,9 @@
 import { requireAuth } from "../../../lib/auth";
 import { connectDB } from "../../../lib/mongodb";
-import { findUserById } from "../../../lib/paymentGatewaySettings";
+import {
+  findUserById,
+  resolveActivePaymentGateway,
+} from "../../../lib/paymentGatewaySettings";
 import { normalizeQuickPayInput } from "../../../lib/quickPay";
 
 export async function GET(req) {
@@ -45,6 +48,7 @@ export async function POST(req) {
         ownerId: userId,
         businessName: user?.businessName || "",
         businessLogo: user?.businessLogo || "",
+        gateway: body.gateway || resolveActivePaymentGateway(user || {}),
       },
       user || {}
     );
@@ -68,3 +72,4 @@ export async function POST(req) {
     );
   }
 }
+

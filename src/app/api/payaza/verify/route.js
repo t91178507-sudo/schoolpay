@@ -72,6 +72,7 @@ export async function POST(req) {
     const verification = await verifyPayazaDynamicTransaction({
       publicKey: payazaConfig.publicKey,
       transactionReference: paymentReference,
+      environment: payazaConfig.environment,
     });
 
     if (verification.transaction_status !== "Completed") {
@@ -118,3 +119,4 @@ export async function POST(req) {
     );
   }
 }
+

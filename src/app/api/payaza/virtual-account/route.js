@@ -9,6 +9,10 @@ import {
 } from "../../../../lib/paymentGatewaySettings";
 import { findAccessibleInvoice } from "../../../../lib/publicInvoiceAccess";
 
+function isPayazaConfigReady(config = {}) {
+  return Boolean(config.enabled && config.publicKey && config.secretKey);
+}
+
 function buildAccountName(invoice = {}, owner = {}) {
   const businessName = owner.businessName || invoice.businessName || "InvoiceHub";
   const invoiceNumber = invoice.invoiceNumber || "Invoice";
@@ -64,10 +68,13 @@ export async function POST(req) {
     const owner = invoice.ownerId ? await findUserById(db, invoice.ownerId) : null;
     const payazaConfig = resolvePayazaConfig(owner || {});
 
-    if (!payazaConfig.enabled || !payazaConfig.publicKey) {
+    if (!isPayazaConfigReady(payazaConfig)) {
       return Response.json(
-        { error: "PayAza is not configured for this business" },
-        { status: 500 }
+        {
+          error: "PayAza is not configured correctly for this business. Re-enter the PayAza public key in Settings > Payment Gateway, then click Verify connection.",
+          code: "PAYAZA_NOT_CONFIGURED",
+        },
+        { status: 422 }
       );
     }
 
@@ -85,6 +92,7 @@ export async function POST(req) {
       description:
         invoice.description || invoice.category || invoice.class || "Invoice payment",
       expiresInMinutes: 30,
+      environment: payazaConfig.environment,
     });
 
     await db.collection("invoices").updateOne(
@@ -124,10 +132,28 @@ export async function POST(req) {
       },
     });
   } catch (error) {
-    console.error("PAYAZA VIRTUAL ACCOUNT ERROR:", error);
+    const errorMessage =
+      typeof error?.message === "string" && error.message.trim()
+        ? error.message
+        : "Unable to create PayAza virtual account";
+    const responseStatus =
+      Number.isInteger(error?.status) && error.status >= 400 && error.status <= 599
+        ? error.status
+        : 500;
+
+    console.error("PAYAZA VIRTUAL ACCOUNT ERROR:", {
+      message: errorMessage,
+      code: error?.code,
+      details: error?.details,
+    });
     return Response.json(
-      { error: error.message || "Unable to create PayAza virtual account" },
-      { status: 500 }
+      {
+        error: errorMessage,
+        code: error?.code || "PAYAZA_VIRTUAL_ACCOUNT_ERROR",
+        details: error?.details || undefined,
+      },
+      { status: responseStatus }
     );
   }
 }
+

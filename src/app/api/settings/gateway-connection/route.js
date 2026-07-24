@@ -6,7 +6,7 @@ import {
 } from "../../../../lib/monnify";
 import { connectDB } from "../../../../lib/mongodb";
 import {
-  buildPayazaAuthHeader,
+  buildPayazaHeaders,
   PAYAZA_DEFAULT_BASE_URL,
 } from "../../../../lib/payaza";
 import {
@@ -32,17 +32,23 @@ async function verifyMonnify(user = {}) {
     throw new Error("Monnify API key, secret key, and contract code are required.");
   }
 
-  const baseUrl = getMonnifyBaseUrl(config.apiKey);
+  const baseUrl = getMonnifyBaseUrl(config.apiKey, config.environment);
   await getMonnifyAccessToken({
     apiKey: config.apiKey,
     secretKey: config.secretKey,
     baseUrl,
+    environment: config.environment,
   });
 
   return {
     environment: config.environment,
     message: "Monnify accepted the API key and secret key.",
   };
+}
+
+function isPayazaAuthorizationError(data = {}, responseStatus = 0) {
+  const message = String(data?.message || data?.error || "").toLowerCase();
+  return responseStatus === 401 || responseStatus === 403 || message.includes("authorization");
 }
 
 async function verifyPayaza(user = {}) {
@@ -55,15 +61,13 @@ async function verifyPayaza(user = {}) {
   const response = await fetch(
     `${PAYAZA_DEFAULT_BASE_URL}/merchant-collection/transfer_notification_controller/transaction-query?transaction_reference=invoicehub_connection_test`,
     {
-      headers: {
-        Authorization: buildPayazaAuthHeader(config.publicKey),
-      },
+      headers: buildPayazaHeaders(config.publicKey, config.environment),
       cache: "no-store",
     }
   );
   const data = await response.json().catch(() => ({}));
 
-  if (response.status === 401 || response.status === 403) {
+  if (isPayazaAuthorizationError(data, response.status)) {
     throw new Error(data?.message || "PayAza rejected these credentials.");
   }
 
@@ -121,8 +125,13 @@ export async function POST(req) {
   } catch (error) {
     const status = error.status || 500;
     return Response.json(
-      { error: error.message || "Unable to verify gateway connection" },
+      {
+        error: error.message || "Unable to verify gateway connection",
+        code: error.code || "GATEWAY_CONNECTION_ERROR",
+        details: error.details || undefined,
+      },
       { status }
     );
   }
 }
+
