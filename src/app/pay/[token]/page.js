@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useParams } from "next/navigation";
+import { useToast } from "../../../components/AppFeedback";
 
 const MONNIFY_SDK_SRC = "https://sdk.monnify.com/plugin/monnify.js";
 
@@ -47,6 +48,7 @@ function getOutstandingAmount(invoice) {
 }
 
 export default function PaymentPage() {
+  const toast = useToast();
   const { token } = useParams();
   const [customerData, setCustomerData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -144,14 +146,12 @@ export default function PaymentPage() {
     const requestedAmount = parseAmount(payAmount);
 
     if (requestedAmount <= 0) {
-      alert("Enter a valid amount");
+      toast("warning", "Enter a valid amount");
       return;
     }
 
     if (requestedAmount > invoiceAmount) {
-      alert(
-        `Amount cannot be more than the outstanding invoice balance. Maximum: N${invoiceAmount.toLocaleString()}.`
-      );
+      toast("warning", `Amount cannot be more than the outstanding invoice balance. Maximum: N${invoiceAmount.toLocaleString()}.`);
       return;
     }
 
@@ -185,7 +185,7 @@ export default function PaymentPage() {
         onComplete: (response) => {
           if (!response?.paymentReference) {
             setLaunchingPayment(false);
-            alert("Payment was not completed.");
+            toast("warning", "Payment was not completed.");
             return;
           }
 
@@ -203,7 +203,7 @@ export default function PaymentPage() {
       });
     } catch (err) {
       console.error(err);
-      alert(err.message || "Unable to start Monnify payment");
+      toast("error", err.message || "Unable to start Monnify payment");
       setLaunchingPayment(false);
       return;
     }
@@ -215,14 +215,12 @@ export default function PaymentPage() {
     const requestedAmount = parseAmount(payAmount);
 
     if (requestedAmount <= 0) {
-      alert("Enter a valid amount");
+      toast("warning", "Enter a valid amount");
       return;
     }
 
     if (requestedAmount > invoiceAmount) {
-      alert(
-        `Amount cannot be more than the outstanding invoice balance. Maximum: N${invoiceAmount.toLocaleString()}.`
-      );
+      toast("warning", `Amount cannot be more than the outstanding invoice balance. Maximum: N${invoiceAmount.toLocaleString()}.`);
       return;
     }
 
@@ -254,7 +252,7 @@ export default function PaymentPage() {
       });
     } catch (err) {
       console.error(err);
-      alert(err.message || "Unable to start PayAza payment");
+      toast("error", err.message || "Unable to start PayAza payment");
     } finally {
       setLaunchingPayment(false);
     }
@@ -298,7 +296,7 @@ export default function PaymentPage() {
       return true;
     } catch (err) {
       if (!silent) {
-        alert(err.message || "Payment is not complete yet");
+        toast("info", err.message || "Payment is not complete yet");
       }
       return false;
     } finally {
@@ -307,7 +305,7 @@ export default function PaymentPage() {
         setVerifyingPayaza(false);
       }
     }
-  }, [activeInvoice, payazaAccount, token]);
+  }, [activeInvoice, payazaAccount, toast, token]);
 
   useEffect(() => {
     if (!activeInvoice || !payazaAccount?.paymentReference) {
@@ -367,7 +365,7 @@ export default function PaymentPage() {
     event.preventDefault();
 
     if (!activeInvoice || !receiptFile) {
-      alert("Upload your payment receipt.");
+      toast("warning", "Upload your payment receipt.");
       return;
     }
 
@@ -391,7 +389,7 @@ export default function PaymentPage() {
 
       setReceiptSubmitted(true);
     } catch (uploadError) {
-      alert(uploadError.message || "Unable to upload receipt");
+      toast("error", uploadError.message || "Unable to upload receipt");
     } finally {
       setUploadingReceipt(false);
     }
@@ -1066,3 +1064,7 @@ function PayazaPaymentModal({
     </div>
   );
 }
+
+
+
+

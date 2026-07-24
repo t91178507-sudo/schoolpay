@@ -17,6 +17,7 @@ import {
 import { authFetch } from "../../../lib/authFetch";
 import { getCustomerLabels } from "../../../lib/businessLabels";
 import { useBusinessSession } from "../../../lib/clientSession";
+import { useConfirm } from "../../../components/AppFeedback";
 
 function formatDateTime(value) {
   if (!value) return "-";
@@ -183,6 +184,7 @@ function openExternalTab(url, notify) {
 }
 
 export default function Invoices() {
+  const confirm = useConfirm();
   const session = useBusinessSession();
   const customerLabels = getCustomerLabels(session.businessType);
   const [invoices, setInvoices] = useState([]);
@@ -260,13 +262,21 @@ export default function Invoices() {
   }, []);
 
   useEffect(() => {
-    loadInvoices();
+    const initialLoad = setTimeout(() => {
+      loadInvoices();
+    }, 0);
+    return () => clearTimeout(initialLoad);
   }, [loadInvoices]);
 
   useEffect(() => {
-    if (activePage === "recurring" && !recurringLoaded && !recurringLoading) {
-      loadRecurringInvoices();
+    if (activePage !== "recurring" || recurringLoaded || recurringLoading) {
+      return undefined;
     }
+
+    const recurringLoad = setTimeout(() => {
+      loadRecurringInvoices();
+    }, 0);
+    return () => clearTimeout(recurringLoad);
   }, [activePage, recurringLoaded, recurringLoading, loadRecurringInvoices]);
 
   const showNotice = useCallback((tone, text) => {
@@ -336,7 +346,12 @@ export default function Invoices() {
   };
 
   const deleteInvoice = async (id) => {
-    if (!confirm("Delete this invoice?")) return;
+    const confirmed = await confirm({
+      title: "Delete invoice",
+      message: "Delete this invoice? This action cannot be undone.",
+      confirmLabel: "Delete",
+    });
+    if (!confirmed) return;
 
     try {
       const res = await authFetch(`/api/invoices/${id}`, {
@@ -344,13 +359,13 @@ export default function Invoices() {
       });
 
       if (!res.ok) {
-        alert("Delete failed");
+        showNotice("error", "Delete failed");
         return;
       }
 
       setInvoices((prev) => prev.filter((invoice) => String(invoice._id) !== String(id)));
     } catch {
-      alert("Error deleting invoice");
+      showNotice("error", "Error deleting invoice");
     }
   };
 
@@ -448,7 +463,7 @@ export default function Invoices() {
 
   const sendBulkReminders = async () => {
     if (actionableInvoices.length === 0) {
-      alert("There are no unpaid invoices to remind.");
+      showNotice("info", "There are no unpaid invoices to remind.");
       return;
     }
 
@@ -477,13 +492,11 @@ export default function Invoices() {
         });
       }
 
-      alert(
-        `Reminders processed: ${data.processedCount}\nSent through WhatsApp provider: ${data.sentCount}\nOpened in WhatsApp manually: ${data.fallbackCount}\nSkipped: ${data.skippedCount}\nCooldown skipped: ${data.cooldownSkippedCount || 0}\nDaily cap skipped: ${data.cappedSkippedCount || 0}`
-      );
+      showNotice("success", `Reminders processed: ${data.processedCount}\nSent through WhatsApp provider: ${data.sentCount}\nOpened in WhatsApp manually: ${data.fallbackCount}\nSkipped: ${data.skippedCount}\nCooldown skipped: ${data.cooldownSkippedCount || 0}\nDaily cap skipped: ${data.cappedSkippedCount || 0}`);
 
       loadInvoices();
     } catch (error) {
-      alert(error.message || "Unable to send reminders");
+      showNotice("error", error.message || "Unable to send reminders");
     } finally {
       setSendingReminders(false);
     }
@@ -505,21 +518,6 @@ export default function Invoices() {
 
   const applyInvoiceFilters = () => {
     setInvoiceFilters(invoiceFilterForm);
-  };
-
-  const resetInvoiceFilters = () => {
-    const defaults = {
-      search: "",
-      category: "all",
-      provider: "all",
-      status: "all",
-      notification: "all",
-      dateFrom: "",
-      dateTo: "",
-    };
-
-    setInvoiceFilterForm(defaults);
-    setInvoiceFilters(defaults);
   };
 
   const createRecurringInvoice = async (event) => {
@@ -559,7 +557,7 @@ export default function Invoices() {
       setShowRecurringForm(false);
       await Promise.all([loadInvoices(), loadRecurringInvoices()]);
     } catch (error) {
-      alert(error.message || "Unable to create recurring invoice");
+      showNotice("error", error.message || "Unable to create recurring invoice");
     } finally {
       setSavingRecurring(false);
     }
@@ -578,12 +576,10 @@ export default function Invoices() {
         throw new Error(data.error || "Unable to run recurring invoices");
       }
 
-      alert(
-        `Recurring invoices processed: ${data.processedCount}\nGenerated: ${data.generatedCount}\nSkipped: ${data.skippedCount}`
-      );
+      showNotice("success", `Recurring invoices processed: ${data.processedCount}\nGenerated: ${data.generatedCount}\nSkipped: ${data.skippedCount}`);
       await Promise.all([loadInvoices(), loadRecurringInvoices()]);
     } catch (error) {
-      alert(error.message || "Unable to run recurring invoices");
+      showNotice("error", error.message || "Unable to run recurring invoices");
     } finally {
       setRunningRecurring(false);
     }
@@ -607,12 +603,17 @@ export default function Invoices() {
 
       loadRecurringInvoices();
     } catch (error) {
-      alert(error.message || "Unable to update recurring invoice");
+      showNotice("error", error.message || "Unable to update recurring invoice");
     }
   };
 
   const deleteRecurringInvoice = async (schedule) => {
-    if (!confirm("Delete this recurring invoice schedule?")) return;
+    const confirmed = await confirm({
+      title: "Delete recurring schedule",
+      message: "Delete this recurring invoice schedule? This action cannot be undone.",
+      confirmLabel: "Delete",
+    });
+    if (!confirmed) return;
 
     try {
       const res = await authFetch(`/api/recurring-invoices/${schedule._id}`, {
@@ -626,7 +627,7 @@ export default function Invoices() {
 
       loadRecurringInvoices();
     } catch (error) {
-      alert(error.message || "Unable to delete recurring invoice");
+      showNotice("error", error.message || "Unable to delete recurring invoice");
     }
   };
 
@@ -1748,5 +1749,9 @@ function ManualPaymentModal({
     </div>
   );
 }
+
+
+
+
 
 

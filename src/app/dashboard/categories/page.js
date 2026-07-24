@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import AddCustomerModal from "../../../components/AddCustomerModal";
+import { useConfirm, useToast } from "../../../components/AppFeedback";
 import { authFetch } from "../../../lib/authFetch";
 import { getCustomerLabels } from "../../../lib/businessLabels";
 import { useBusinessSession } from "../../../lib/clientSession";
@@ -23,6 +24,8 @@ function createEmptyInvoiceItem() {
 }
 
 export default function CategoriesPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const session = useBusinessSession();
   const customerLabels = getCustomerLabels(session.businessType);
   const isSchoolBusiness = String(session.businessType || "").toLowerCase() === "school";
@@ -42,6 +45,8 @@ export default function CategoriesPage() {
   const [bulkError, setBulkError] = useState("");
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [importingStudents, setImportingStudents] = useState(false);
+  const [renameModal, setRenameModal] = useState({ open: false, category: "", value: "" });
+  const [renamingCategory, setRenamingCategory] = useState(false);
 
   const fetchCustomers = useCallback(async () => {
     try {
@@ -168,12 +173,17 @@ export default function CategoriesPage() {
   };
 
   const deleteCustomer = async (id) => {
-    if (!confirm(`Delete this ${customerLabels.singular}?`)) return;
+    const confirmed = await confirm({
+      title: `Delete ${customerLabels.singularTitle}`,
+      message: `Delete this ${customerLabels.singular}? This action cannot be undone.`, 
+      confirmLabel: "Delete",
+    });
+    if (!confirmed) return;
     try {
       const res = await authFetch(`/api/customers/${id}`, { method: "DELETE" });
       if (res.ok) fetchCustomers();
     } catch {
-      alert(`Failed to delete ${customerLabels.singular}`);
+      toast("error", `Failed to delete ${customerLabels.singular}`);
     }
   };
 
@@ -444,7 +454,8 @@ export default function CategoriesPage() {
     setBulkItems([createEmptyInvoiceItem()]);
     setBulkError("");
 
-    alert(
+    toast(
+      "success",
       `Created ${savedCount} invoice${savedCount !== 1 ? "s" : ""}.\n` +
         `${notificationCount} notification${notificationCount !== 1 ? "s" : ""} prepared` +
         (whatsappOpenedCount > 0
@@ -460,9 +471,11 @@ export default function CategoriesPage() {
   };
 
   const deleteCategory = async (category) => {
-    const confirmed = confirm(
-      `Delete the "${category}" category? ${customerLabels.pluralTitle} and invoices will be moved to Uncategorized.`
-    );
+    const confirmed = await confirm({
+      title: "Delete category",
+      message: `Delete the "${category}" category? ${customerLabels.pluralTitle} and invoices will be moved to Uncategorized.`,
+      confirmLabel: "Delete",
+    });
 
     if (!confirmed) return;
 
@@ -483,15 +496,30 @@ export default function CategoriesPage() {
       fetchCustomers();
     } catch (error) {
       console.error(error);
-      alert(error.message || "Failed to delete category");
+      toast("error", error.message || "Failed to delete category");
     }
   };
 
-  const renameCategory = async (category) => {
-    const newCategory = prompt("Enter the new category name", category);
-    const trimmedCategory = String(newCategory || "").trim();
+  const renameCategory = (category) => {
+    setRenameModal({ open: true, category, value: category });
+  };
 
-    if (!trimmedCategory || trimmedCategory === category) return;
+  const closeRenameModal = () => {
+    if (renamingCategory) return;
+    setRenameModal({ open: false, category: "", value: "" });
+  };
+
+  const submitRenameCategory = async (event) => {
+    event.preventDefault();
+    const category = renameModal.category;
+    const trimmedCategory = String(renameModal.value || "").trim();
+
+    if (!trimmedCategory || trimmedCategory === category) {
+      closeRenameModal();
+      return;
+    }
+
+    setRenamingCategory(true);
 
     try {
       const res = await authFetch("/api/categories", {
@@ -513,10 +541,14 @@ export default function CategoriesPage() {
         setSelectedCategory(trimmedCategory);
       }
 
+      closeRenameModal();
+      toast("success", "Category renamed.");
       fetchCustomers();
     } catch (error) {
       console.error(error);
-      alert(error.message || "Failed to rename category");
+      toast("error", error.message || "Failed to rename category");
+    } finally {
+      setRenamingCategory(false);
     }
   };
 
@@ -585,7 +617,7 @@ export default function CategoriesPage() {
       const students = await parseImportRows(file);
 
       if (students.length === 0) {
-        alert("No rows found in the selected file.");
+        toast("warning", "No rows found in the selected file.");
         return;
       }
 
@@ -610,13 +642,14 @@ export default function CategoriesPage() {
       }
 
       await fetchCustomers();
-      alert(
+      toast(
+        "success",
         `Imported ${data.insertedCount || 0} ${customerLabels.plural}.` +
           (data.skippedCount ? ` ${data.skippedCount} row(s) skipped.` : "")
       );
     } catch (error) {
       console.error(error);
-      alert(error.message || "Unable to import students");
+      toast("error", error.message || "Unable to import students");
     } finally {
       setImportingStudents(false);
     }
@@ -1399,6 +1432,49 @@ export default function CategoriesPage() {
         </div>
       )}
 
+
+      {renameModal.open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <form
+            onSubmit={submitRenameCategory}
+            className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+          >
+            <h2 className="text-xl font-semibold text-slate-950 dark:text-white">Rename category</h2>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              Update the category name for existing records.
+            </p>
+            <label className="mt-5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Category name
+            </label>
+            <input
+              type="text"
+              value={renameModal.value}
+              onChange={(event) =>
+                setRenameModal((current) => ({ ...current, value: event.target.value }))
+              }
+              className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-slate-800"
+              autoFocus
+            />
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeRenameModal}
+                disabled={renamingCategory}
+                className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={renamingCategory}
+                className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:bg-slate-300"
+              >
+                {renamingCategory ? "Renaming..." : "Rename"}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
       <AddCustomerModal
         key={`${showAddModal}-${selectedCategory || ""}`}
         isOpen={showAddModal}
@@ -1409,3 +1485,9 @@ export default function CategoriesPage() {
     </div>
   );
 }
+
+
+
+
+
+

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import QRCode from "qrcode";
+import { useConfirm } from "../../../components/AppFeedback";
 import { authFetch } from "../../../lib/authFetch";
 import {
   emitSessionChange,
@@ -193,6 +194,7 @@ function getQuickPayUrl(token) {
 }
 
 export default function SettingsPage() {
+  const confirm = useConfirm();
   const session = useBusinessSession();
   const darkMode = useDarkModePreference();
   const [settings, setSettings] = useState(EMPTY_SETTINGS);
@@ -390,7 +392,9 @@ export default function SettingsPage() {
         if (!cancelled) {
           setWhatsAppWebStatus(null);
           setWhatsAppWebLogs([]);
-          setError(statusError.message || "Unable to load WhatsApp Web status");
+          if (!silent) {
+            setError(statusError.message || "Unable to load WhatsApp Web status");
+          }
         }
       } finally {
         if (!cancelled && !silent) {
@@ -400,9 +404,13 @@ export default function SettingsPage() {
     };
 
     loadBridgeStatus();
+    const statusPoll = setInterval(() => {
+      loadBridgeStatus({ silent: true });
+    }, 8000);
 
     return () => {
       cancelled = true;
+      clearInterval(statusPoll);
     };
   }, [
     applyResolvedWhatsAppWebState,
@@ -676,28 +684,6 @@ export default function SettingsPage() {
     }
   };
 
-  const refreshWhatsAppWebStatus = async () => {
-    setLoadingWhatsAppWebStatus(true);
-    setError("");
-
-    try {
-      const res = await authFetch("/api/notifications/whatsapp/bridge/status", {
-        cache: "no-store",
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Unable to refresh WhatsApp Web status");
-      }
-
-      applyResolvedWhatsAppWebState(data);
-    } catch (statusError) {
-      setError(statusError.message || "Unable to refresh WhatsApp Web status");
-    } finally {
-      setLoadingWhatsAppWebStatus(false);
-    }
-  };
-
   const requestWhatsAppPairingCode = async () => {
     const phoneNumber = pairingPhoneNumber.trim();
 
@@ -769,7 +755,13 @@ export default function SettingsPage() {
   };
 
   const deleteWhatsAppWebSession = async () => {
-    if (!confirm("Delete this WhatsApp Web session? You will need to connect the phone again.")) {
+    const confirmed = await confirm({
+      title: "Delete WhatsApp session",
+      message: "Delete this WhatsApp Web session? You will need to connect the phone again.",
+      confirmLabel: "Delete session",
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -1474,15 +1466,10 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={refreshWhatsAppWebStatus}
-                      disabled={loadingWhatsAppWebStatus}
-                      className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                    >
-                      {loadingWhatsAppWebStatus ? "Checking..." : "Check status"}
-                    </button>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950 dark:text-emerald-200">
+                      {loadingWhatsAppWebStatus ? "Checking status..." : "Status checks automatically"}
+                    </span>
                     <button
                       type="button"
                       onClick={disconnectWhatsAppWeb}
@@ -1894,3 +1881,9 @@ function SummaryItem({ label, value, multiline = false }) {
     </div>
   );
 }
+
+
+
+
+
+

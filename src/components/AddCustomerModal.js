@@ -5,6 +5,7 @@ import { authFetch } from "../lib/authFetch";
 import { getCustomerLabels, isSchoolBusinessType } from "../lib/businessLabels";
 import { useBusinessSession } from "../lib/clientSession";
 import { generateInvoiceToken } from "../lib/invoiceUtils";
+import { useToast } from "./AppFeedback";
 
 export default function AddCustomerModal({ 
   isOpen, 
@@ -12,6 +13,7 @@ export default function AddCustomerModal({
   onCustomerAdded,
   defaultCategory = "" 
 }) {
+  const toast = useToast();
   const session = useBusinessSession();
   const customerLabels = getCustomerLabels(session.businessType);
   const isSchoolBusiness = isSchoolBusinessType(session.businessType);
@@ -34,7 +36,7 @@ export default function AddCustomerModal({
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.phone || !formData.category) {
-      alert("Please fill all required fields");
+      toast("warning", "Please fill all required fields");
       return;
     }
 
@@ -69,7 +71,7 @@ export default function AddCustomerModal({
       onCustomerAdded?.(newCustomer);
       onClose();
 
-      alert(`${customerLabels.singularTitle} added under ${formData.category}!`);
+      toast("success", `${customerLabels.singularTitle} added under ${formData.category}.`);
 
       setFormData({
         name: "",
@@ -81,7 +83,7 @@ export default function AddCustomerModal({
       });
     } catch (error) {
       console.error(error);
-      alert(`Failed to add ${customerLabels.singular}`);
+      toast("error", `Failed to add ${customerLabels.singular}`);
     } finally {
       setSubmitting(false);
     }
@@ -161,3 +163,5 @@ export default function AddCustomerModal({
     </div>
   );
 }
+
+

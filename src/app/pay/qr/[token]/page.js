@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import PublicLegalFooter from "../../../../components/PublicLegalFooter";
+import { useToast } from "../../../../components/AppFeedback";
 
 export default function QuickPayPage() {
+  const toast = useToast();
   const { token } = useParams();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -137,7 +139,7 @@ export default function QuickPayPage() {
       return true;
     } catch (verifyError) {
       if (!silent) {
-        alert(verifyError.message || "Payment is not complete yet");
+        toast("info", verifyError.message || "Payment is not complete yet");
       }
       return false;
     } finally {
@@ -146,7 +148,7 @@ export default function QuickPayPage() {
         setVerifyingPayaza(false);
       }
     }
-  }, [payazaAccount, profile]);
+  }, [payazaAccount, profile, toast]);
 
   useEffect(() => {
     if (!payazaAccount?.paymentReference || !profile?.token) {
@@ -390,3 +392,7 @@ function PayazaPaymentModal({
     </div>
   );
 }
+
+
+
+

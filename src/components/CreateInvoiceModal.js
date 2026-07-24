@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { authFetch } from "../lib/authFetch";
 import { generateInvoiceToken } from "../lib/invoiceUtils";
+import { useToast } from "./AppFeedback";
 
 export default function CreateInvoiceModal({ isOpen, onClose, onInvoiceAdded }) {
+  const toast = useToast();
   const [formData, setFormData] = useState({
     customer: "",
     amount: "",
@@ -20,7 +22,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onInvoiceAdded }) 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.customer || !formData.amount) {
-      alert("Customer name and amount are required");
+      toast("warning", "Customer name and amount are required");
       return;
     }
 
@@ -51,11 +53,11 @@ export default function CreateInvoiceModal({ isOpen, onClose, onInvoiceAdded }) 
           date: new Date().toISOString().split("T")[0],
         });
       } else {
-        alert("Failed to create invoice");
+        toast("error", "Failed to create invoice");
       }
     } catch (error) {
       console.error(error);
-      alert("Something went wrong");
+      toast("error", "Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -152,3 +154,5 @@ export default function CreateInvoiceModal({ isOpen, onClose, onInvoiceAdded }) 
     </div>
   );
 }
+
+
