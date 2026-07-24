@@ -15,6 +15,25 @@ import {
 } from "../../../../lib/paymentLifecycle";
 import { deliverPaymentConfirmation } from "../../../../lib/whatsappNotifications";
 
+function invoiceAlreadyPaidForReference(invoice, paymentReference) {
+  if (invoice?.status !== "Paid") {
+    return false;
+  }
+
+  if (String(invoice.paymentReference || "") === String(paymentReference)) {
+    return true;
+  }
+
+  return Boolean(
+    Array.isArray(invoice.paymentTransactions) &&
+      invoice.paymentTransactions.some((transaction) =>
+        [transaction.reference, transaction.paymentReference].some(
+          (reference) => String(reference || "") === String(paymentReference)
+        )
+      )
+  );
+}
+
 export async function POST(req) {
   try {
     const db = await connectDB();
@@ -36,6 +55,16 @@ export async function POST(req) {
       return Response.json({ error: "Invoice not found" }, { status: 404 });
     }
 
+    if (invoiceAlreadyPaidForReference(invoice, paymentReference)) {
+      return Response.json({
+        success: true,
+        paymentStatus: "PAID",
+        paymentReference,
+        alreadyPaid: true,
+        message: "Your payment has been confirmed successfully.",
+      });
+    }
+
     const owner = invoice.ownerId
       ? await findUserById(db, invoice.ownerId)
       : null;
@@ -48,11 +77,36 @@ export async function POST(req) {
       );
     }
 
-    const verification = await verifyMonnifyTransaction({
-      apiKey: monnifyConfig.apiKey,
-      secretKey: monnifyConfig.secretKey,
-      paymentReference,
-    });
+    let verification;
+
+    try {
+      verification = await verifyMonnifyTransaction({
+        apiKey: monnifyConfig.apiKey,
+        secretKey: monnifyConfig.secretKey,
+        paymentReference,
+      });
+    } catch (verificationError) {
+      const pendingReferenceMatches =
+        invoice.pendingPaymentReference &&
+        String(invoice.pendingPaymentReference) === String(paymentReference);
+
+      if (pendingReferenceMatches) {
+        console.error("MONNIFY VERIFY PENDING:", verificationError);
+        return Response.json(
+          {
+            success: false,
+            pending: true,
+            paymentStatus: "PENDING_VERIFICATION",
+            paymentReference,
+            message:
+              "Payment received. Final confirmation is pending while the business Monnify credentials are checked.",
+          },
+          { status: 202 }
+        );
+      }
+
+      throw verificationError;
+    }
 
     const amountPaid = parseAmount(verification.amountPaid);
     const expectedAmount = parseAmount(
@@ -105,6 +159,7 @@ export async function POST(req) {
       success: true,
       paymentStatus: verification.paymentStatus,
       paymentReference,
+      message: "Your payment has been confirmed successfully.",
       invoice: {
         invoiceId: String(invoice._id),
         customerName,

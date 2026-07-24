@@ -164,6 +164,7 @@ export default function PaymentPage() {
         body: JSON.stringify({
           token,
           invoiceId: activeInvoice._id,
+        provider: "payaza",
           amount: requestedAmount,
           origin: window.location.origin,
         }),
@@ -191,9 +192,10 @@ export default function PaymentPage() {
           const params = new URLSearchParams({
             paymentReference: response.paymentReference,
             invoiceId: data.invoiceId,
+            provider: "monnify",
           });
 
-          window.location.href = `/pay/success/${activeInvoice.token}?${params.toString()}`;
+          window.location.href = `/pay/success/${token}?${params.toString()}`;
         },
         onClose: () => {
           setLaunchingPayment(false);
@@ -233,6 +235,7 @@ export default function PaymentPage() {
         body: JSON.stringify({
           token,
           invoiceId: activeInvoice._id,
+        provider: "payaza",
           amount: requestedAmount,
         }),
       });
@@ -246,6 +249,7 @@ export default function PaymentPage() {
       setPayazaAccount({
         ...data.virtualAccount,
         invoiceId: data.invoiceId,
+            provider: "monnify",
         paymentReference: data.paymentReference,
       });
     } catch (err) {
@@ -274,6 +278,7 @@ export default function PaymentPage() {
         body: JSON.stringify({
           token,
           invoiceId: activeInvoice._id,
+        provider: "payaza",
           paymentReference: payazaAccount.paymentReference,
         }),
       });
@@ -286,6 +291,7 @@ export default function PaymentPage() {
       const params = new URLSearchParams({
         paymentReference: payazaAccount.paymentReference,
         invoiceId: activeInvoice._id,
+        provider: "payaza",
       });
 
       window.location.href = `/pay/success/${token}?${params.toString()}`;

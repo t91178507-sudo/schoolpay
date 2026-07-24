@@ -21,7 +21,7 @@ import {
 } from "../../components/DashboardUI";
 import { authFetch } from "../../lib/authFetch";
 import { getCustomerLabels } from "../../lib/businessLabels";
-import { useBusinessSession } from "../../lib/clientSession";
+import { useBusinessSession, useHydrated } from "../../lib/clientSession";
 
 async function readJsonSafely(response, fallback) {
   if (!response?.ok) {
@@ -107,6 +107,7 @@ function getLastFiveYearsCollections(invoices = []) {
 
 export default function Dashboard() {
   const session = useBusinessSession();
+  const isHydrated = useHydrated();
   const customerLabels = getCustomerLabels(session.businessType);
   const [stats, setStats] = useState({
     totalCustomers: 0,
@@ -121,12 +122,31 @@ export default function Dashboard() {
   const [currentTime, setCurrentTime] = useState(null);
 
   useEffect(() => {
+    if (!isHydrated) {
+      return undefined;
+    }
+
+    if (!session.isLoggedIn) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let redirectingForAuth = false;
+
     const fetchDashboardData = async () => {
+      setLoading(true);
+      setError(null);
+
       try {
         const [customersRes, invoicesRes] = await Promise.all([
           authFetch("/api/customers"),
           authFetch("/api/invoices"),
         ]);
+
+        if (customersRes.status === 401 || invoicesRes.status === 401) {
+          redirectingForAuth = true;
+          return;
+        }
 
         const customers = await readJsonSafely(customersRes, []);
         const invoices = await readJsonSafely(invoicesRes, []);
@@ -144,6 +164,10 @@ export default function Dashboard() {
         const paid = invoices.filter((inv) => inv.status === "Paid").length;
         const incomplete = invoices.filter((inv) => inv.status === "Partially Paid").length;
 
+        if (cancelled) {
+          return;
+        }
+
         setStats({
           totalCustomers: customers.length,
           expectedRevenue,
@@ -153,15 +177,23 @@ export default function Dashboard() {
         });
         setInvoices(Array.isArray(invoices) ? invoices : []);
       } catch (err) {
-        console.error(err);
-        setError("Failed to load dashboard data");
+        if (!cancelled) {
+          console.error(err);
+          setError("Failed to load dashboard data");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled && !redirectingForAuth) {
+          setLoading(false);
+        }
       }
     };
 
     fetchDashboardData();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isHydrated, session.isLoggedIn]);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -292,7 +324,7 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          <div className="min-w-0 h-[240px] px-2 py-2.5 sm:h-[260px] sm:px-3 xl:h-[280px]">
+          <div className="h-[240px] min-w-[1px] px-2 py-2.5 sm:h-[260px] sm:px-3 xl:h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyCollections} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
                 <defs>
@@ -353,7 +385,7 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          <div className="min-w-0 h-[240px] px-3 py-2.5 sm:h-[260px] sm:px-3 xl:h-[280px]">
+          <div className="h-[240px] min-w-[1px] px-3 py-2.5 sm:h-[260px] sm:px-3 xl:h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={yearlyCollections} margin={{ top: 12, right: 16, left: 8, bottom: 8 }}>
                 <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="4 4" />
@@ -395,3 +427,4 @@ export default function Dashboard() {
     </PageShell>
   );
 }
+

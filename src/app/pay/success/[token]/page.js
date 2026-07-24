@@ -12,11 +12,17 @@ export default function SuccessPage() {
     searchParams.get("reference") ||
     "";
   const invoiceId = searchParams.get("invoiceId") || "";
-  const [status, setStatus] = useState("loading");
-  const [message, setMessage] = useState("Confirming your payment...");
+  const provider = (searchParams.get("provider") || "monnify").toLowerCase();
+  const alreadyVerified = provider === "payaza";
+  const [status, setStatus] = useState(alreadyVerified ? "success" : "loading");
+  const [message, setMessage] = useState(
+    alreadyVerified
+      ? "Your payment has been confirmed successfully."
+      : "Confirming your payment..."
+  );
 
   useEffect(() => {
-    if (!token || !paymentReference || !invoiceId) {
+    if (!token || !paymentReference || !invoiceId || alreadyVerified) {
       return;
     }
 
@@ -36,15 +42,21 @@ export default function SuccessPage() {
           throw new Error(data.error || "Unable to confirm payment");
         }
 
+        if (data.pending) {
+          setStatus("loading");
+          setMessage(data.message || "Payment received. Final confirmation is pending.");
+          return;
+        }
+
         setStatus("success");
-        setMessage("Your payment has been confirmed successfully.");
+        setMessage(data.message || "Your payment has been confirmed successfully.");
       })
       .catch((err) => {
         console.error("Failed to update payment status:", err);
         setStatus("error");
         setMessage(err.message || "We could not confirm this payment.");
       });
-  }, [invoiceId, paymentReference, token]);
+  }, [alreadyVerified, invoiceId, paymentReference, token]);
 
   const displayStatus = !paymentReference || !invoiceId ? "error" : status;
   const displayMessage =
