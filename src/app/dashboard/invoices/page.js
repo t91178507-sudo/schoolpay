@@ -37,13 +37,26 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString();
 }
 
-function getOutstandingAmount(invoice) {
-  const amount = Number(invoice.amount || 0);
-  const paidAmount = Number(invoice.paidAmount || 0);
-  const balanceDue = Number(invoice.balanceDue || 0);
+function getOriginalInvoiceAmount(invoice = {}) {
+  const amount = Number(
+    invoice.originalAmount ?? invoice.amount ?? invoice.total ?? 0
+  );
 
-  if (balanceDue > 0) {
-    return balanceDue;
+  return Number.isFinite(amount) ? Math.max(amount, 0) : 0;
+}
+
+function getOutstandingAmount(invoice = {}) {
+  const amount = getOriginalInvoiceAmount(invoice);
+  const paidAmount = Number(invoice.paidAmount || invoice.amountPaid || 0);
+  const balanceDue = Number(invoice.balanceDue);
+  const status = String(invoice.status || invoice.paymentStatus || "").toLowerCase();
+
+  if (status === "paid") {
+    return 0;
+  }
+
+  if (Number.isFinite(balanceDue) && balanceDue > 0) {
+    return Math.min(balanceDue, amount || balanceDue);
   }
 
   if (paidAmount > 0) {
@@ -54,7 +67,7 @@ function getOutstandingAmount(invoice) {
 }
 
 function getManualPaymentLimit(invoice) {
-  const invoiceAmount = Number(invoice?.amount || 0);
+  const invoiceAmount = getOriginalInvoiceAmount(invoice);
   const outstandingAmount = Number(getOutstandingAmount(invoice) || 0);
 
   if (outstandingAmount > 0 && outstandingAmount < invoiceAmount) {
@@ -795,7 +808,7 @@ export default function Invoices() {
         {activePage === "invoices" ? (
           <>
             <StatCard label="Total invoices" value={actionableInvoices.length} tone="slate" />
-            <StatCard label="Total amount" value={`N${totalAmount.toLocaleString()}`} tone="blue" />
+            <StatCard label="Balance pending" value={`N${totalAmount.toLocaleString()}`} tone="orange" />
             <StatCard label="Unpaid" value={unpaidCount} tone="orange" />
           </>
         ) : (
@@ -1150,11 +1163,22 @@ export default function Invoices() {
 
                       <div className="space-y-2">
                         <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                          Payment
+                          Amounts
                         </p>
-                        <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                          N{Number(getOutstandingAmount(invoice) || 0).toLocaleString()}
-                        </p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Original amount</p>
+                            <p className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
+                              N{getOriginalInvoiceAmount(invoice).toLocaleString()}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Balance pending</p>
+                            <p className="mt-1 text-base font-semibold text-amber-700 dark:text-amber-300">
+                              N{getOutstandingAmount(invoice).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
                         <div className="flex flex-wrap items-center gap-2">
                           <StatusBadge tone={invoice.status === "Paid" ? "green" : "orange"}>
                             {invoice.status || "Unpaid"}
@@ -1178,7 +1202,7 @@ export default function Invoices() {
                           className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-green-700"
                         >
                           <FiCheckCircle className="h-4 w-4" />
-                          Mark paid
+                          Record payment
                         </button>
                       ) : null}
                       <button
@@ -1202,7 +1226,7 @@ export default function Invoices() {
             </div>
 
             <div className="hidden overflow-x-auto lg:block">
-              <table className="min-w-[1180px] w-full">
+              <table className="min-w-[1320px] w-full">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
                   <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
@@ -1221,7 +1245,10 @@ export default function Invoices() {
                     Gateway
                   </th>
                   <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Amount
+                    Original amount
+                  </th>
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Balance pending
                   </th>
                   <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     Status
@@ -1276,8 +1303,13 @@ export default function Invoices() {
                         </p>
                       </td>
                       <td className="px-5 py-3.5 align-top">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                          N{Number(getOutstandingAmount(invoice) || 0).toLocaleString()}
+                        <p className="whitespace-nowrap text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          N{getOriginalInvoiceAmount(invoice).toLocaleString()}
+                        </p>
+                      </td>
+                      <td className="px-5 py-3.5 align-top">
+                        <p className="whitespace-nowrap text-sm font-semibold text-amber-700 dark:text-amber-300">
+                          N{getOutstandingAmount(invoice).toLocaleString()}
                         </p>
                       </td>
                       <td className="px-5 py-3.5 align-top">
@@ -1296,10 +1328,10 @@ export default function Invoices() {
                             <button
                               onClick={() => openManualPaymentModal(invoice)}
                               className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-green-700"
-                              title="Mark paid"
+                              title="Record payment"
                             >
                               <FiCheckCircle className="h-3.5 w-3.5" />
-                              <span>Paid</span>
+                              <span>Record payment</span>
                             </button>
                           )}
                           <button

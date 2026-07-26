@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 import { connectDB } from "../../../lib/mongodb";
-import { requireAuth } from "../../../lib/auth";
+import { requireSchoolReceiptAccess } from "../../../lib/receiptAccess";
 
 function serialize(receipt) {
   const safeReceipt = { ...receipt };
@@ -16,8 +16,9 @@ function serialize(receipt) {
 
 export async function GET(req) {
   try {
-    const userId = requireAuth(req);
     const db = await connectDB();
+    const access = await requireSchoolReceiptAccess(req, db);
+    const userId = access.ownerId;
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const query = { ownerId: userId };

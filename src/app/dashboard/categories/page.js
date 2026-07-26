@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import * as XLSX from "xlsx";
 import AddCustomerModal from "../../../components/AddCustomerModal";
 import { useConfirm, useToast } from "../../../components/AppFeedback";
@@ -663,12 +664,6 @@ export default function CategoriesPage() {
     );
   }
 
-  const totalCategories = categoryList.length;
-  const uncategorizedCount = grouped.Uncategorized?.length || 0;
-  const currentViewCount = selectedCategory
-    ? visibleSelectedCustomers.length
-    : customers.length;
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 py-4 sm:py-5">
       <div className="w-full px-3 sm:px-4 lg:px-5">
@@ -695,52 +690,10 @@ export default function CategoriesPage() {
                 >
                   Add new {customerLabels.singular}
                 </button>
-                <div className="rounded-2xl border border-slate-200 bg-white/85 px-4 py-2.5 text-left shadow-sm dark:border-slate-800 dark:bg-slate-950/60 xl:min-w-[11rem]">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                    Total {customerLabels.plural}
-                  </p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
-                    {customers.length}
-                  </p>
-                </div>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-2.5 px-5 py-3.5 sm:grid-cols-2 xl:grid-cols-4 sm:px-6 lg:px-7">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-800 dark:bg-slate-950/60">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                Categories
-              </p>
-              <p className="mt-1.5 text-2xl font-semibold text-slate-950 dark:text-white">
-                {totalCategories}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-800 dark:bg-slate-950/60">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                Visible now
-              </p>
-              <p className="mt-1.5 text-2xl font-semibold text-slate-950 dark:text-white">
-                {currentViewCount}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-800 dark:bg-slate-950/60">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                Uncategorized
-              </p>
-              <p className="mt-1.5 text-2xl font-semibold text-slate-950 dark:text-white">
-                {uncategorizedCount}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-800 dark:bg-slate-950/60">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                Current view
-              </p>
-              <p className="mt-1.5 truncate text-base font-semibold text-slate-950 dark:text-white">
-                {selectedCategory || "All categories"}
-              </p>
-            </div>
-          </div>
         </div>
 
         {selectedCategory && (
@@ -921,6 +874,7 @@ export default function CategoriesPage() {
                   >
                     Generate Invoice for All
                   </button>
+
                   <button
                     onClick={() => renameCategory(selectedCategory)}
                     className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/20"
@@ -972,6 +926,12 @@ export default function CategoriesPage() {
                     >
                       Generate Invoice
                     </button>
+                    <Link
+                      href={`/dashboard/payments?student=${encodeURIComponent(customer.name)}&category=${encodeURIComponent(selectedCategory)}`}
+                      className="inline-flex items-center justify-center rounded-xl bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700"
+                    >
+                      Payment history
+                    </Link>
                     <button
                       onClick={() => deleteCustomer(customer._id)}
                       className="rounded-xl bg-red-50 px-4 py-2 text-sm font-medium text-red-600"
@@ -987,19 +947,19 @@ export default function CategoriesPage() {
               <table className="w-full table-fixed">
                 <thead>
                   <tr className="border-b bg-slate-50">
-                    <th className="w-[24%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="w-[20%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                       {customerLabels.singularTitle} Name
                     </th>
-                    <th className="w-[18%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="w-[16%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                       Phone Number
                     </th>
-                    <th className="w-[24%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="w-[20%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                       Email
                     </th>
                     <th className="w-[16%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                       Token
                     </th>
-                    <th className="w-[18%] px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="w-[26%] px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-gray-500">
                       Actions
                     </th>
                   </tr>
@@ -1029,6 +989,12 @@ export default function CategoriesPage() {
                           >
                             Invoice
                           </button>
+                          <Link
+                            href={`/dashboard/payments?student=${encodeURIComponent(customer.name)}&category=${encodeURIComponent(selectedCategory)}`}
+                            className="inline-flex items-center justify-center whitespace-nowrap rounded-xl border border-blue-200 px-3 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
+                          >
+                            Payment history
+                          </Link>
                           <button
                             onClick={() => deleteCustomer(customer._id)}
                             className="whitespace-nowrap rounded-xl border border-red-200 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50"

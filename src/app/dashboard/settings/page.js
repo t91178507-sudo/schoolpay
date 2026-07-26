@@ -847,6 +847,53 @@ export default function SettingsPage() {
     }
   };
 
+  const selectedGatewaySettings =
+    settings.paymentGateways?.[selectedGateway.key] || {};
+  const gatewayRequiredFields = selectedGateway.fields.filter(
+    (field) => !["webhookUrl", "callbackUrl", "paymentInstructions"].includes(field.key)
+  );
+  const gatewayConfigured = gatewayRequiredFields.every((field) =>
+    Boolean(
+      selectedGatewaySettings[field.key] ||
+        selectedGatewaySettings[`${field.key}Configured`]
+    )
+  );
+  const businessProfileConfigured = Boolean(
+    settings.businessName && (settings.businessEmail || settings.businessPhone)
+  );
+  const whatsAppConfigured =
+    selectedWhatsAppProvider.key === "browser" || whatsAppWebStatus?.status === "ready";
+  const setupItems = [
+    {
+      href: "#business-profile",
+      step: "1",
+      title: "Business profile",
+      detail: "Name, contact details, address and logo",
+      ready: businessProfileConfigured,
+    },
+    {
+      href: "#payment-method",
+      step: "2",
+      title: "Payment method",
+      detail: selectedGateway.name,
+      ready: gatewayConfigured,
+    },
+    {
+      href: "#whatsapp",
+      step: "3",
+      title: "WhatsApp delivery",
+      detail: selectedWhatsAppProvider.name,
+      ready: whatsAppConfigured,
+    },
+    {
+      href: "#qr-payments",
+      step: "4",
+      title: "QR payments",
+      detail: `${quickPayProfiles.length} saved QR ${quickPayProfiles.length === 1 ? "profile" : "profiles"}`,
+      ready: quickPayProfiles.length > 0,
+      optional: true,
+    },
+  ];
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
@@ -856,15 +903,79 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Settings</h1>
-        <p className="text-gray-600 dark:text-slate-400">
-          Configure your business identity and connect the payment gateway details each business needs before taking payments.
-        </p>
+    <div className="mx-auto max-w-7xl space-y-6 pb-8">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Settings</h1>
+          <p className="mt-2 max-w-2xl text-gray-600 dark:text-slate-400">
+            Set up how your business appears, receives payments, and sends WhatsApp messages.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-slate-900 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+        >
+          {saving ? "Saving changes..." : "Save changes"}
+        </button>
       </div>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
+      <section className="rounded-lg border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/60">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Setup guide</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            Complete the first three sections before sending live payment requests. QR payments are optional.
+          </p>
+        </div>
+        <nav className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Settings sections">
+          {setupItems.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              className="flex min-h-24 items-start gap-3 rounded-lg border border-slate-200 bg-white p-4 transition hover:border-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-600"
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white dark:bg-white dark:text-slate-950">
+                {item.step}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-900 dark:text-white">
+                  {item.title}
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  {item.detail}
+                </span>
+                <span
+                  className={`mt-2 inline-block text-xs font-semibold ${
+                    item.ready
+                      ? "text-emerald-700 dark:text-emerald-300"
+                      : item.optional
+                        ? "text-slate-500 dark:text-slate-400"
+                        : "text-amber-700 dark:text-amber-300"
+                  }`}
+                >
+                  {item.ready ? "Ready" : item.optional ? "Optional" : "Needs attention"}
+                </span>
+              </span>
+            </a>
+          ))}
+        </nav>
+      </section>
+
+      {(error || message) && (
+        <div
+          role="status"
+          className={`rounded-lg border px-5 py-4 text-sm ${
+            error
+              ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+              : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
+          }`}
+        >
+          {error || message}
+        </div>
+      )}
+
+      <section id="business-profile" className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Business profile</h2>
@@ -895,7 +1006,7 @@ export default function SettingsPage() {
                 onClick={() => setEditingBusinessProfile((current) => !current)}
                 className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               >
-                {editingBusinessProfile ? "Minimize" : "Edit profile"}
+                {editingBusinessProfile ? "Close details" : "Edit business profile"}
               </button>
               {editingBusinessProfile ? (
                 <label className="inline-flex cursor-pointer items-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800">
@@ -990,7 +1101,7 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
+      <section id="appearance" className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Appearance</h2>
@@ -1004,7 +1115,7 @@ export default function SettingsPage() {
             onClick={() => toggleSection("appearance")}
             className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
-            {openSections.appearance ? "Minimize" : "Edit"}
+            {openSections.appearance ? "Collapse" : "Change theme"}
           </button>
         </div>
 
@@ -1043,12 +1154,12 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
+      <section id="payment-method" className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Gateway setup</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Payment method</h2>
             <p className="text-sm text-gray-500 dark:text-slate-400">
-              Save your provider credentials here so each business can manage its own payment account instead of relying on one global platform key.
+              Choose one way to receive payments. Enter its details below, save your changes, then verify the connection when available.
             </p>
           </div>
           <button
@@ -1056,7 +1167,7 @@ export default function SettingsPage() {
             onClick={() => toggleSection("gateway")}
             className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
-            {openSections.gateway ? "Minimize" : "Edit"}
+            {openSections.gateway ? "Collapse" : "Configure payment"}
           </button>
         </div>
 
@@ -1064,7 +1175,7 @@ export default function SettingsPage() {
           <>
             <div className="mt-6 max-w-xl">
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-300">
-                Preferred payment gateway
+                How customers will pay
               </label>
               <select
                 value={settings.defaultPaymentGateway}
@@ -1346,7 +1457,7 @@ export default function SettingsPage() {
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">WhatsApp delivery</h2>
             <p className="text-sm text-gray-500 dark:text-slate-400">
-              Choose how invoice messages and paid confirmations should be delivered to customers.
+              Choose whether messages open in your browser for manual sending or go through your connected WhatsApp number.
             </p>
           </div>
           <button
@@ -1354,7 +1465,7 @@ export default function SettingsPage() {
             onClick={() => toggleSection("whatsapp")}
             className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
-            {openSections.whatsapp ? "Minimize" : "Edit"}
+            {openSections.whatsapp ? "Collapse" : "Configure WhatsApp"}
           </button>
         </div>
 
@@ -1678,13 +1789,12 @@ export default function SettingsPage() {
 
       </section>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-8 space-y-5 dark:border-slate-800 dark:bg-slate-900">
+      <section id="compliance" className="rounded-2xl border border-gray-200 bg-white p-8 space-y-5 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Platform compliance posture</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Legal and payment notices</h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-              InvoiceHub should be presented as invoicing software, not as the entity receiving,
-              pooling, or resettling customer funds.
+              Review the rules and public notices that explain InvoiceHub&apos;s role in processing payments.
             </p>
           </div>
           <button
@@ -1692,7 +1802,7 @@ export default function SettingsPage() {
             onClick={() => toggleSection("compliance")}
             className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
-            {openSections.compliance ? "Minimize" : "Edit"}
+            {openSections.compliance ? "Collapse" : "View details"}
           </button>
         </div>
 
@@ -1726,12 +1836,12 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-8 space-y-6 dark:border-slate-800 dark:bg-slate-900">
+      <section id="qr-payments" className="rounded-2xl border border-gray-200 bg-white p-8 space-y-6 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">QR payment setup</h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-              Create reusable QR payment links. When someone scans one, they enter their phone number and amount, complete payment in Monnify, and a paid invoice is created automatically.
+              Create optional reusable QR codes for payments that are not tied to an existing invoice.
             </p>
           </div>
           <button
@@ -1739,7 +1849,7 @@ export default function SettingsPage() {
             onClick={() => toggleSection("quickPay")}
             className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
-            {openSections.quickPay ? "Minimize" : "Edit"}
+            {openSections.quickPay ? "Collapse" : "Manage QR codes"}
           </button>
         </div>
 
@@ -1853,26 +1963,20 @@ export default function SettingsPage() {
         )}
       </section>
 
-      {(error || message) && (
-        <div
-          className={`rounded-2xl px-5 py-4 text-sm ${
-            error
-              ? "bg-red-50 border border-red-200 text-red-700 dark:bg-red-950/40 dark:border-red-900 dark:text-red-300"
-              : "bg-emerald-50 border border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-300"
-          }`}
-        >
-          {error || message}
+      <div className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:bg-slate-900">
+        <div>
+          <p className="text-sm font-semibold text-slate-900 dark:text-white">Finished updating settings?</p>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Save once to apply changes made in any section on this page.
+          </p>
         </div>
-      )}
-
-      <div className="flex justify-end">
         <button
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:bg-slate-300"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-slate-900 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
         >
-          {saving ? "Saving..." : "Save settings"}
+          {saving ? "Saving changes..." : "Save changes"}
         </button>
       </div>
     </div>

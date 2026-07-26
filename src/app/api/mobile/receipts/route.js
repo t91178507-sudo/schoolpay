@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
-import { buildScopedQuery, requireAccessContext } from "../../../../lib/accessControl";
+import { buildScopedQuery } from "../../../../lib/accessControl";
+import { requireSchoolReceiptAccess } from "../../../../lib/receiptAccess";
 import { logUserActivity } from "../../../../lib/activityLogs";
 import { connectDB } from "../../../../lib/mongodb";
 import { approveReceiptUpload, rejectReceiptUpload } from "../../../../lib/receiptUploads";
@@ -7,7 +8,7 @@ import { approveReceiptUpload, rejectReceiptUpload } from "../../../../lib/recei
 export async function GET(req) {
   try {
     const db = await connectDB();
-    const context = await requireAccessContext(req, db, {
+    const context = await requireSchoolReceiptAccess(req, db, {
       permission: "payments.validateReceipts",
     });
     const receipts = await db
@@ -38,7 +39,7 @@ export async function GET(req) {
 export async function PATCH(req) {
   try {
     const db = await connectDB();
-    const context = await requireAccessContext(req, db, {
+    const context = await requireSchoolReceiptAccess(req, db, {
       permission: "payments.validateReceipts",
     });
     const body = await req.json();
@@ -81,7 +82,7 @@ export async function PATCH(req) {
     }
 
     if (action === "reject") {
-      await rejectReceiptUpload(db, receipt, {
+      const rejection = await rejectReceiptUpload(db, receipt, {
         userId: context.user._id,
         ipAddress: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "",
         reason: String(body.reason || "Receipt rejected"),
@@ -100,7 +101,10 @@ export async function PATCH(req) {
         description: `${context.user.fullName || "Staff"} rejected a receipt upload.`,
       });
 
-      return Response.json({ success: true });
+      return Response.json({
+        success: true,
+        notification: rejection.notification,
+      });
     }
 
     return Response.json({ error: "Unsupported action." }, { status: 400 });

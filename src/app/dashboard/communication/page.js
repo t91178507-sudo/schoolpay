@@ -12,6 +12,8 @@ import {
 } from "../../../components/DashboardUI";
 import { authFetch } from "../../../lib/authFetch";
 
+const MAX_PREVIOUS_MESSAGES = 5;
+
 export default function CommunicationPage() {
   const [bridgeStatus, setBridgeStatus] = useState(null);
   const [logs, setLogs] = useState([]);
@@ -51,7 +53,11 @@ export default function CommunicationPage() {
       }
 
       setBridgeStatus(data);
-      setLogs(Array.isArray(data.logs) ? data.logs : []);
+      setLogs(
+        Array.isArray(data.logs)
+          ? data.logs.slice(0, MAX_PREVIOUS_MESSAGES)
+          : []
+      );
     } catch (statusError) {
       setBridgeStatus({
         bridgeReachable: false,

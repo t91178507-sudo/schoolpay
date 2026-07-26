@@ -309,8 +309,13 @@ function armReadyTimeout(
 }
 
 function serializeSessionState(sessionState) {
+  const status =
+    sessionState.status === "ready" && !sessionState.client
+      ? "starting"
+      : sessionState.status;
+
   return {
-    status: sessionState.status,
+    status,
     sessionName: sessionState.sessionName,
     connectedNumber: sessionState.connectedNumber,
     pairingCode: sessionState.pairingCode,
@@ -433,13 +438,18 @@ async function buildClient(sessionState) {
     }
   });
 
+  sessionState.client = nextClient;
+
   try {
     await nextClient.initialize();
   } catch (error) {
+    if (sessionState.client === nextClient) {
+      sessionState.client = null;
+    }
+    await nextClient.destroy().catch(() => {});
     throw new Error(formatBridgeLaunchError(error));
   }
 
-  sessionState.client = nextClient;
   return nextClient;
 }
 
@@ -516,6 +526,30 @@ async function ensureSession(sessionName) {
   }
 
   return sessionState;
+}
+
+async function waitForSessionReady(sessionState, timeoutMs = 15000) {
+  await ensureSession(sessionState.sessionName);
+
+  if (sessionState.client && sessionState.status === "ready") {
+    return true;
+  }
+
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    const interval = setInterval(() => {
+      if (sessionState.client && sessionState.status === "ready") {
+        clearInterval(interval);
+        resolve(true);
+        return;
+      }
+
+      if (Date.now() - startedAt >= timeoutMs) {
+        clearInterval(interval);
+        resolve(false);
+      }
+    }, 250);
+  });
 }
 
 function waitForPairingCode(sessionState, timeoutMs = 45000) {
@@ -694,11 +728,17 @@ app.get("/api/messages/logs", requireApiKey, async (req, res) => {
 });
 
 app.post("/api/messages/send-text", requireApiKey, async (req, res) => {
-  const sessionState = await ensureSession(readSessionName(req));
+  const sessionState = getSessionState(readSessionName(req));
 
   try {
-    if (!sessionState.client || sessionState.status !== "ready") {
-      res.status(409).json({ error: "WhatsApp session is not ready" });
+    const isReady = await waitForSessionReady(sessionState);
+
+    if (!isReady) {
+      res.status(409).json({
+        error: "WhatsApp session is not ready",
+        status: sessionState.status,
+        sessionName: sessionState.sessionName,
+      });
       return;
     }
 

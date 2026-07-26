@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useConfirm } from "../../../components/AppFeedback";
 import {
   EmptyState,
   PageHeader,
@@ -11,6 +14,8 @@ import {
   SurfaceCard,
 } from "../../../components/DashboardUI";
 import { authFetch } from "../../../lib/authFetch";
+import { isSchoolBusinessType } from "../../../lib/businessLabels";
+import { useBusinessSession, useHydrated } from "../../../lib/clientSession";
 
 function formatCurrency(value) {
   return `N${Number(value || 0).toLocaleString()}`;
@@ -35,6 +40,11 @@ function getStatusTone(status) {
 }
 
 export default function ReceiptValidationPage() {
+  const router = useRouter();
+  const confirm = useConfirm();
+  const session = useBusinessSession();
+  const isHydrated = useHydrated();
+  const isSchoolBusiness = isSchoolBusinessType(session.businessType);
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeReceipt, setActiveReceipt] = useState(null);
@@ -42,6 +52,7 @@ export default function ReceiptValidationPage() {
   const [busy, setBusy] = useState("");
   const [rejecting, setRejecting] = useState(null);
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState("success");
   const [error, setError] = useState("");
 
   const loadReceipts = async () => {
@@ -62,9 +73,18 @@ export default function ReceiptValidationPage() {
   };
 
   useEffect(() => {
+    if (!isHydrated) {
+      return undefined;
+    }
+
+    if (!isSchoolBusiness) {
+      router.replace("/dashboard");
+      return undefined;
+    }
+
     const initialLoad = setTimeout(loadReceipts, 0);
     return () => clearTimeout(initialLoad);
-  }, []);
+  }, [isHydrated, isSchoolBusiness, router]);
 
   const stats = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -126,16 +146,42 @@ export default function ReceiptValidationPage() {
         method: "POST",
       });
 
-      if (fileRes.ok) {
-        const blob = await fileRes.blob();
-        setReceiptPreviewUrl(URL.createObjectURL(blob));
+      if (!fileRes.ok) {
+        const fileError = await fileRes.json().catch(() => ({}));
+        throw new Error(fileError.error || "Unable to load receipt preview");
       }
+
+      const blob = await fileRes.blob();
+      setReceiptPreviewUrl(URL.createObjectURL(blob));
     } catch (openError) {
+      setActiveReceipt(null);
+      setReceiptPreviewUrl("");
       setError(openError.message || "Unable to open receipt");
     }
   };
 
+  const closeReceipt = () => {
+    if (receiptPreviewUrl) {
+      URL.revokeObjectURL(receiptPreviewUrl);
+    }
+    setReceiptPreviewUrl("");
+    setActiveReceipt(null);
+  };
+
   const updateReceipt = async (receipt, action, reason = "") => {
+    if (action === "approve") {
+      const approved = await confirm({
+        title: "Approve this payment?",
+        message: `This will mark ${receipt.invoiceNumber || "the invoice"} as paid and notify the customer.`,
+        confirmLabel: "Approve payment",
+        tone: "warning",
+      });
+
+      if (!approved) {
+        return;
+      }
+    }
+
     setBusy(`${receipt._id}-${action}`);
     setMessage("");
     setError("");
@@ -152,13 +198,17 @@ export default function ReceiptValidationPage() {
         throw new Error(data.error || "Unable to update receipt");
       }
 
+      const notificationFailed = action === "reject" && !data.notification?.sent;
+      setMessageTone(notificationFailed ? "warning" : "success");
       setMessage(
         action === "approve"
           ? "Receipt approved and invoice marked paid."
-          : "Receipt rejected."
+          : data.notification?.sent
+            ? "Receipt rejected and the customer was informed on WhatsApp."
+            : "Receipt rejected, but the WhatsApp notification could not be sent."
       );
       setRejecting(null);
-      setActiveReceipt(null);
+      closeReceipt();
       await loadReceipts();
     } catch (updateError) {
       setError(updateError.message || "Unable to update receipt");
@@ -168,6 +218,14 @@ export default function ReceiptValidationPage() {
   };
 
   const pendingReceipts = receipts.filter((receipt) => receipt.status === "pending");
+
+  if (!isHydrated || !isSchoolBusiness) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-r-transparent" />
+      </div>
+    );
+  }
 
   return (
     <PageShell>
@@ -186,7 +244,13 @@ export default function ReceiptValidationPage() {
       </StatGrid>
 
       {message ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            messageTone === "warning"
+              ? "border-amber-200 bg-amber-50 text-amber-800"
+              : "border-emerald-200 bg-emerald-50 text-emerald-700"
+          }`}
+        >
           {message}
         </div>
       ) : null}
@@ -237,27 +301,12 @@ export default function ReceiptValidationPage() {
                       </StatusBadge>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => openReceipt(receipt)}
-                          className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold"
-                        >
-                          View Receipt
-                        </button>
-                        <button
-                          onClick={() => updateReceipt(receipt, "approve")}
-                          disabled={busy === `${receipt._id}-approve`}
-                          className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                        >
-                          Approve Payment
-                        </button>
-                        <button
-                          onClick={() => setRejecting(receipt)}
-                          className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600"
-                        >
-                          Reject Payment
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => openReceipt(receipt)}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Review receipt
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -276,7 +325,7 @@ export default function ReceiptValidationPage() {
         <ReceiptDrawer
           receipt={activeReceipt}
           previewUrl={receiptPreviewUrl}
-          onClose={() => setActiveReceipt(null)}
+          onClose={closeReceipt}
           onApprove={() => updateReceipt(activeReceipt, "approve")}
           onReject={() => setRejecting(activeReceipt)}
           busy={busy}
@@ -307,7 +356,14 @@ function ReceiptDrawer({ receipt, previewUrl, onClose, onApprove, onReject, busy
             receipt.fileType === "application/pdf" ? (
               <iframe src={previewUrl} className="h-full min-h-[640px] w-full rounded-xl" />
             ) : (
-              <img src={previewUrl} alt="Uploaded receipt" className="max-h-full rounded-xl object-contain" />
+              <Image
+                src={previewUrl}
+                alt="Uploaded receipt"
+                width={1200}
+                height={1600}
+                unoptimized
+                className="max-h-full w-auto rounded-xl object-contain"
+              />
             )
           ) : (
             <p className="text-sm text-slate-500">Loading receipt preview...</p>
@@ -361,7 +417,7 @@ function ReceiptDrawer({ receipt, previewUrl, onClose, onApprove, onReject, busy
             <div className="mt-3 space-y-2 text-sm">
               {(extracted.checks || []).map((check) => (
                 <p key={check.label} className={check.ok ? "text-emerald-700" : "text-amber-700"}>
-                  {check.ok ? "✓" : "⚠"} {check.label}
+                  {check.ok ? "Passed:" : "Review:"} {check.label}
                 </p>
               ))}
             </div>
@@ -370,14 +426,15 @@ function ReceiptDrawer({ receipt, previewUrl, onClose, onApprove, onReject, busy
           <div className="mt-6 flex flex-wrap gap-3">
             <button
               onClick={onApprove}
-              disabled={busy === `${receipt._id}-approve`}
+              disabled={!previewUrl || busy === `${receipt._id}-approve`}
               className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
             >
               Approve Payment
             </button>
             <button
               onClick={onReject}
-              className="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600"
+              disabled={!previewUrl || Boolean(busy)}
+              className="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 disabled:opacity-50"
             >
               Reject Payment
             </button>
@@ -406,6 +463,7 @@ function InfoBlock({ title, rows }) {
 
 function RejectModal({ receipt, onCancel, onReject, busy }) {
   const [reason, setReason] = useState("Incorrect amount");
+  const [customReason, setCustomReason] = useState("");
   const reasons = [
     "Incorrect amount",
     "Receipt unreadable",
@@ -414,13 +472,14 @@ function RejectModal({ receipt, onCancel, onReject, busy }) {
     "Wrong invoice",
     "Other",
   ];
+  const rejectionReason = reason === "Other" ? customReason.trim() : reason;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 px-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
         <h2 className="text-lg font-semibold text-slate-900">Reject receipt</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Select why this receipt cannot be confirmed.
+          Select a reason. The customer will receive it in a WhatsApp message.
         </p>
         <select
           value={reason}
@@ -431,16 +490,31 @@ function RejectModal({ receipt, onCancel, onReject, busy }) {
             <option key={item} value={item}>{item}</option>
           ))}
         </select>
+        {reason === "Other" ? (
+          <div className="mt-4">
+            <label htmlFor="custom-rejection-reason" className="mb-2 block text-sm font-medium text-slate-700">
+              Rejection reason
+            </label>
+            <textarea
+              id="custom-rejection-reason"
+              value={customReason}
+              onChange={(event) => setCustomReason(event.target.value)}
+              rows={3}
+              placeholder="Explain why the receipt could not be validated"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+            />
+          </div>
+        ) : null}
         <div className="mt-6 flex justify-end gap-3">
           <button onClick={onCancel} className="rounded-xl border px-4 py-2 text-sm">
             Cancel
           </button>
           <button
-            onClick={() => onReject(reason)}
-            disabled={busy === `${receipt._id}-reject`}
+            onClick={() => onReject(rejectionReason)}
+            disabled={busy === `${receipt._id}-reject` || !rejectionReason}
             className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
-            Reject
+            {busy === `${receipt._id}-reject` ? "Rejecting..." : "Reject and notify customer"}
           </button>
         </div>
       </div>

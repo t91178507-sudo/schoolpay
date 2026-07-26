@@ -46,6 +46,23 @@ function normalizeNotificationStatus(status) {
   return "pending";
 }
 
+function resolveNotificationStatus(transaction = {}, invoice = {}) {
+  const invoiceStatus =
+    String(invoice.lastReminderOutcome || "").toLowerCase() === "sent"
+      ? "sent"
+      : invoice.customerNotificationStatus;
+
+  if (normalizeNotificationStatus(invoiceStatus) === "sent") {
+    return "sent";
+  }
+
+  return normalizeNotificationStatus(
+    transaction.notificationStatus ||
+      transaction.customerNotificationStatus ||
+      invoiceStatus
+  );
+}
+
 function getNotificationTone(status) {
   const normalized = normalizeNotificationStatus(status);
 
@@ -104,54 +121,6 @@ function buildGeneratedTransactionId(seed = "", happenedAt = "", index = 0) {
   return `TXN-${normalizedDate}-${String(index + 1).padStart(2, "0")}${
     normalizedSeed || "AUTO"
   }`;
-}
-
-function buildCompactDetails(row) {
-  const segments = [row.description];
-
-  if (row.invoiceNumber && row.invoiceNumber !== "-") {
-    segments.push(`Invoice ${row.invoiceNumber}`);
-  }
-
-  if (Number(row.balanceDue || 0) > 0) {
-    segments.push(`Balance ${formatCurrency(row.balanceDue)}`);
-  }
-
-  return segments.filter(Boolean).join(" • ");
-}
-
-function buildCompactCustomer(row) {
-  return [row.customerName, row.phone].filter(Boolean).join(" • ");
-}
-
-function buildCompactProvider(row) {
-  return [row.provider || "-", formatNotificationStatus(row.notificationStatus)]
-    .filter(Boolean)
-    .join(" • ");
-}
-
-function buildInlineDetails(row) {
-  const segments = [row.description];
-
-  if (row.invoiceNumber && row.invoiceNumber !== "-") {
-    segments.push(`Invoice ${row.invoiceNumber}`);
-  }
-
-  if (Number(row.balanceDue || 0) > 0) {
-    segments.push(`Balance ${formatCurrency(row.balanceDue)}`);
-  }
-
-  return segments.filter(Boolean).join(" | ");
-}
-
-function buildInlineCustomer(row) {
-  return [row.customerName, row.phone].filter(Boolean).join(" | ");
-}
-
-function buildInlineProvider(row) {
-  return [row.provider || "-", formatNotificationStatus(row.notificationStatus)]
-    .filter(Boolean)
-    .join(" | ");
 }
 
 function normalizePaymentStatus(status) {
@@ -265,11 +234,23 @@ export default function Payments() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [studentFilter, setStudentFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [notificationFilter, setNotificationFilter] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  useEffect(() => {
+    const applyCategoryFilter = setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      setCategoryFilter(String(params.get("category") || "").trim());
+      setStudentFilter(String(params.get("student") || "").trim());
+    }, 0);
+
+    return () => clearTimeout(applyCategoryFilter);
+  }, []);
 
   useEffect(() => {
     const loadPayments = async () => {
@@ -317,6 +298,7 @@ export default function Payments() {
         source,
         sourceLabel: getSourceLabel({ type: "invoice", source }),
         customerName,
+        category: String(invoice.category || "").trim(),
         description:
           invoice.description ||
           invoice.category ||
@@ -350,11 +332,7 @@ export default function Payments() {
               normalizePaymentStatus(transactionStatus) === "partial"
                 ? "Partially Paid"
                 : transactionStatus,
-            notificationStatus: normalizeNotificationStatus(
-              transaction.notificationStatus ||
-                transaction.customerNotificationStatus ||
-                invoice.customerNotificationStatus
-            ),
+            notificationStatus: resolveNotificationStatus(transaction, invoice),
             provider,
             reference,
             transactionId:
@@ -389,9 +367,7 @@ export default function Payments() {
             normalizePaymentStatus(invoice.status) === "partial"
               ? "Partially Paid"
               : invoice.status || "Paid",
-          notificationStatus: normalizeNotificationStatus(
-            invoice.customerNotificationStatus
-          ),
+          notificationStatus: resolveNotificationStatus({}, invoice),
           provider:
             invoice.paymentProvider ||
             invoice.pendingPaymentProvider ||
@@ -447,6 +423,14 @@ export default function Payments() {
         .toLowerCase()
         .includes(search);
 
+    const matchesStudent =
+      !studentFilter ||
+      String(row.customerName || "").trim().toLowerCase() === studentFilter.toLowerCase();
+
+    const matchesCategory =
+      !categoryFilter ||
+      String(row.category || "").trim().toLowerCase() === categoryFilter.toLowerCase();
+
     const matchesSource = sourceFilter === "all" || row.source === sourceFilter;
 
     const matchesStatus =
@@ -469,6 +453,8 @@ export default function Payments() {
 
     return (
       matchesSearch &&
+      matchesStudent &&
+      matchesCategory &&
       matchesSource &&
       matchesStatus &&
       matchesNotification &&
@@ -504,6 +490,12 @@ export default function Payments() {
   const filterSummary = `${filteredRows.length} record${
     filteredRows.length === 1 ? "" : "s"
   } found`;
+
+  const clearCategoryFilter = () => {
+    setCategoryFilter("");
+    setStudentFilter("");
+    window.history.replaceState({}, "", "/dashboard/payments");
+  };
 
   const exportPayments = () => {
     const headers = [
@@ -568,6 +560,28 @@ export default function Payments() {
           </button>
         }
       />
+
+      {studentFilter || categoryFilter ? (
+        <div className="flex flex-col gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-emerald-900 dark:bg-emerald-950/30">
+          <div>
+            <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+              Payment history for {studentFilter || categoryFilter}
+            </p>
+            <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">
+              {studentFilter
+                ? `Totals, transactions, and exports are limited to this student in ${categoryFilter || "their group"}.`
+                : "Totals, transactions, and exports are currently limited to this student group."}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={clearCategoryFilter}
+            className="rounded-lg border border-emerald-300 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:text-emerald-200 dark:hover:bg-emerald-900"
+          >
+            Show all payments
+          </button>
+        </div>
+      ) : null}
 
       <StatGrid>
         <StatCard
@@ -700,164 +714,136 @@ export default function Payments() {
         </div>
       </SurfaceCard>
 
-      <SurfaceCard className="overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-950/60 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-              Collection records
-            </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Showing {filteredRows.length} individual transaction
-              {filteredRows.length === 1 ? "" : "s"}.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[28rem]">
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                Total collected
+      <SurfaceCard className="overflow-hidden border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="border-b border-slate-200 px-5 py-5 dark:border-slate-800 sm:px-6">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Payment ledger
               </p>
-              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {formatCurrency(totalCollected)}
+              <h2 className="mt-1 text-xl font-semibold text-slate-950 dark:text-white">
+                Collection records
+              </h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                {filteredRows.length} transaction{filteredRows.length === 1 ? "" : "s"} in the current view
               </p>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                Notifications sent
-              </p>
-              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {sentNotifications}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                Pending items
-              </p>
-              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {pendingCount}
-              </p>
-            </div>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 sm:divide-x sm:divide-slate-200 dark:sm:divide-slate-800">
+              <div className="sm:pr-6">
+                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">Collected</dt>
+                <dd className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
+                  {formatCurrency(totalCollected)}
+                </dd>
+              </div>
+              <div className="sm:px-6">
+                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">Notifications sent</dt>
+                <dd className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
+                  {sentNotifications}
+                </dd>
+              </div>
+              <div className="sm:pl-6">
+                <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">Pending</dt>
+                <dd className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
+                  {pendingCount}
+                </dd>
+              </div>
+            </dl>
           </div>
         </div>
 
         {loading ? (
           <div className="py-16 text-center text-sm text-slate-500 dark:text-slate-400">
-            Loading collections history...
+            Loading collection records...
           </div>
         ) : filteredRows.length === 0 ? (
           <EmptyState
             title="No collection records match these filters"
-            description="Try clearing one or two filters to widen the timeline."
+            description="Clear one or more filters to widen the payment history."
           />
         ) : (
           <>
             <div className="divide-y divide-slate-200 dark:divide-slate-800 lg:hidden">
               {filteredRows.map((row) => (
-                <div key={row.id} className="space-y-3 p-3.5 sm:p-4">
-                  <div className="space-y-1">
-                    <p className="font-medium text-slate-900 dark:text-slate-100">
-                      {row.customerName}
+                <article key={row.id} className="space-y-4 px-4 py-5 sm:px-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-slate-950 dark:text-white">
+                        {row.customerName}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        {row.phone || "No phone number"}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-base font-semibold text-slate-950 dark:text-white">
+                      {formatCurrency(row.amount)}
                     </p>
+                  </div>
 
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Payment</p>
+                      <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-200">
+                        {row.description || "Invoice payment"}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        Invoice {row.invoiceNumber || "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Provider and reference</p>
+                      <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-200">
+                        {row.provider || "-"}
+                      </p>
+                      <p className="mt-1 break-all font-mono text-xs text-slate-500 dark:text-slate-400">
+                        {row.reference || "-"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
                     <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge tone={getStatusTone(row.status)}>
+                        {formatPaymentStatus(row.status)}
+                      </StatusBadge>
+                      <StatusBadge tone={getNotificationTone(row.notificationStatus)}>
+                        Message {formatNotificationStatus(row.notificationStatus).toLowerCase()}
+                      </StatusBadge>
                       <StatusBadge tone="slate">{row.sourceLabel}</StatusBadge>
-
-                      {row.phone ? (
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
-                          {row.phone}
-                        </span>
-                      ) : null}
                     </div>
+                    <time className="text-xs text-slate-500 dark:text-slate-400">
+                      {formatDateTime(row.happenedAt)}
+                    </time>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                        Description
-                      </p>
-                      <p className="text-sm text-slate-800 dark:text-slate-300">
-                        {row.description}
-                      </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Invoice: {row.invoiceNumber || "-"}
-                      </p>
-                      <p className="break-all text-xs text-slate-500 dark:text-slate-400">
-                        Transaction ID: {row.transactionId}
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                        Payment
-                      </p>
-                      <p className="font-semibold text-slate-900 dark:text-slate-100">
-                        {formatCurrency(row.amount)}
-                      </p>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        <StatusBadge tone={getStatusTone(row.status)}>
-                          {formatPaymentStatus(row.status)}
-                        </StatusBadge>
-
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
-                          {row.provider || "-"}
-                        </span>
-                      </div>
-
-                      {Number(row.balanceDue || 0) > 0 ? (
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          Balance: {formatCurrency(row.balanceDue)}
-                        </p>
-                      ) : null}
-
-                      <p className="text-xs text-slate-400 dark:text-slate-500">
-                        {formatDateTime(row.happenedAt)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge tone={getNotificationTone(row.notificationStatus)}>
-                      {formatNotificationStatus(row.notificationStatus)}
-                    </StatusBadge>
-
-                    <p className="break-all font-mono text-xs text-slate-500 dark:text-slate-400">
-                      {row.reference || "-"}
-                    </p>
-                  </div>
-                </div>
+                  <p className="break-all font-mono text-[11px] text-slate-400 dark:text-slate-500">
+                    {row.transactionId}
+                  </p>
+                </article>
               ))}
             </div>
 
             <div className="hidden overflow-x-auto lg:block">
               <table className="w-full table-fixed">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
-                    <th className="w-[14%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Transaction ID
+                  <tr className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950/50">
+                    <th className="w-[18%] px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Transaction
                     </th>
-                    <th className="w-[13%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Date
-                    </th>
-                    <th className="w-[15%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    <th className="w-[18%] px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                       {customerLabels.singularTitle}
                     </th>
-                    <th className="w-[20%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Details
+                    <th className="w-[24%] px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Payment details
                     </th>
-                    <th className="w-[9%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Source
+                    <th className="w-[18%] px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Provider / reference
                     </th>
-                    <th className="w-[10%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    <th className="w-[10%] px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Amount
                     </th>
-                    <th className="w-[9%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    <th className="w-[12%] px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Status
-                    </th>
-                    <th className="w-[10%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Provider / Msg
                     </th>
                   </tr>
                 </thead>
@@ -866,67 +852,71 @@ export default function Payments() {
                   {filteredRows.map((row) => (
                     <tr
                       key={row.id}
-                      className="hover:bg-slate-50 dark:hover:bg-slate-950/60"
+                      className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-950/50"
                     >
-                      <td className="px-4 py-3 align-middle">
-                        <p
-                          className="truncate whitespace-nowrap font-mono text-xs text-slate-600 dark:text-slate-300"
-                          title={row.transactionId}
-                        >
+                      <td className="px-5 py-4 align-top">
+                        <p className="truncate font-mono text-xs font-medium text-slate-700 dark:text-slate-300" title={row.transactionId}>
                           {row.transactionId}
                         </p>
-                      </td>
-
-                      <td className="px-4 py-3 align-middle">
-                        <p
-                          className="truncate whitespace-nowrap text-sm text-slate-800 dark:text-slate-300"
-                          title={formatDateTime(row.happenedAt)}
-                        >
+                        <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
                           {formatDateTime(row.happenedAt)}
                         </p>
                       </td>
 
-                      <td className="px-4 py-3 align-middle">
-                        <p
-                          className="truncate whitespace-nowrap font-medium text-slate-900 dark:text-slate-100"
-                          title={buildInlineCustomer(row)}
-                        >
-                          {buildInlineCustomer(row)}
+                      <td className="px-5 py-4 align-top">
+                        <p className="truncate text-sm font-semibold text-slate-950 dark:text-white" title={row.customerName}>
+                          {row.customerName}
+                        </p>
+                        <p className="mt-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                          {row.phone || "No phone number"}
                         </p>
                       </td>
 
-                      <td className="px-4 py-3 align-middle">
-                        <p
-                          className="truncate whitespace-nowrap text-sm text-slate-800 dark:text-slate-300"
-                          title={buildInlineDetails(row)}
-                        >
-                          {buildInlineDetails(row)}
+                      <td className="px-5 py-4 align-top">
+                        <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200" title={row.description}>
+                          {row.description || "Invoice payment"}
+                        </p>
+                        <p className="mt-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                          Invoice {row.invoiceNumber || "-"}
+                          {Number(row.balanceDue || 0) > 0
+                            ? ` | Balance ${formatCurrency(row.balanceDue)}`
+                            : ""}
                         </p>
                       </td>
 
-                      <td className="px-4 py-3 align-middle">
-                        <StatusBadge tone="slate">{row.sourceLabel}</StatusBadge>
+                      <td className="px-5 py-4 align-top">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
+                            {row.provider || "-"}
+                          </p>
+                          <StatusBadge tone="slate">{row.sourceLabel}</StatusBadge>
+                        </div>
+                        <p className="mt-1.5 truncate font-mono text-xs text-slate-500 dark:text-slate-400" title={row.reference || "-"}>
+                          {row.reference || "-"}
+                        </p>
                       </td>
 
-                      <td className="px-4 py-3 align-middle">
-                        <p className="truncate whitespace-nowrap font-semibold text-slate-900 dark:text-slate-100">
+                      <td className="px-5 py-4 text-right align-top">
+                        <p className="whitespace-nowrap text-sm font-semibold text-slate-950 dark:text-white">
                           {formatCurrency(row.amount)}
                         </p>
                       </td>
 
-                      <td className="px-4 py-3 align-middle">
-                        <StatusBadge tone={getStatusTone(row.status)}>
-                          {formatPaymentStatus(row.status)}
-                        </StatusBadge>
-                      </td>
-
-                      <td className="px-4 py-3 align-middle">
-                        <p
-                          className="truncate whitespace-nowrap text-sm text-slate-700 dark:text-slate-300"
-                          title={`${buildInlineProvider(row)} | Ref: ${row.reference || "-"}`}
-                        >
-                          {buildInlineProvider(row)}
-                        </p>
+                      <td className="px-5 py-4 align-top">
+                        <div className="flex flex-col items-start gap-2">
+                          <StatusBadge tone={getStatusTone(row.status)}>
+                            {formatPaymentStatus(row.status)}
+                          </StatusBadge>
+                          <span className={`text-xs font-medium ${
+                            normalizeNotificationStatus(row.notificationStatus) === "sent"
+                              ? "text-emerald-700 dark:text-emerald-300"
+                              : normalizeNotificationStatus(row.notificationStatus) === "failed"
+                                ? "text-red-700 dark:text-red-300"
+                                : "text-amber-700 dark:text-amber-300"
+                          }`}>
+                            Message {formatNotificationStatus(row.notificationStatus).toLowerCase()}
+                          </span>
+                        </div>
                       </td>
                     </tr>
                   ))}

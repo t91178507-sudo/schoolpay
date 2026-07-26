@@ -140,14 +140,49 @@ export async function markInvoiceNotificationPrepared(
   invoiceId,
   notificationStatus = "prepared"
 ) {
+  const normalizedStatus = String(notificationStatus || "prepared").trim().toLowerCase();
+  const now = new Date();
+  const invoice = await db.collection("invoices").findOne(
+    { _id: invoiceId },
+    { projection: { paymentTransactions: 1 } }
+  );
+  const paymentTransactions = Array.isArray(invoice?.paymentTransactions)
+    ? invoice.paymentTransactions.map((transaction) => ({ ...transaction }))
+    : [];
+
+  for (let index = paymentTransactions.length - 1; index >= 0; index -= 1) {
+    const currentStatus = String(
+      paymentTransactions[index]?.notificationStatus ||
+        paymentTransactions[index]?.customerNotificationStatus ||
+        ""
+    )
+      .trim()
+      .toLowerCase();
+
+    if (currentStatus !== "sent") {
+      paymentTransactions[index].notificationStatus = normalizedStatus;
+      paymentTransactions[index].notificationUpdatedAt = now;
+      break;
+    }
+  }
+
+  const nextState = {
+    customerNotificationStatus: normalizedStatus,
+    updatedAt: now,
+  };
+
+  if (normalizedStatus === "sent") {
+    nextState.customerNotificationSentAt = now;
+  } else if (normalizedStatus === "prepared") {
+    nextState.customerNotificationPreparedAt = now;
+  }
+
+  if (paymentTransactions.length > 0) {
+    nextState.paymentTransactions = paymentTransactions;
+  }
+
   await db.collection("invoices").updateOne(
     { _id: invoiceId },
-    {
-      $set: {
-        customerNotificationStatus: notificationStatus,
-        customerNotificationPreparedAt: new Date(),
-        updatedAt: new Date(),
-      },
-    }
+    { $set: nextState }
   );
 }

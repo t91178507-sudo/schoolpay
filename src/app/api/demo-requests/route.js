@@ -27,6 +27,32 @@ function buildDemoRequestMessage(request = {}) {
   ].join("\n");
 }
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function sendDemoAlertWithRetry(config, requestRecord) {
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await sendWhatsAppWebMessage(config, {
+        phone: DEMO_ALERT_PHONE,
+        text: buildDemoRequestMessage(requestRecord),
+      });
+    } catch (error) {
+      const canRetry = error.status === 409 && attempt < maxAttempts;
+
+      if (!canRetry) {
+        throw error;
+      }
+
+      await wait(2000 * attempt);
+    }
+  }
+
+  throw new Error("WhatsApp delivery failed after retrying");
+}
 export async function POST(req) {
   try {
     const db = await connectDB();
@@ -80,10 +106,7 @@ export async function POST(req) {
         enabled: platformBridge.enabled === true,
         sessionName: DEMO_ALERT_SESSION,
       };
-      const delivery = await sendWhatsAppWebMessage(bridgeConfig, {
-        phone: DEMO_ALERT_PHONE,
-        text: buildDemoRequestMessage(requestRecord),
-      });
+      const delivery = await sendDemoAlertWithRetry(bridgeConfig, requestRecord);
 
       await db.collection("demo_requests").updateOne(
         { _id: new ObjectId(result.insertedId) },

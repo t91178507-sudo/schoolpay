@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -84,71 +84,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex">
-      <div className="hidden lg:flex w-1/2 bg-[#123B5D] text-white relative overflow-hidden flex-col p-10 xl:p-12">
-        <div className="relative z-10">
-          <Link href="/" className="inline-flex items-center gap-3 transition-opacity hover:opacity-85">
-            <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-2xl font-bold">
-              ₦
-            </div>
-            <span className="text-3xl font-bold tracking-tight">InvoiceHub</span>
-          </Link>
-        </div>
-
-        <div className="relative z-10 flex flex-1 items-center">
-          <div className="max-w-xl">
-          <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-5">
-            Send invoices and collect payments
-            <span className="text-emerald-300"> with confidence</span>
-          </h1>
-
-          <p className="max-w-xl text-base xl:text-lg leading-7 text-sky-100">
-            Connect your preferred payment provider, generate invoices,
-            receive customer payments directly, and track every confirmation
-            from one secure workspace.
-          </p>
-
-          <div className="bg-[#0E2E48] rounded-3xl p-6 mt-8 relative border border-white/10 shadow-2xl">
-            <div className="flex items-start gap-5 mb-5">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-400/15 text-sm font-bold tracking-wide text-emerald-200">
-                NGN
-              </div>
-              <div className="min-w-0">
-                <p className="text-lg font-bold leading-6 text-white">
-                  Payment-ready invoicing
-                </p>
-                <p className="mt-1 max-w-sm text-sm leading-6 text-sky-100">
-                  Connect your business payment account and start receiving customer
-                  payments directly into your business account.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-2.5 text-sm text-sky-50">
-              <div className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
-                <span>Payment setup</span>
-                <span className="font-semibold text-emerald-300">Your provider</span>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
-                <span>Payment tracking</span>
-                <span className="font-semibold text-emerald-300">Automatic status updates</span>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
-                <span>Customer receipts</span>
-                <span className="font-semibold text-emerald-300">WhatsApp-ready</span>
-              </div>
-            </div>
-
-            <p className="mt-5 text-sm leading-6 text-sky-100">
-              Your customers get a simple payment experience, while your team
-              keeps clear records of invoices, payments, and outstanding balances.
-            </p>
-          </div>
-          </div>
-        </div>
-
-        <div className="absolute bottom-0 left-0 w-full h-96 bg-gradient-to-br from-emerald-500/10 to-transparent"></div>
-      </div>
-
       <div className="flex-1 flex items-center justify-center px-5 py-8 bg-gray-50">
         <div className="w-full max-w-lg">
           <div className="overflow-hidden rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70">
@@ -195,7 +130,7 @@ export default function Login() {
                     onChange={handleChange}
                     required
                     className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700 focus:border-transparent"
-                    placeholder="••••••••"
+                    placeholder="Enter your password"
                   />
                   <button
                     type="button"
@@ -237,3 +172,5 @@ export default function Login() {
     </div>
   );
 }
+
+

@@ -103,7 +103,7 @@ export async function deliverInvoiceMessage({
   if (isWhatsAppWebConfigured(whatsAppWebConfig)) {
     try {
       await sendWhatsAppWebMessage(whatsAppWebConfig, { phone, text: message });
-      await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
+      await markInvoiceNotificationPrepared(db, invoice._id, "sent");
 
       return { sent: true, status: "sent", provider: "whatsappWeb" };
     } catch (error) {
@@ -185,7 +185,7 @@ export async function deliverPaymentConfirmation({
         console.error("PAYMENT RECEIPT PDF SEND ERROR:", attachmentError);
       }
 
-      await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
+      await markInvoiceNotificationPrepared(db, invoice._id, "sent");
 
       return {
         sent: true,
@@ -213,5 +213,59 @@ export async function deliverPaymentConfirmation({
     fallbackUrl: buildFallbackUrl(phone, message),
     message,
     attachmentSent: false,
+  };
+}
+
+export async function deliverReceiptRejection({
+  db,
+  invoice,
+  owner,
+  phone,
+  reason,
+}) {
+  const recipientPhone = String(phone || invoice?.phone || "").trim();
+
+  if (!recipientPhone) {
+    return { sent: false, provider: "none", reason: "missing_phone" };
+  }
+
+  const customerName =
+    invoice?.customer || invoice?.customerName || invoice?.student || "Customer";
+  const businessName = invoice?.businessName || owner?.businessName || "the business";
+  const invoiceNumber = invoice?.invoiceNumber || "your invoice";
+  const rejectionReason = String(reason || "Receipt could not be validated").trim();
+  const message = [
+    `Hello ${customerName},`,
+    "",
+    `Your uploaded payment receipt for Invoice ${invoiceNumber} could not be validated.`,
+    `Reason: ${rejectionReason}`,
+    "",
+    `The invoice remains unpaid. Please contact ${businessName} or upload another receipt.`,
+  ].join("\n");
+  const savedConfig = await resolveWhatsAppWebConfigForUser(db, owner || {});
+  let whatsAppWebConfig = savedConfig;
+
+  if (isWhatsAppWebConfigured(savedConfig)) {
+    try {
+      whatsAppWebConfig = await resolveActiveWhatsAppWebConfig(savedConfig);
+    } catch {
+      whatsAppWebConfig = savedConfig;
+    }
+  }
+
+  if (!isWhatsAppWebConfigured(whatsAppWebConfig)) {
+    return { sent: false, provider: "none", reason: "bridge_not_configured" };
+  }
+
+  const delivery = await sendWhatsAppWebMessage(whatsAppWebConfig, {
+    phone: recipientPhone,
+    text: message,
+  });
+
+  return {
+    sent: true,
+    status: "sent",
+    provider: "whatsappWeb",
+    messageId: delivery?.messageId || delivery?.id || delivery?.key?.id || "",
   };
 }

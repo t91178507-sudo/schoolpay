@@ -4,7 +4,10 @@ import { ObjectId } from "mongodb";
 import { parseAmount } from "./monnify";
 import { markInvoicePaid } from "./paymentLifecycle";
 import { findUserById } from "./paymentGatewaySettings";
-import { deliverPaymentConfirmation } from "./whatsappNotifications";
+import {
+  deliverPaymentConfirmation,
+  deliverReceiptRejection,
+} from "./whatsappNotifications";
 
 const require = createRequire(import.meta.url);
 const MAX_RECEIPT_SIZE = 10 * 1024 * 1024;
@@ -577,7 +580,22 @@ export async function rejectReceiptUpload(
   { userId, ipAddress, reason }
 ) {
   const rejectionReason = reason || "Receipt rejected";
-  await db.collection("receiptUploads").deleteOne({ _id: receipt._id });
+  const invoice = await db.collection("invoices").findOne({
+    _id: new ObjectId(receipt.invoiceId),
+    ownerId: receipt.ownerId,
+  });
+  await db.collection("receiptUploads").updateOne(
+    { _id: receipt._id },
+    {
+      $set: {
+        status: "rejected",
+        rejectionReason,
+        rejectedAt: new Date(),
+        rejectedBy: userId,
+        updatedAt: new Date(),
+      },
+    }
+  );
 
   await db.collection("invoices").updateOne(
     { _id: new ObjectId(receipt.invoiceId), ownerId: receipt.ownerId },
@@ -594,6 +612,28 @@ export async function rejectReceiptUpload(
     }
   );
 
+  let notification = { sent: false, provider: "none" };
+
+  if (invoice) {
+    try {
+      const owner = receipt.ownerId ? await findUserById(db, receipt.ownerId) : null;
+      notification = await deliverReceiptRejection({
+        db,
+        invoice,
+        owner,
+        phone: receipt.phoneNumber || invoice.phone,
+        reason: rejectionReason,
+      });
+    } catch (error) {
+      notification = {
+        sent: false,
+        provider: "whatsappWeb",
+        error: error.message || "WhatsApp notification failed",
+      };
+      console.error("RECEIPT REJECTION WHATSAPP ERROR:", error);
+    }
+  }
+
   await logReceiptAudit(db, {
     ownerId: receipt.ownerId,
     receiptId: receipt._id,
@@ -603,4 +643,16 @@ export async function rejectReceiptUpload(
     action: "Receipt Rejected",
     reason: rejectionReason,
   });
+  await logReceiptAudit(db, {
+    ownerId: receipt.ownerId,
+    receiptId: receipt._id,
+    invoiceId: receipt.invoiceId,
+    userId,
+    ipAddress,
+    action: notification.sent ? "Notification Sent" : "Notification Failed",
+    channel: "WhatsApp",
+    reason: notification.error || notification.reason || "",
+  });
+
+  return { notification };
 }

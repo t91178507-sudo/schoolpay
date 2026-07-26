@@ -37,12 +37,9 @@ export default function DashboardLayout({ children }) {
   const navItems = [
     { name: "Dashboard", href: "/dashboard", badge: "D" },
     { name: `${customerLabels.singularTitle} groups`, href: "/dashboard/categories", badge: "G" },
-    { name: `${customerLabels.singularTitle} overview`, href: "/dashboard/customers", badge: "C" },
     { name: "Invoices", href: "/dashboard/invoices", badge: "I" },
     { name: "Communication", href: "/dashboard/communication", badge: "M" },
     { name: "Collections history", href: "/dashboard/payments", badge: "P" },
-    { name: "Receipt validation", href: "/dashboard/receipts", badge: "V" },
-    { name: "Users & Staff", href: "/dashboard/staff", badge: "U" },
     { name: "Settings", href: "/dashboard/settings", badge: "S" },
   ];
 
