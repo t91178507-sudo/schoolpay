@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { requireAccessContext } from "../../../../lib/accessControl";
 import { logUserActivity } from "../../../../lib/activityLogs";
 import { connectDB } from "../../../../lib/mongodb";
+import { requireVerifiedBusiness } from "../../../../lib/businessVerification";
 import { ensureDefaultRoles, normalizePermissionMap, serializeRole } from "../../../../lib/staffRoles";
 
 function normalizeStaffUser(user = {}, rolesById = new Map()) {

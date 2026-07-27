@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { ObjectId } from "mongodb";
 import { connectDB } from "../../../../../lib/mongodb";
+import { requireVerifiedOwnerBusiness } from "../../../../../lib/businessVerification";
 import {
   analyzeReceiptFile,
   encryptReceiptBuffer,
@@ -111,6 +112,8 @@ export async function POST(req, context) {
     if (!invoice) {
       return Response.json({ error: "Invoice not found" }, { status: 404 });
     }
+
+    await requireVerifiedOwnerBusiness(db, invoice.ownerId, invoice.businessId);
 
     const owner = invoice.ownerId
       ? await db.collection("users").findOne({ _id: new ObjectId(invoice.ownerId) })
@@ -263,7 +266,7 @@ export async function POST(req, context) {
     console.error("RECEIPT UPLOAD ERROR:", error);
 
     return Response.json(
-      { error: error.message || "Unable to upload receipt" },
+      { error: error.message || "Unable to upload receipt", code: error.code || "", verificationUrl: error.verificationUrl || "" },
       { status: error.status || 500 }
     );
   }

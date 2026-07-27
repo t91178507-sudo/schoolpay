@@ -1,6 +1,7 @@
 import { ObjectId } from "mongodb";
 import { requireAuth } from "../../../../../lib/auth";
 import { connectDB } from "../../../../../lib/mongodb";
+import { requireVerifiedOwnerBusiness } from "../../../../../lib/businessVerification";
 import { findUserById } from "../../../../../lib/paymentGatewaySettings";
 import {
   getOutstandingAmount,
@@ -13,6 +14,7 @@ export async function POST(req) {
   try {
     const userId = requireAuth(req);
     const db = await connectDB();
+    await requireVerifiedOwnerBusiness(db, userId);
     const body = await req.json();
     const invoiceId = body.invoiceId;
     const origin = body.origin;

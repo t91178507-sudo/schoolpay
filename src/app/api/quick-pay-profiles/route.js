@@ -1,5 +1,6 @@
 import { requireAuth } from "../../../lib/auth";
 import { connectDB } from "../../../lib/mongodb";
+import { requireVerifiedOwnerBusiness } from "../../../lib/businessVerification";
 import {
   findUserById,
   resolveActivePaymentGateway,
@@ -31,6 +32,7 @@ export async function POST(req) {
   try {
     const userId = requireAuth(req);
     const db = await connectDB();
+    await requireVerifiedOwnerBusiness(db, userId);
     const body = await req.json();
 
     if (!body.description) {
@@ -67,9 +69,8 @@ export async function POST(req) {
   } catch (error) {
     const status = error.status || 500;
     return Response.json(
-      { error: error.message || "Unable to create quick pay profile" },
+      { error: error.message || "Unable to create quick pay profile", code: error.code || "", verificationUrl: error.verificationUrl || "" },
       { status }
     );
   }
 }
-

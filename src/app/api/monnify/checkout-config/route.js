@@ -1,5 +1,6 @@
 import { connectDB } from "../../../../lib/mongodb";
 import { parseAmount } from "../../../../lib/monnify";
+import { requireVerifiedOwnerBusiness } from "../../../../lib/businessVerification";
 import {
   findUserById,
   resolveMonnifyConfig,
@@ -55,6 +56,7 @@ export async function POST(req) {
     const owner = invoice.ownerId
       ? await findUserById(db, invoice.ownerId)
       : null;
+    await requireVerifiedOwnerBusiness(db, invoice.ownerId, invoice.businessId);
     const monnifyConfig = resolveMonnifyConfig(owner || {});
 
     if (!monnifyConfig.apiKey || !monnifyConfig.contractCode) {
@@ -97,8 +99,8 @@ export async function POST(req) {
   } catch (error) {
     console.error("MONNIFY CHECKOUT CONFIG ERROR:", error);
     return Response.json(
-      { error: error.message || "Unable to prepare Monnify checkout" },
-      { status: 500 }
+      { error: error.message || "Unable to prepare Monnify checkout", code: error.code || "", verificationUrl: error.verificationUrl || "" },
+      { status: error.status || 500 }
     );
   }
 }

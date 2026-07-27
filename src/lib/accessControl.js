@@ -5,6 +5,10 @@ import {
   normalizePermissionMap,
   resolveRoleForUser,
 } from "./staffRoles";
+import {
+  BUSINESS_STATUSES,
+  normalizeBusinessStatus,
+} from "./businessVerification";
 
 function normalizeId(value) {
   if (!value) {
@@ -63,6 +67,8 @@ function buildDefaultBusinessFromOwner(owner = {}) {
     website: String(owner.website || "").trim(),
     active: true,
     isPrimary: true,
+    verificationStatus: BUSINESS_STATUSES.VERIFIED,
+    verificationLegacyAccount: true,
   };
 }
 
@@ -73,6 +79,10 @@ export async function ensureOwnerPrimaryBusiness(db, owner = {}) {
     return null;
   }
 
+  if (owner.requiresBusinessSetup === true) {
+    return null;
+  }
+
   const collection = db.collection("businesses");
   const existingPrimary = await collection.findOne({
     ownerId,
@@ -80,7 +90,10 @@ export async function ensureOwnerPrimaryBusiness(db, owner = {}) {
   });
 
   if (existingPrimary) {
-    return sanitizeBusiness(existingPrimary);
+    return sanitizeBusiness({
+      ...existingPrimary,
+      verificationStatus: normalizeBusinessStatus(existingPrimary),
+    });
   }
 
   const fallbackExisting = await collection.findOne({ ownerId });
@@ -90,7 +103,11 @@ export async function ensureOwnerPrimaryBusiness(db, owner = {}) {
       { _id: fallbackExisting._id },
       { $set: { isPrimary: true, active: fallbackExisting.active !== false } }
     );
-    return sanitizeBusiness({ ...fallbackExisting, isPrimary: true });
+    return sanitizeBusiness({
+      ...fallbackExisting,
+      isPrimary: true,
+      verificationStatus: normalizeBusinessStatus(fallbackExisting),
+    });
   }
 
   const seeded = {
@@ -285,6 +302,14 @@ export function serializeSessionUser(context) {
       primaryBusiness?.type || context.owner.businessType || context.user.businessType || "",
     businessLogo:
       primaryBusiness?.logo || context.owner.businessLogo || context.user.businessLogo || "",
+    hasBusiness: Boolean(primaryBusiness),
+    businessId: primaryBusiness?._id || "",
+    businessVerificationStatus: primaryBusiness
+      ? normalizeBusinessStatus(primaryBusiness)
+      : BUSINESS_STATUSES.DRAFT,
+    businessVerified: primaryBusiness
+      ? normalizeBusinessStatus(primaryBusiness) === BUSINESS_STATUSES.VERIFIED
+      : false,
     role: context.user.roleName || context.user.role || "",
     roleKey: context.user.roleKey || "",
     accountType: isOwnerAccount(context.user) ? "owner" : "staff",
@@ -300,6 +325,7 @@ export function serializeSessionUser(context) {
         _id: business._id,
         name: business.name || "",
         type: business.type || "",
+        verificationStatus: normalizeBusinessStatus(business),
       })),
     permissions: context.user.permissions || {},
     assignedAllBusinesses: context.assignedAllBusinesses === true,

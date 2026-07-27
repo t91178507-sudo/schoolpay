@@ -5,6 +5,7 @@ import {
   getMonnifyBaseUrl,
 } from "../../../../lib/monnify";
 import { connectDB } from "../../../../lib/mongodb";
+import { requireVerifiedOwnerBusiness } from "../../../../lib/businessVerification";
 import {
   buildPayazaHeaders,
   PAYAZA_DEFAULT_BASE_URL,
@@ -81,6 +82,7 @@ export async function POST(req) {
   try {
     const userId = requireAuth(req);
     const db = await connectDB();
+    await requireVerifiedOwnerBusiness(db, userId);
     const body = await req.json().catch(() => ({}));
     const gateway = String(body.gateway || "").trim().toLowerCase();
 
@@ -134,4 +136,3 @@ export async function POST(req) {
     );
   }
 }
-

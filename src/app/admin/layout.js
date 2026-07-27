@@ -14,6 +14,7 @@ const INACTIVITY_LIMIT_MS = 5 * 60 * 1000;
 const navItems = [
   { name: "Dashboard", href: "/admin", label: "OV" },
   { name: "Businesses", href: "/admin/businesses", label: "BIZ" },
+  { name: "Business Verification", href: "/admin/verifications", label: "VER" },
   { name: "Users", href: "/admin/users", label: "USR" },
   { name: "Invoices", href: "/admin/invoices", label: "INV" },
   { name: "Payments", href: "/admin/payments", label: "PAY" },

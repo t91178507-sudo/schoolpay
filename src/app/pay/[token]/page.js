@@ -446,14 +446,31 @@ export default function PaymentPage() {
     );
   }
 
+  if (customer?.businessVerified === false) {
+    return (
+      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6">
+        <div className="w-full max-w-sm rounded-2xl border border-amber-200 bg-white p-7 text-center shadow-sm">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-xl font-semibold text-amber-800">!</div>
+          <h1 className="mt-4 text-lg font-semibold text-slate-950">Payments are not available yet</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{customer.businessName || "This business"} is awaiting InvoiceHub verification. No payment can be accepted from this link until verification is complete.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!activeInvoice) {
     return (
       <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 py-16 px-4">
         <div className="max-w-md mx-auto">
           <div className="mb-6 px-1">
-            <span className="text-[13px] font-semibold tracking-wide text-slate-900 uppercase dark:text-slate-100">
-              {customer.businessName || "Invoice Payment"}
-            </span>
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-[13px] font-semibold tracking-wide text-slate-900 uppercase dark:text-slate-100">
+                {customer.businessName || "Invoice Payment"}
+              </span>
+              {customer.businessVerified ? (
+                <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold normal-case text-emerald-800">Verified Business</span>
+              ) : null}
+            </div>
           </div>
 
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
@@ -533,9 +550,14 @@ export default function PaymentPage() {
               Back to all invoices
             </button>
           ) : (
-            <span className="text-[13px] font-semibold tracking-wide text-slate-900 uppercase dark:text-slate-100">
-              {customer.businessName || "Invoice Payment"}
-            </span>
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-[13px] font-semibold tracking-wide text-slate-900 uppercase dark:text-slate-100">
+                {customer.businessName || "Invoice Payment"}
+              </span>
+              {customer.businessVerified ? (
+                <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold normal-case text-emerald-800">Verified Business</span>
+              ) : null}
+            </div>
           )}
           <span
             className={`text-[11px] font-medium px-2.5 py-1 rounded-full border ${
@@ -589,6 +611,16 @@ export default function PaymentPage() {
                   : "-"
               }
             />
+            <div className="mt-3">
+              <a
+                href={`/api/invoices/by-token/${token}/pdf`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800"
+              >
+                Download invoice PDF
+              </a>
+            </div>
           </div>
 
           {receiptUploadEnabled || accountDetailsEnabled ? (
@@ -1064,4 +1096,3 @@ function PayazaPaymentModal({
     </div>
   );
 }
-

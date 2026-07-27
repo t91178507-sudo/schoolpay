@@ -90,8 +90,9 @@ function normalizeNotificationStatus(status) {
 function getNotificationTone(status) {
   const normalized = normalizeNotificationStatus(status);
 
-  if (normalized === "prepared") return "green";
-  if (normalized === "draft") return "blue";
+  if (normalized === "sent") return "green";
+  if (normalized === "prepared") return "blue";
+  if (normalized === "failed") return "red";
   return "slate";
 }
 function openExternalTab(url, notify) {
@@ -1084,10 +1085,10 @@ export default function Invoices() {
                       {schedule.customerName || schedule.customer}
                     </p>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                      {schedule.description} · N{Number(schedule.amount || 0).toLocaleString()}
+                      {schedule.description} &middot; N{Number(schedule.amount || 0).toLocaleString()}
                     </p>
                     <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                      {schedule.frequency || "monthly"} · next {formatDateTime(schedule.nextRunAt)}
+                      {schedule.frequency || "monthly"} &middot; next {formatDateTime(schedule.nextRunAt)}
                     </p>
                   </div>
                   <StatusBadge tone={schedule.active === false ? "slate" : "green"}>
@@ -1183,11 +1184,6 @@ export default function Invoices() {
                           <StatusBadge tone={invoice.status === "Paid" ? "green" : "orange"}>
                             {invoice.status || "Unpaid"}
                           </StatusBadge>
-                          <span className="text-xs text-slate-500 dark:text-slate-400">
-                            {invoice.paymentProvider ||
-                              invoice.pendingPaymentProvider ||
-                              "Not started"}
-                          </span>
                         </div>
                         <StatusBadge tone={getNotificationTone(invoice.customerNotificationStatus)}>
                           {normalizeNotificationStatus(invoice.customerNotificationStatus)}
@@ -1225,137 +1221,84 @@ export default function Invoices() {
               })}
             </div>
 
-            <div className="hidden overflow-x-auto lg:block">
-              <table className="min-w-[1320px] w-full">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Invoice No
-                  </th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Date
-                  </th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Customer
-                  </th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Description
-                  </th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Gateway
-                  </th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Original amount
-                  </th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Balance pending
-                  </th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Status
-                  </th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Notification
-                  </th>
-                  <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filteredActionableInvoices.map((invoice) => {
-                  const customerName =
-                    invoice.customer || invoice.customerName || invoice.student || customerLabels.singularTitle;
-                  const invoiceCategory = invoice.category || invoice.class || "Uncategorized";
+            <div className="hidden min-w-0 lg:block">
+              <table className="w-full table-fixed">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950/50">
+                    <th className="px-2 py-3.5 text-left text-[10px] xl:px-3 xl:text-xs font-semibold uppercase tracking-wide text-slate-500">Invoice</th>
+                    <th className="px-2 py-3.5 text-left text-[10px] xl:px-3 xl:text-xs font-semibold uppercase tracking-wide text-slate-500">Customer</th>
+                    <th className="px-2 py-3.5 text-left text-[10px] xl:px-3 xl:text-xs font-semibold uppercase tracking-wide text-slate-500">Invoice details</th>
+                    <th className="px-2 py-3.5 text-left text-[10px] xl:px-3 xl:text-xs font-semibold uppercase tracking-wide text-slate-500">Amounts</th>
+                    <th className="px-2 py-3.5 text-left text-[10px] xl:px-3 xl:text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
+                    <th className="px-2 py-3.5 text-left text-[10px] xl:px-3 xl:text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredActionableInvoices.map((invoice) => {
+                    const customerName =
+                      invoice.customer || invoice.customerName || invoice.student || customerLabels.singularTitle;
+                    const invoiceCategory = invoice.category || invoice.class || "Uncategorized";
+                    const notificationStatus = normalizeNotificationStatus(invoice.customerNotificationStatus);
+                    const notificationTone = getNotificationTone(invoice.customerNotificationStatus);
 
-                  return (
-                    <tr key={invoice._id} className="hover:bg-slate-50 dark:hover:bg-slate-950/60">
-                      <td className="px-5 py-3.5 align-top">
-                        <p className="font-mono text-xs text-slate-900 dark:text-slate-100">
-                          {invoice.invoiceNumber || "-"}
-                        </p>
-                      </td>
-                      <td className="px-5 py-3.5 align-top">
-                        <p className="text-xs text-slate-600 dark:text-slate-300">
-                          {formatDateTime(invoice.date)}
-                        </p>
-                      </td>
-                      <td className="px-5 py-3.5 align-top">
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                            {customerName}
+                    return (
+                      <tr key={invoice._id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-950/50">
+                        <td className="min-w-0 px-2 py-4 align-middle xl:px-3">
+                          <p className="truncate font-mono text-xs font-medium text-slate-700 dark:text-slate-300" title={invoice.invoiceNumber || "-"}>
+                            {invoice.invoiceNumber || "-"}
                           </p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">{invoice.phone || "-"}</p>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 align-top">
-                        <div className="space-y-1">
-                          <p className="text-sm text-slate-700 dark:text-slate-300">
+                          <p className="mt-1.5 truncate text-xs text-slate-500 dark:text-slate-400" title={formatDateTime(invoice.date)}>{formatDateTime(invoice.date)}</p>
+                        </td>
+                        <td className="min-w-0 px-2 py-4 align-middle xl:px-3">
+                          <p className="truncate text-sm font-semibold text-slate-950 dark:text-white" title={customerName}>{customerName}</p>
+                          <p className="mt-1.5 truncate text-xs text-slate-500 dark:text-slate-400">{invoice.phone || "No phone number"}</p>
+                        </td>
+                        <td className="min-w-0 px-2 py-4 align-middle xl:px-3">
+                          <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200" title={invoice.description || invoice.category || invoice.class || "-"}>
                             {invoice.description || invoice.category || invoice.class || "-"}
                           </p>
-                          <StatusBadge tone="slate">{invoiceCategory}</StatusBadge>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 align-top">
-                        <p className="text-xs text-slate-600 dark:text-slate-300">
-                          {invoice.paymentProvider ||
-                            invoice.pendingPaymentProvider ||
-                            "Not started"}
-                        </p>
-                      </td>
-                      <td className="px-5 py-3.5 align-top">
-                        <p className="whitespace-nowrap text-sm font-semibold text-slate-900 dark:text-slate-100">
-                          N{getOriginalInvoiceAmount(invoice).toLocaleString()}
-                        </p>
-                      </td>
-                      <td className="px-5 py-3.5 align-top">
-                        <p className="whitespace-nowrap text-sm font-semibold text-amber-700 dark:text-amber-300">
-                          N{getOutstandingAmount(invoice).toLocaleString()}
-                        </p>
-                      </td>
-                      <td className="px-5 py-3.5 align-top">
-                        <StatusBadge tone={invoice.status === "Paid" ? "green" : "orange"}>
-                          {invoice.status || "Unpaid"}
-                        </StatusBadge>
-                      </td>
-                      <td className="px-5 py-3.5 align-top">
-                        <StatusBadge tone={getNotificationTone(invoice.customerNotificationStatus)}>
-                          {normalizeNotificationStatus(invoice.customerNotificationStatus)}
-                        </StatusBadge>
-                      </td>
-                      <td className="px-5 py-3.5 align-top">
-                        <div className="ml-auto flex justify-end gap-2">
-                          {invoice.status !== "Paid" && (
-                            <button
-                              onClick={() => openManualPaymentModal(invoice)}
-                              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-green-700"
-                              title="Record payment"
-                            >
-                              <FiCheckCircle className="h-3.5 w-3.5" />
-                              <span>Record payment</span>
+                          <div className="mt-1.5 min-w-0 overflow-hidden"><StatusBadge tone="slate">{invoiceCategory}</StatusBadge></div>
+                        </td>
+
+                        <td className="min-w-0 px-2 py-4 align-middle xl:px-3">
+                          <p className="truncate text-xs font-semibold text-slate-950 dark:text-white xl:text-sm">N{getOriginalInvoiceAmount(invoice).toLocaleString()}</p>
+                          <p className="mt-1.5 truncate text-[11px] font-medium text-amber-700 dark:text-amber-300 xl:text-xs">Balance N{getOutstandingAmount(invoice).toLocaleString()}</p>
+                        </td>
+                        <td className="min-w-0 px-2 py-4 align-middle xl:px-3">
+                          <div className="min-w-0 overflow-hidden flex flex-col items-start gap-1.5">
+                            <StatusBadge tone={invoice.status === "Paid" ? "green" : "orange"}>{invoice.status || "Unpaid"}</StatusBadge>
+                            <span className={`max-w-full truncate text-[11px] font-medium xl:text-xs ${
+                              notificationTone === "green"
+                                ? "text-emerald-700 dark:text-emerald-300"
+                                : notificationTone === "red"
+                                  ? "text-red-700 dark:text-red-300"
+                                  : notificationTone === "blue"
+                                    ? "text-blue-700 dark:text-blue-300"
+                                    : "text-slate-500 dark:text-slate-400"
+                            }`}>
+                              Message {notificationStatus}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="min-w-0 px-2 py-4 align-middle xl:px-3">
+                          <div className="flex min-w-0 flex-wrap items-center justify-start gap-1">
+                            {invoice.status !== "Paid" && (
+                              <button onClick={() => openManualPaymentModal(invoice)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white transition hover:bg-emerald-700" title="Record payment" aria-label="Record payment">
+                                <FiCheckCircle className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            <button onClick={() => shareWhatsApp(invoice)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#25D366] text-white transition hover:bg-[#20BA5C]" title="Share on WhatsApp" aria-label="Share on WhatsApp">
+                              <FiMessageCircle className="h-3.5 w-3.5" />
                             </button>
-                          )}
-                          <button
-                            onClick={() => shareWhatsApp(invoice)}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#25D366] px-3 py-2 text-xs font-medium text-white transition hover:bg-[#20BA5C]"
-                            title="Share on WhatsApp"
-                          >
-                            <FiMessageCircle className="h-3.5 w-3.5" />
-                            <span>Share</span>
-                          </button>
-                          <button
-                            onClick={() => deleteInvoice(invoice._id)}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-red-700"
-                            title="Delete invoice"
-                          >
-                            <FiTrash2 className="h-3.5 w-3.5" />
-                            <span>Delete</span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
+                            <button onClick={() => deleteInvoice(invoice._id)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white transition hover:bg-red-700" title="Delete invoice" aria-label="Delete invoice">
+                              <FiTrash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
               </table>
             </div>
           </>

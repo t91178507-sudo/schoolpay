@@ -1,4 +1,5 @@
 import { connectDB } from "../../../../../../lib/mongodb";
+import { isBusinessVerified } from "../../../../../../lib/businessVerification";
 import {
   findUserById,
   resolveActivePaymentGateway,
@@ -8,7 +9,7 @@ import {
   serializePublicInvoice,
 } from "../../../../../../lib/publicInvoiceAccess";
 
-function buildCustomerPayload(record = {}, owner = null) {
+function buildCustomerPayload(record = {}, owner = null, business = null) {
   const activeGateway = resolveActivePaymentGateway(owner || {});
   const accountDetails = owner?.paymentGateways?.accountDetails || {};
   const receiptUpload = owner?.paymentGateways?.receiptUpload || {};
@@ -18,7 +19,9 @@ function buildCustomerPayload(record = {}, owner = null) {
     phone: record.phone || "",
     email: record.email || "",
     businessName: record.businessName || owner?.businessName || "",
-    businessLogo: record.businessLogo || owner?.businessLogo || "",
+    businessLogo: record.businessLogo || business?.logo || owner?.businessLogo || "",
+    businessVerified: isBusinessVerified(business || {}),
+    businessVerificationStatus: business?.verificationStatus || "",
     defaultPaymentGateway: activeGateway,
     accountDetails:
       activeGateway === "accountDetails" && accountDetails.enabled
@@ -54,9 +57,16 @@ export async function GET(req, context) {
     }
     const baseRecord = accessGroup.baseInvoice || accessGroup.customer;
     const owner = baseRecord?.ownerId ? await findUserById(db, baseRecord.ownerId) : null;
+    const business = baseRecord?.ownerId
+      ? await db.collection("businesses").findOne({
+          ownerId: String(baseRecord.ownerId),
+          active: { $ne: false },
+          $or: [{ isPrimary: true }, { _id: baseRecord.businessId }],
+        })
+      : null;
 
     return Response.json({
-      customer: buildCustomerPayload(baseRecord || {}, owner),
+      customer: buildCustomerPayload(baseRecord || {}, owner, business),
       invoices: (accessGroup.invoices || []).map(serializePublicInvoice),
     });
   } catch (error) {

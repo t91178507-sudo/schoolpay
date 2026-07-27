@@ -1,4 +1,5 @@
 import { connectDB } from "../../../../../../lib/mongodb";
+import { requireVerifiedOwnerBusiness } from "../../../../../../lib/businessVerification";
 import { markInvoicePaid } from "../../../../../../lib/paymentLifecycle";
 import { findUserById } from "../../../../../../lib/paymentGatewaySettings";
 import { deliverPaymentConfirmation } from "../../../../../../lib/whatsappNotifications";
@@ -17,6 +18,8 @@ export async function POST(req, context) {
     if (!invoice) {
       return Response.json({ error: "Invoice not found" }, { status: 404 });
     }
+
+    await requireVerifiedOwnerBusiness(db, invoice.ownerId, invoice.businessId);
 
     if (!paymentReference) {
       return Response.json(
@@ -71,6 +74,6 @@ export async function POST(req, context) {
 
     return Response.json({ message: "Invoice marked as paid" });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error.message, code: error.code || "", verificationUrl: error.verificationUrl || "" }, { status: error.status || 500 });
   }
 }

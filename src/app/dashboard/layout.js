@@ -5,6 +5,16 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  FiClock,
+  FiFileText,
+  FiGrid,
+  FiLogOut,
+  FiMessageCircle,
+  FiSettings,
+  FiShield,
+  FiUsers,
+} from "react-icons/fi";
+import {
   emitSessionChange,
   useBusinessSession,
   useDarkModePreference,
@@ -35,13 +45,38 @@ export default function DashboardLayout({ children }) {
   const isHydrated = useHydrated();
   const customerLabels = getCustomerLabels(session.businessType);
   const navItems = [
-    { name: "Dashboard", href: "/dashboard", badge: "D" },
-    { name: `${customerLabels.singularTitle} groups`, href: "/dashboard/categories", badge: "G" },
-    { name: "Invoices", href: "/dashboard/invoices", badge: "I" },
-    { name: "Communication", href: "/dashboard/communication", badge: "M" },
-    { name: "Collections history", href: "/dashboard/payments", badge: "P" },
-    { name: "Settings", href: "/dashboard/settings", badge: "S" },
+    { name: "Dashboard", href: "/dashboard", icon: FiGrid },
+    { name: `${customerLabels.singularTitle} groups`, href: "/dashboard/categories", icon: FiUsers },
+    { name: "Invoices", href: "/dashboard/invoices", icon: FiFileText },
+    { name: "Receipts", href: "/dashboard/receipts", icon: FiFileText },
+    { name: "Collections history", href: "/dashboard/payments", icon: FiClock },
+    { name: "Verification", href: "/dashboard/verification", icon: FiShield },
+    { name: "Settings", href: "/dashboard/settings", icon: FiSettings },
   ];
+
+  useEffect(() => {
+    if (!isHydrated || !session.isLoggedIn || !session.hasBusiness || session.accountType === "staff") {
+      return undefined;
+    }
+
+    const refreshVerificationStatus = async () => {
+      try {
+        const response = await authFetch("/api/businesses");
+        const businesses = response.ok ? await response.json() : [];
+        const business = Array.isArray(businesses) ? businesses[0] : null;
+        if (!business) return;
+        localStorage.setItem("businessVerificationStatus", business.verificationStatus || "pending_verification");
+        localStorage.setItem("businessVerified", String(business.isVerified === true));
+        emitSessionChange();
+      } catch {
+        // Keep the last known status while offline.
+      }
+    };
+
+    refreshVerificationStatus();
+    const interval = setInterval(refreshVerificationStatus, 60000);
+    return () => clearInterval(interval);
+  }, [isHydrated, session.accountType, session.hasBusiness, session.isLoggedIn]);
 
   useEffect(() => {
     if (!isHydrated) {
@@ -55,10 +90,19 @@ export default function DashboardLayout({ children }) {
 
     if (session.accountType === "staff") {
       router.replace("/mobile");
+      return;
     }
-  }, [isHydrated, router, session.accountType, session.isLoggedIn]);
 
-  useEffect(() => {
+    if (!session.hasBusiness && pathname !== "/dashboard/business-setup") {
+      router.replace("/dashboard/business-setup");
+    }
+
+    if (session.hasBusiness && pathname === "/dashboard/business-setup") {
+      router.replace("/dashboard/verification");
+    }
+  }, [isHydrated, pathname, router, session.accountType, session.hasBusiness, session.isLoggedIn]);
+
+useEffect(() => {
     if (!isHydrated) {
       return;
     }
@@ -113,6 +157,9 @@ export default function DashboardLayout({ children }) {
     localStorage.removeItem("businessName");
     localStorage.removeItem("businessType");
     localStorage.removeItem("businessLogo");
+    localStorage.removeItem("hasBusiness");
+    localStorage.removeItem("businessVerificationStatus");
+    localStorage.removeItem("businessVerified");
     emitSessionChange();
     router.replace("/auth/login");
   }, [router]);
@@ -271,6 +318,7 @@ export default function DashboardLayout({ children }) {
         <nav className="flex-1 p-4">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
+            const Icon = item.icon;
 
             return (
               <Link
@@ -290,7 +338,7 @@ export default function DashboardLayout({ children }) {
                       : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
                   }`}
                 >
-                  {item.badge}
+                  <Icon className="h-4 w-4" aria-hidden="true" />
                 </span>
                 <span className="font-medium">{item.name}</span>
               </Link>
@@ -304,7 +352,7 @@ export default function DashboardLayout({ children }) {
             className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-red-600 transition-all hover:bg-red-50 dark:hover:bg-red-950/50"
           >
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-red-50 text-xs font-semibold dark:bg-red-950/50">
-              Q
+              <FiLogOut className="h-4 w-4" aria-hidden="true" />
             </span>
             <span className="font-medium">Logout</span>
           </button>
@@ -321,6 +369,23 @@ export default function DashboardLayout({ children }) {
           </button>
 
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3 sm:gap-4">
+            {session.hasBusiness ? (
+              <Link
+                href="/dashboard/verification"
+                className={`hidden rounded-full px-3 py-1.5 text-xs font-semibold sm:inline-flex ${
+                  session.businessVerified
+                    ? "bg-emerald-100 text-emerald-800"
+                    : session.businessVerificationStatus === "under_review"
+                      ? "bg-blue-100 text-blue-800"
+                      : ["rejected", "suspended"].includes(session.businessVerificationStatus)
+                        ? "bg-red-100 text-red-800"
+                        : "bg-amber-100 text-amber-800"
+                }`}
+              >
+                {session.businessVerified ? "Verified Business" : String(session.businessVerificationStatus || "pending_verification").replaceAll("_", " ")}
+              </Link>
+            ) : null}
+
             <div className="hidden text-right text-sm text-gray-500 dark:text-gray-400 xl:block">
               {currentTime ? `${formattedDate} | ${formattedTime}` : ""}
             </div>
@@ -396,6 +461,15 @@ export default function DashboardLayout({ children }) {
         </header>
 
         <main className="flex-1 overflow-auto bg-gray-50 p-4 dark:bg-gray-950 sm:p-6 lg:p-8">
+          {session.hasBusiness && !session.businessVerified && pathname !== "/dashboard/verification" ? (
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-amber-950">Business verification required</p>
+                <p className="mt-0.5 text-xs text-amber-800">Customer-facing payments and messages unlock after InvoiceHub verifies your business.</p>
+              </div>
+              <Link href="/dashboard/verification" className="rounded-lg bg-amber-900 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-950">Complete Verification</Link>
+            </div>
+          ) : null}
           {children}
         </main>
       </div>

@@ -1,14 +1,21 @@
 import { requireAuth } from "../../../../../lib/auth";
 import { connectDB } from "../../../../../lib/mongodb";
+import { requireVerifiedOwnerBusiness } from "../../../../../lib/businessVerification";
 import {
   findUserById,
   resolveWhatsAppWebConfigForUser,
+  resolveTwilioWhatsAppConfig,
 } from "../../../../../lib/paymentGatewaySettings";
 import {
   isWhatsAppWebConfigured,
   resolveActiveWhatsAppWebConfig,
   sendWhatsAppWebMessage,
 } from "../../../../../lib/whatsappWebBridge";
+import {
+  getTwilioTemplate,
+  isTwilioWhatsAppConfigured,
+  sendTrackedTwilioWhatsAppMessage,
+} from "../../../../../lib/twilioWhatsApp";
 
 const BULK_MESSAGE_MIN_DELAY_MS = 45 * 1000;
 const BULK_MESSAGE_MAX_DELAY_MS = 90 * 1000;
@@ -58,6 +65,7 @@ export async function POST(req) {
   try {
     const userId = requireAuth(req);
     const db = await connectDB();
+    await requireVerifiedOwnerBusiness(db, userId);
     const body = await req.json();
     const category = String(body.category || "").trim();
     const text = String(body.message || "").trim();
@@ -75,13 +83,19 @@ export async function POST(req) {
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
+    const twilioConfig = resolveTwilioWhatsAppConfig(user);
+    const useTwilio = twilioConfig.enabled;
+    if (useTwilio && !isTwilioWhatsAppConfigured(twilioConfig)) {
+      return Response.json({ error: "Twilio WhatsApp is not fully configured." }, { status: 422 });
+    }
+
     const savedWhatsAppWebConfig = await resolveWhatsAppWebConfigForUser(db, user);
     const whatsAppWebConfig = isWhatsAppWebConfigured(savedWhatsAppWebConfig)
       ? await resolveActiveWhatsAppWebConfig(savedWhatsAppWebConfig).catch(
           () => savedWhatsAppWebConfig
         )
       : savedWhatsAppWebConfig;
-    if (!isWhatsAppWebConfigured(whatsAppWebConfig)) {
+    if (!useTwilio && !isWhatsAppWebConfigured(whatsAppWebConfig)) {
       return Response.json(
         { error: "WhatsApp Web bridge is not configured" },
         { status: 400 }
@@ -122,10 +136,15 @@ export async function POST(req) {
       const { customer, phone } = sendableCustomers[index];
 
       try {
-        const result = await sendWhatsAppWebMessage(whatsAppWebConfig, {
-          phone,
-          text,
-        });
+        const result = useTwilio
+          ? await sendTrackedTwilioWhatsAppMessage({
+              db, user, config: twilioConfig, messageType: "bulk", relatedId: customer._id,
+              message: {
+                phone, text, contentSid: getTwilioTemplate(twilioConfig, "general"),
+                contentVariables: { 1: text },
+              },
+            })
+          : await sendWhatsAppWebMessage(whatsAppWebConfig, { phone, text });
         sentCount += 1;
         results.push({
           customerId: String(customer._id),

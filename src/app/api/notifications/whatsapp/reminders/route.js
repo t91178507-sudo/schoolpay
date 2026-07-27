@@ -1,5 +1,6 @@
 import { requireAuth } from "../../../../../lib/auth";
 import { connectDB } from "../../../../../lib/mongodb";
+import { requireVerifiedOwnerBusiness } from "../../../../../lib/businessVerification";
 import { findUserById } from "../../../../../lib/paymentGatewaySettings";
 import {
   evaluateReminderEligibility,
@@ -14,6 +15,7 @@ export async function POST(req) {
   try {
     const userId = requireAuth(req);
     const db = await connectDB();
+    await requireVerifiedOwnerBusiness(db, userId);
     const body = await req.json();
     const origin = String(body.origin || "").trim();
     const force = body.force === true;

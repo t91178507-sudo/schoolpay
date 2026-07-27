@@ -1,19 +1,27 @@
 import { requireAuth } from "../../../../../lib/auth";
 import { connectDB } from "../../../../../lib/mongodb";
+import { requireVerifiedOwnerBusiness } from "../../../../../lib/businessVerification";
 import {
   findUserById,
   resolveWhatsAppWebConfigForUser,
+  resolveTwilioWhatsAppConfig,
 } from "../../../../../lib/paymentGatewaySettings";
 import {
   isWhatsAppWebConfigured,
   resolveActiveWhatsAppWebConfig,
   sendWhatsAppWebMessage,
 } from "../../../../../lib/whatsappWebBridge";
+import {
+  getTwilioTemplate,
+  isTwilioWhatsAppConfigured,
+  sendTrackedTwilioWhatsAppMessage,
+} from "../../../../../lib/twilioWhatsApp";
 
 export async function POST(req) {
   try {
     const userId = requireAuth(req);
     const db = await connectDB();
+    await requireVerifiedOwnerBusiness(db, userId);
     const body = await req.json();
     const phone = String(body.phone || "").trim();
 
@@ -25,6 +33,22 @@ export async function POST(req) {
 
     if (!user) {
       return Response.json({ error: "User not found" }, { status: 404 });
+    }
+
+    const twilioConfig = resolveTwilioWhatsAppConfig(user);
+    if (twilioConfig.enabled) {
+      if (!isTwilioWhatsAppConfigured(twilioConfig)) {
+        return Response.json({ error: "Twilio WhatsApp is not fully configured." }, { status: 422 });
+      }
+      const testText = "InvoiceHub test message. Your Twilio WhatsApp connection is working.";
+      const result = await sendTrackedTwilioWhatsAppMessage({
+        db, user, config: twilioConfig, messageType: "test",
+        message: {
+          phone, text: testText, contentSid: getTwilioTemplate(twilioConfig, "general"),
+          contentVariables: { 1: testText },
+        },
+      });
+      return Response.json({ success: true, provider: "twilio", result });
     }
 
     const savedWhatsAppWebConfig = await resolveWhatsAppWebConfigForUser(db, user);

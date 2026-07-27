@@ -104,6 +104,7 @@ export function buildInvoiceMessage({
   customerName,
   customerLabel = "Customer Name",
   amount,
+  pendingBalance,
   description,
   items = [],
   paymentLink,
@@ -113,12 +114,17 @@ export function buildInvoiceMessage({
 }) {
   const lines = formatLineItems(items);
   const reminderLine = isReminder ? "\nPayment Reminder\n" : "";
+  const normalizedPendingBalance = Number(pendingBalance);
+  const pendingBalanceLine =
+    Number.isFinite(normalizedPendingBalance) && normalizedPendingBalance > 0
+      ? `\nPending Balance: ${formatCurrency(normalizedPendingBalance)}`
+      : "";
 
   return `${formatLogoLine(businessLogo)}${businessName || "InvoiceHub"}${reminderLine}
 
 Invoice Number: ${invoiceNumber || "Pending"}
 ${customerLabel}: ${customerName}
-Amount: ${formatCurrency(amount)}
+Amount: ${formatCurrency(amount)}${pendingBalanceLine}
 Description: ${description || "Invoice payment"}
 Date: ${formatMessageDate(date)}
 ${lines ? `\nItems:\n${lines}\n` : ""}

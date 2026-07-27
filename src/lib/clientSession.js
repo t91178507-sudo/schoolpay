@@ -11,6 +11,9 @@ const EMPTY_BUSINESS_SESSION = Object.freeze({
   businessName: "",
   businessType: "",
   businessLogo: "",
+  hasBusiness: false,
+  businessVerificationStatus: "draft",
+  businessVerified: false,
   role: "",
   roleKey: "",
   accountType: "owner",
@@ -70,6 +73,9 @@ function getBusinessSnapshot() {
     businessName: localStorage.getItem("businessName") || "",
     businessType: localStorage.getItem("businessType") || "",
     businessLogo: localStorage.getItem("businessLogo") || "",
+    hasBusiness: localStorage.getItem("hasBusiness") !== "false",
+    businessVerificationStatus: localStorage.getItem("businessVerificationStatus") || "verified",
+    businessVerified: localStorage.getItem("businessVerified") !== "false",
     role: localStorage.getItem("role") || "",
     roleKey: localStorage.getItem("roleKey") || "",
     accountType: localStorage.getItem("accountType") || "owner",
@@ -88,6 +94,9 @@ function getBusinessSnapshot() {
     businessSnapshotCache.businessName === nextSnapshot.businessName &&
     businessSnapshotCache.businessType === nextSnapshot.businessType &&
     businessSnapshotCache.businessLogo === nextSnapshot.businessLogo &&
+    businessSnapshotCache.hasBusiness === nextSnapshot.hasBusiness &&
+    businessSnapshotCache.businessVerificationStatus === nextSnapshot.businessVerificationStatus &&
+    businessSnapshotCache.businessVerified === nextSnapshot.businessVerified &&
     businessSnapshotCache.role === nextSnapshot.role &&
     businessSnapshotCache.roleKey === nextSnapshot.roleKey &&
     businessSnapshotCache.accountType === nextSnapshot.accountType &&

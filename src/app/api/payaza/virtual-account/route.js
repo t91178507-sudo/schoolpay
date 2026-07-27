@@ -1,4 +1,5 @@
 import { connectDB } from "../../../../lib/mongodb";
+import { requireVerifiedOwnerBusiness } from "../../../../lib/businessVerification";
 import {
   createPayazaDynamicVirtualAccount,
   parseAmount,
@@ -66,6 +67,7 @@ export async function POST(req) {
     }
 
     const owner = invoice.ownerId ? await findUserById(db, invoice.ownerId) : null;
+    await requireVerifiedOwnerBusiness(db, invoice.ownerId, invoice.businessId);
     const payazaConfig = resolvePayazaConfig(owner || {});
 
     if (!isPayazaConfigReady(payazaConfig)) {
@@ -156,4 +158,3 @@ export async function POST(req) {
     );
   }
 }
-

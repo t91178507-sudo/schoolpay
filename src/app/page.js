@@ -1,4 +1,4 @@
-﻿import Image from "next/image";
+import Image from "next/image";
 import Link from "next/link";
 import PublicLegalFooter from "../components/PublicLegalFooter";
 
@@ -116,8 +116,8 @@ export default function Home() {
                   InvoiceHub
                 </div>
                 <h1 className="mt-4 max-w-4xl text-[2.25rem] font-semibold leading-[1.06] tracking-normal sm:text-[3rem] lg:text-[3rem] xl:text-[3.25rem]">
-                  InvoiceHub helps businesses send invoices, track payments, follow up{" "}
-                  <span className="text-emerald-300">unpaid customers and keep every collection organised.</span>
+                  Send invoices. Track payments. Follow up{" "}
+                  <span className="text-emerald-300">unpaid customers.</span>
                 </h1>
                 <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">
                   Stop managing payments across WhatsApp chats, screenshots, bank alerts

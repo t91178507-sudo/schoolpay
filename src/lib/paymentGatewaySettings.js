@@ -60,6 +60,23 @@ export const DEFAULT_WHATSAPP_PROVIDERS = Object.freeze({
     qrConnectUrl: "http://localhost:8787/qr",
     statusWebhookUrl: "",
   },
+  twilio: {
+    enabled: false,
+    mode: "own",
+    accountSid: "",
+    authToken: "",
+    subaccountSid: "",
+    subaccountAuthToken: "",
+    whatsappNumber: "",
+    messagingServiceSid: "",
+    statusCallbackUrl: "",
+    invoiceContentSid: "",
+    reminderContentSid: "",
+    paymentContentSid: "",
+    receiptRejectionContentSid: "",
+    generalContentSid: "",
+    managedSubaccountsAvailable: false,
+  },
 });
 
 const SECRET_FIELDS = Object.freeze({
@@ -70,6 +87,7 @@ const SECRET_FIELDS = Object.freeze({
 
 const WHATSAPP_SECRET_FIELDS = Object.freeze({
   whatsappWeb: ["apiKey"],
+  twilio: ["accountSid", "authToken", "subaccountAuthToken"],
 });
 
 const ENCRYPTED_PREFIX = "enc::";
@@ -370,6 +388,12 @@ export function buildSettingsPayload(user = {}, platformSettings = {}) {
         user,
         platformSettings
       ),
+      twilio: {
+        ...buildWhatsAppPayload("twilio", whatsappProviders.twilio, user, platformSettings),
+        managedSubaccountsAvailable: Boolean(
+          process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
+        ),
+      },
     },
   };
 }
@@ -386,7 +410,7 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
     "accountDetails",
     "receiptUpload",
   ];
-  const whatsAppProviderKeys = ["browser", "whatsappWeb"];
+  const whatsAppProviderKeys = ["browser", "whatsappWeb", "twilio"];
   const selectedPaymentGateway = paymentGatewayKeys.includes(body.defaultPaymentGateway)
     ? body.defaultPaymentGateway
     : "monnify";
@@ -522,6 +546,10 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
     whatsappProviders: {
       browser: normalizeWhatsAppProvider("browser"),
       whatsappWeb: normalizeWhatsAppProvider("whatsappWeb"),
+      twilio: {
+        ...normalizeWhatsAppProvider("twilio"),
+        mode: whatsappProviders.twilio?.mode === "managed" ? "managed" : "own",
+      },
     },
   };
 }
@@ -634,3 +662,36 @@ export async function resolveWhatsAppWebConfigForUser(db, user = {}) {
   );
 }
 
+export function resolveTwilioWhatsAppConfig(user = {}) {
+  const provider = user.whatsappProviders?.twilio || {};
+  const mode = provider.mode === "managed" ? "managed" : "own";
+  const accountSid = mode === "managed"
+    ? normalizeText(provider.subaccountSid)
+    : decryptGatewayValue(provider, "accountSid");
+  const authToken = mode === "managed"
+    ? decryptGatewayValue(provider, "subaccountAuthToken")
+    : decryptGatewayValue(provider, "authToken");
+
+  return {
+    enabled: normalizeText(user.defaultWhatsAppProvider) === "twilio",
+    mode,
+    accountSid,
+    authToken,
+    whatsappNumber: normalizeText(provider.whatsappNumber),
+    messagingServiceSid: normalizeText(provider.messagingServiceSid),
+    statusCallbackUrl: normalizeText(provider.statusCallbackUrl),
+    invoiceContentSid: normalizeText(provider.invoiceContentSid),
+    reminderContentSid: normalizeText(provider.reminderContentSid),
+    paymentContentSid: normalizeText(provider.paymentContentSid),
+    receiptRejectionContentSid: normalizeText(provider.receiptRejectionContentSid),
+    generalContentSid: normalizeText(provider.generalContentSid),
+  };
+}
+
+export function encryptSettingsSecret(value) {
+  return encryptValue(value);
+}
+
+export function decryptSettingsSecret(value) {
+  return decryptValue(value);
+}

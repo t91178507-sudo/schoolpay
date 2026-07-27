@@ -4,23 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-const businessTypes = [
-  "Retail",
-  "Professional Service",
-  "School",
-  "Healthcare",
-  "Real Estate",
-  "Distribution",
-  "Hospitality",
-];
-
 export default function Register() {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
-    businessName: "",
     email: "",
-    businessType: "",
     password: "",
     confirmPassword: "",
     country: "",
@@ -53,10 +41,6 @@ export default function Register() {
       setError("Password must be at least 8 characters");
       return;
     }
-    if (!formData.businessType) {
-      setError("Please select a business type");
-      return;
-    }
     if (!formData.acceptTerms) {
       setError("Please accept the Terms & Conditions");
       return;
@@ -72,8 +56,6 @@ export default function Register() {
           fullName: `${formData.firstName} ${formData.lastName}`.trim(),
           email: formData.email,
           password: formData.password,
-          businessName: formData.businessName,
-          businessType: formData.businessType,
           role: "Admin",
         }),
       });
@@ -103,7 +85,7 @@ export default function Register() {
         <div className="absolute top-10 left-10">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-2xl font-bold">
-              ₦
+              ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¦
             </div>
             <span className="text-3xl font-bold tracking-tight">InvoiceHub</span>
           </div>
@@ -139,9 +121,10 @@ export default function Register() {
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold text-gray-900">Create your InvoiceHub account</h2>
               <p className="text-gray-600 mt-2 text-sm">
-                Set up your business profile and start managing invoices in one place.
+                Create your owner account. You will add your business details after login.
               </p>
             </div>
+
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
@@ -166,16 +149,6 @@ export default function Register() {
               </div>
 
               <input
-                type="text"
-                name="businessName"
-                placeholder="Business Name"
-                value={formData.businessName}
-                onChange={handleChange}
-                required
-                className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
-              />
-
-              <input
                 type="email"
                 name="email"
                 placeholder="Email Address"
@@ -184,21 +157,6 @@ export default function Register() {
                 required
                 className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
               />
-
-              <select
-                name="businessType"
-                value={formData.businessType}
-                onChange={handleChange}
-                required
-                className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
-              >
-                <option value="">Select Business Type</option>
-                {businessTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
 
               <input
                 type="text"

@@ -7,15 +7,23 @@ import {
   resolveBrowserWhatsAppConfig,
   resolveActivePaymentGateway,
   resolveWhatsAppWebConfigForUser,
+  resolveTwilioWhatsAppConfig,
 } from "./paymentGatewaySettings";
+import { buildInvoiceAttachment } from "./invoicePdf";
 import { buildPaymentReceiptAttachment } from "./paymentReceiptPdf";
 import { markInvoiceNotificationPrepared } from "./paymentLifecycle";
+import { getOutstandingAmount } from "./reminderSafety";
 import {
   isWhatsAppWebConfigured,
   resolveActiveWhatsAppWebConfig,
   sendWhatsAppWebDocument,
   sendWhatsAppWebMessage,
 } from "./whatsappWebBridge";
+import {
+  getTwilioTemplate,
+  isTwilioWhatsAppConfigured,
+  sendTrackedTwilioWhatsAppMessage,
+} from "./twilioWhatsApp";
 
 function buildFallbackUrl(phone, message) {
   const normalizedPhone = toWhatsAppNumber(phone);
@@ -72,6 +80,12 @@ export async function deliverInvoiceMessage({
       : activeGateway === "receiptUpload"
         ? "Click to view bank transfer details"
         : "Payment Link";
+  const invoiceAmount = Number(invoice.amount || 0);
+  const outstandingAmount = getOutstandingAmount(invoice);
+  const pendingBalance =
+    isReminder && outstandingAmount > 0 && outstandingAmount < invoiceAmount
+      ? outstandingAmount
+      : null;
   const message = buildInvoiceMessage({
     businessLogo: invoice.businessLogo || owner?.businessLogo || "",
     businessName: invoice.businessName || owner?.businessName || "",
@@ -79,6 +93,7 @@ export async function deliverInvoiceMessage({
     customerName,
     customerLabel: getCustomerMessageLabel(owner),
     amount: invoice.amount,
+    pendingBalance,
     description:
       invoice.description || invoice.category || invoice.class || "Invoice payment",
     items: invoice.items || [],
@@ -87,6 +102,36 @@ export async function deliverInvoiceMessage({
     date: invoice.date ? new Date(invoice.date) : new Date(),
     isReminder,
   });
+
+  const twilioConfig = resolveTwilioWhatsAppConfig(owner || {});
+  if (twilioConfig.enabled) {
+    if (!isTwilioWhatsAppConfigured(twilioConfig)) {
+      throw new Error("Twilio WhatsApp is selected but its account or sender is not configured.");
+    }
+    const templateType = isReminder ? "reminder" : "invoice";
+    const result = await sendTrackedTwilioWhatsAppMessage({
+      db,
+      user: owner,
+      config: twilioConfig,
+      messageType: templateType,
+      relatedId: invoice._id,
+      message: {
+        phone,
+        text: message,
+        contentSid: getTwilioTemplate(twilioConfig, templateType),
+        contentVariables: {
+          1: customerName,
+          2: invoice.businessName || owner?.businessName || "InvoiceHub",
+          3: invoice.invoiceNumber || "Invoice",
+          4: `N${Number(pendingBalance || outstandingAmount || invoice.amount || 0).toLocaleString()}`,
+          5: invoice.description || invoice.category || invoice.class || "Invoice payment",
+          6: `${origin}/pay/${invoice.token}`,
+        },
+      },
+    });
+    await markInvoiceNotificationPrepared(db, invoice._id, result.status || "queued");
+    return { sent: true, status: result.status || "queued", provider: "twilio", messageId: result.messageId };
+  }
 
   const browserConfig = resolveBrowserWhatsAppConfig(owner || {});
   const savedWhatsAppWebConfig = await resolveWhatsAppWebConfigForUser(db, owner || {});
@@ -103,9 +148,28 @@ export async function deliverInvoiceMessage({
   if (isWhatsAppWebConfigured(whatsAppWebConfig)) {
     try {
       await sendWhatsAppWebMessage(whatsAppWebConfig, { phone, text: message });
+      const attachment = buildInvoiceAttachment({ invoice, owner, origin });
+      let attachmentSent = false;
+
+      try {
+        await sendWhatsAppWebDocument(whatsAppWebConfig, {
+          phone,
+          caption: "Invoice PDF attached.",
+          attachment,
+        });
+        attachmentSent = true;
+      } catch (attachmentError) {
+        console.error("WHATSAPP INVOICE PDF SEND ERROR:", attachmentError);
+      }
+
       await markInvoiceNotificationPrepared(db, invoice._id, "sent");
 
-      return { sent: true, status: "sent", provider: "whatsappWeb" };
+      return {
+        sent: true,
+        status: "sent",
+        provider: "whatsappWeb",
+        attachmentSent,
+      };
     } catch (error) {
       if (!shouldFallbackToBrowser(error)) {
         throw error;
@@ -151,6 +215,26 @@ export async function deliverPaymentConfirmation({
     description:
       invoice.description || invoice.category || invoice.class || "Invoice payment",
   });
+
+  const twilioConfig = resolveTwilioWhatsAppConfig(owner || {});
+  if (twilioConfig.enabled) {
+    if (!isTwilioWhatsAppConfigured(twilioConfig)) {
+      throw new Error("Twilio WhatsApp is selected but its account or sender is not configured.");
+    }
+    const paidAmount = amount ?? invoice.paidAmount ?? invoice.amount ?? 0;
+    const result = await sendTrackedTwilioWhatsAppMessage({
+      db, user: owner, config: twilioConfig, messageType: "payment", relatedId: invoice._id,
+      message: {
+        phone, text: message, contentSid: getTwilioTemplate(twilioConfig, "payment"),
+        contentVariables: {
+          1: customerName, 2: invoice.businessName || owner?.businessName || "InvoiceHub",
+          3: invoice.invoiceNumber || "Invoice", 4: `N${Number(paidAmount).toLocaleString()}`,
+        },
+      },
+    });
+    await markInvoiceNotificationPrepared(db, invoice._id, result.status || "queued");
+    return { sent: true, status: result.status || "queued", provider: "twilio", messageId: result.messageId, attachmentSent: false };
+  }
 
   const browserConfig = resolveBrowserWhatsAppConfig(owner || {});
   const savedWhatsAppWebConfig = await resolveWhatsAppWebConfigForUser(db, owner || {});
@@ -242,6 +326,22 @@ export async function deliverReceiptRejection({
     "",
     `The invoice remains unpaid. Please contact ${businessName} or upload another receipt.`,
   ].join("\n");
+  const twilioConfig = resolveTwilioWhatsAppConfig(owner || {});
+  if (twilioConfig.enabled) {
+    if (!isTwilioWhatsAppConfigured(twilioConfig)) {
+      throw new Error("Twilio WhatsApp is selected but its account or sender is not configured.");
+    }
+    const result = await sendTrackedTwilioWhatsAppMessage({
+      db, user: owner, config: twilioConfig, messageType: "receiptRejection", relatedId: invoice?._id,
+      message: {
+        phone: recipientPhone, text: message,
+        contentSid: getTwilioTemplate(twilioConfig, "receiptRejection"),
+        contentVariables: { 1: customerName, 2: invoiceNumber, 3: rejectionReason, 4: businessName },
+      },
+    });
+    return { sent: true, status: result.status || "queued", provider: "twilio", messageId: result.messageId };
+  }
+
   const savedConfig = await resolveWhatsAppWebConfigForUser(db, owner || {});
   let whatsAppWebConfig = savedConfig;
 

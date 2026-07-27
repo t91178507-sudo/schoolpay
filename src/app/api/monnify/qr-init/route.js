@@ -1,5 +1,6 @@
 import { initializeMonnifyTransaction, parseAmount } from "../../../../lib/monnify";
 import { connectDB } from "../../../../lib/mongodb";
+import { requireVerifiedOwnerBusiness } from "../../../../lib/businessVerification";
 import { createPayazaDynamicVirtualAccount } from "../../../../lib/payaza";
 import {
   findUserById,
@@ -132,6 +133,7 @@ export async function POST(req) {
     }
 
     const owner = profile.ownerId ? await findUserById(db, profile.ownerId) : null;
+    await requireVerifiedOwnerBusiness(db, profile.ownerId, profile.businessId);
     const activeGateway = resolveActivePaymentGateway(owner || {});
 
     const profileGateway = String(profile.gateway || "").trim().toLowerCase();
@@ -277,4 +279,3 @@ export async function POST(req) {
     );
   }
 }
-

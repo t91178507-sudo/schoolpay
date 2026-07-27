@@ -1,6 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { emitSessionChange } from "../../../lib/clientSession";
@@ -51,6 +52,9 @@ export default function Login() {
         localStorage.setItem("businessName", data.user?.businessName || "");
         localStorage.setItem("businessType", data.user?.businessType || "");
         localStorage.setItem("businessLogo", data.user?.businessLogo || "");
+        localStorage.setItem("hasBusiness", String(data.user?.hasBusiness === true));
+        localStorage.setItem("businessVerificationStatus", data.user?.businessVerificationStatus || "draft");
+        localStorage.setItem("businessVerified", String(data.user?.businessVerified === true));
         localStorage.setItem("role", data.user?.role || "");
         localStorage.setItem("roleKey", data.user?.roleKey || "");
         localStorage.setItem("accountType", data.user?.accountType || "owner");
@@ -70,7 +74,11 @@ export default function Login() {
         emitSessionChange();
 
         const destination =
-          data.user?.accountType === "staff" ? "/mobile" : "/dashboard";
+          data.user?.accountType === "staff"
+            ? "/mobile"
+            : data.user?.hasBusiness === false
+              ? "/dashboard/business-setup"
+              : "/dashboard";
         setTimeout(() => router.replace(destination), 200);
       } else {
         setError(data.error || data.message || "Invalid credentials");
@@ -86,6 +94,19 @@ export default function Login() {
     <div className="min-h-screen flex">
       <div className="flex-1 flex items-center justify-center px-5 py-8 bg-gray-50">
         <div className="w-full max-w-lg">
+          <div className="mb-6 text-center">
+            <Link href="/" className="inline-flex items-center justify-center gap-3 rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50">
+              <div className="relative h-12 w-12 rounded-3xl bg-slate-100 p-3 shadow-inner">
+                <Image
+                  src="/file.svg"
+                  alt="InvoiceHub logo"
+                  fill
+                  className="object-contain"
+                />
+              </div>
+              <span>InvoiceHub</span>
+            </Link>
+          </div>
           <div className="overflow-hidden rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70">
             <div className="px-8 pt-10 pb-7 text-center sm:px-10">
               <h2 className="text-3xl font-bold tracking-tight text-gray-900">
@@ -95,6 +116,7 @@ export default function Login() {
                 Enter your email and password to access your invoice workspace.
               </p>
             </div>
+
 
             <form onSubmit={handleSubmit} className="space-y-6 px-8 pb-8 sm:px-10">
               {registered && (
@@ -172,5 +194,3 @@ export default function Login() {
     </div>
   );
 }
-
-
