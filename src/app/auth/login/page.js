@@ -96,13 +96,8 @@ export default function Login() {
         <div className="w-full max-w-lg">
           <div className="mb-6 text-center">
             <Link href="/" className="inline-flex items-center justify-center gap-3 rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50">
-              <div className="relative h-12 w-12 rounded-3xl bg-slate-100 p-3 shadow-inner">
-                <Image
-                  src="/file.svg"
-                  alt="InvoiceHub logo"
-                  fill
-                  className="object-contain"
-                />
+              <div className="relative h-12 w-12 rounded-3xl bg-slate-100 p-1 shadow-inner">
+                <img src="/logo.svg" alt="InvoiceHub logo" className="h-12 w-12 object-contain" />
               </div>
               <span>InvoiceHub</span>
             </Link>

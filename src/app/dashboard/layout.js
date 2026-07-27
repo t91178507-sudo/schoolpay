@@ -300,8 +300,8 @@ useEffect(() => {
               className="h-10 w-10 rounded-2xl border border-gray-200 object-cover dark:border-gray-700"
             />
           ) : (
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 font-semibold text-white">
-              {(session.businessName || session.userName || "I").charAt(0).toUpperCase()}
+            <div className="h-10 w-10 overflow-hidden rounded-2xl bg-slate-50">
+              <img src="/logo.svg" alt="InvoiceHub" className="h-10 w-10 object-cover" />
             </div>
           )}
 

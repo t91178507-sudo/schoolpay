@@ -64,8 +64,8 @@ export default function Home() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
                 <Link href="/" className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500 text-base font-bold text-white shadow-lg shadow-emerald-950/30">
-                    I
+                  <div className="h-11 w-11">
+                    <img src="/logo.svg" alt="InvoiceHub" className="h-11 w-11 object-contain" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-lg font-semibold leading-5 text-white">InvoiceHub</p>
