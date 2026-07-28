@@ -225,6 +225,7 @@ export function getTwilioTemplate(config = {}, type = "general") {
     invoice: "invoiceContentSid",
     reminder: "reminderContentSid",
     payment: "paymentContentSid",
+    paymentReceipt: "paymentReceiptContentSid",
     receiptRejection: "receiptRejectionContentSid",
     general: "generalContentSid",
   }[type];

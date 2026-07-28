@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import { INVOICEHUB_LOGO_PNG } from "./invoiceHubLogo";
 
 function formatMoney(amount) {
   return `N${Number(amount || 0).toLocaleString()}`;
@@ -36,12 +37,16 @@ export function buildPaymentReceiptPdf({
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 48;
-  let y = 56;
+  let y = 78;
 
+  doc.addImage(INVOICEHUB_LOGO_PNG, "PNG", margin, 22, 24, 28);
   doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(15, 23, 42);
+  doc.text("InvoiceHub", margin + 32, 41);
+
   doc.setFontSize(20);
   doc.text(businessName, margin, y);
-
   doc.setFontSize(14);
   doc.text("Payment Receipt", pageWidth - margin, y, { align: "right" });
   y += 32;

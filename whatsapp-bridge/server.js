@@ -8,7 +8,7 @@ import { promisify } from "util";
 import QRCode from "qrcode";
 import pkg from "whatsapp-web.js";
 
-const { Client, LocalAuth } = pkg;
+const { Client, LocalAuth, MessageMedia } = pkg;
 
 const PORT = Number(process.env.WHATSAPP_BRIDGE_PORT || process.env.PORT || 8787);
 const API_KEY =
@@ -31,7 +31,7 @@ const BROWSER_PATH = resolveBrowserPath();
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "12mb" }));
 
 const sessions = new Map();
 const execFileAsync = promisify(execFile);
@@ -626,6 +626,29 @@ async function sendTextWithRecovery(sessionState, chatId, text) {
   }
 }
 
+
+async function sendDocumentWithRecovery(sessionState, chatId, media, caption) {
+  const options = {
+    caption: String(caption || "").slice(0, 1024),
+    sendMediaAsDocument: true,
+  };
+
+  try {
+    return await sessionState.client.sendMessage(chatId, media, options);
+  } catch (error) {
+    if (!isRecoverableBrowserError(error)) {
+      throw error;
+    }
+
+    await restartSessionImmediately(
+      sessionState,
+      error.message || "WhatsApp browser context detached"
+    );
+    await waitForReadySession(sessionState);
+
+    return sessionState.client.sendMessage(chatId, media, options);
+  }
+}
 function requireApiKey(req, res, next) {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
@@ -782,6 +805,96 @@ app.post("/api/messages/send-text", requireApiKey, async (req, res) => {
   }
 });
 
+
+app.post("/api/messages/send-document", requireApiKey, async (req, res) => {
+  const sessionState = getSessionState(readSessionName(req));
+  const to = String(req.body?.to || "").trim().replace(/\D/g, "");
+  const document = req.body?.document || {};
+  const base64 = String(
+    req.body?.data || req.body?.base64 || document.data || ""
+  ).replace(/^data:application\/pdf;base64,/, "");
+  const filename = String(
+    req.body?.filename || req.body?.fileName || document.filename || "payment-receipt.pdf"
+  )
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .slice(0, 120);
+  const mimetype = String(
+    req.body?.mimetype || req.body?.mimeType || document.mimetype || "application/pdf"
+  ).toLowerCase();
+  const caption = String(req.body?.caption || "Payment receipt attached.").trim();
+
+  try {
+    const isReady = await waitForSessionReady(sessionState);
+    if (!isReady) {
+      res.status(409).json({
+        error: "WhatsApp session is not ready",
+        status: sessionState.status,
+        sessionName: sessionState.sessionName,
+      });
+      return;
+    }
+
+    if (!to || !base64) {
+      res.status(400).json({ error: "to and PDF data are required" });
+      return;
+    }
+
+    if (mimetype !== "application/pdf") {
+      res.status(415).json({ error: "Only PDF documents are supported" });
+      return;
+    }
+
+    const fileBuffer = Buffer.from(base64, "base64");
+    if (!fileBuffer.length || fileBuffer.length > 10 * 1024 * 1024) {
+      res.status(413).json({ error: "PDF must be between 1 byte and 10 MB" });
+      return;
+    }
+
+    if (fileBuffer.subarray(0, 5).toString("ascii") !== "%PDF-") {
+      res.status(400).json({ error: "The attachment is not a valid PDF file" });
+      return;
+    }
+
+    const chatId = `${to}@c.us`;
+    const media = new MessageMedia("application/pdf", base64, filename);
+    const result = await sendDocumentWithRecovery(
+      sessionState,
+      chatId,
+      media,
+      caption
+    );
+    touchSession(sessionState);
+    addMessageLog(sessionState, {
+      direction: "outbound",
+      status: "sent",
+      to,
+      preview: `${caption || "PDF document"} (${filename})`.slice(0, 120),
+      provider: "whatsappWeb",
+      messageType: "document",
+    });
+
+    res.json({
+      success: true,
+      id: result?.id?._serialized || "",
+      to,
+      filename,
+      sessionName: sessionState.sessionName,
+    });
+  } catch (error) {
+    sessionState.lastError = error.message || "Unable to send PDF document";
+    touchSession(sessionState);
+    addMessageLog(sessionState, {
+      direction: "outbound",
+      status: "failed",
+      to,
+      preview: filename,
+      provider: "whatsappWeb",
+      messageType: "document",
+      error: sessionState.lastError,
+    });
+    res.status(500).json({ error: sessionState.lastError });
+  }
+});
 app.post("/api/session/logout", requireApiKey, async (req, res) => {
   const sessionState = await ensureSession(readSessionName(req));
 

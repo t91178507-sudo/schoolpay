@@ -58,6 +58,39 @@ function getCustomerMessageLabel(owner = {}) {
     : "Customer Name";
 }
 
+function buildPaymentReceiptMediaUrl(invoice = {}, twilioConfig = {}) {
+  const configuredOrigin =
+    process.env.TWILIO_MEDIA_BASE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    "";
+  let origin = String(configuredOrigin).trim().replace(/\/+$/, "");
+
+  if (!origin && twilioConfig.statusCallbackUrl) {
+    try {
+      origin = new URL(twilioConfig.statusCallbackUrl).origin;
+    } catch {
+      origin = "";
+    }
+  }
+
+  if (!origin || !invoice.token || !/^https:\/\//i.test(origin)) {
+    return "";
+  }
+
+  const transactions = Array.isArray(invoice.paymentTransactions)
+    ? invoice.paymentTransactions
+    : [];
+  const latestPayment = transactions[transactions.length - 1] || {};
+  const reference =
+    latestPayment.reference ||
+    latestPayment.paymentReference ||
+    invoice.paymentReference ||
+    "";
+  const query = reference ? `?reference=${encodeURIComponent(reference)}` : "";
+
+  return `${origin}/api/invoices/by-token/${encodeURIComponent(invoice.token)}/receipt-pdf${query}`;
+}
 export async function deliverInvoiceMessage({
   db,
   invoice,
@@ -222,18 +255,50 @@ export async function deliverPaymentConfirmation({
       throw new Error("Twilio WhatsApp is selected but its account or sender is not configured.");
     }
     const paidAmount = amount ?? invoice.paidAmount ?? invoice.amount ?? 0;
+    const receiptMediaUrl = buildPaymentReceiptMediaUrl(invoice, twilioConfig);
+    const receiptContentSid = getTwilioTemplate(twilioConfig, "paymentReceipt");
+    const contentSid =
+      receiptMediaUrl && receiptContentSid
+        ? receiptContentSid
+        : getTwilioTemplate(twilioConfig, "payment");
+    const businessName = invoice.businessName || owner?.businessName || "InvoiceHub";
+    const contentVariables =
+      receiptMediaUrl && receiptContentSid
+        ? {
+            1: customerName,
+            2: businessName,
+            3: invoice.invoiceNumber || "Invoice",
+            4: `N${Number(paidAmount).toLocaleString()}`,
+            5: receiptMediaUrl,
+          }
+        : {
+            1: customerName,
+            2: businessName,
+            3: invoice.invoiceNumber || "Invoice",
+            4: `N${Number(paidAmount).toLocaleString()}`,
+          };
     const result = await sendTrackedTwilioWhatsAppMessage({
-      db, user: owner, config: twilioConfig, messageType: "payment", relatedId: invoice._id,
+      db,
+      user: owner,
+      config: twilioConfig,
+      messageType: "payment",
+      relatedId: invoice._id,
       message: {
-        phone, text: message, contentSid: getTwilioTemplate(twilioConfig, "payment"),
-        contentVariables: {
-          1: customerName, 2: invoice.businessName || owner?.businessName || "InvoiceHub",
-          3: invoice.invoiceNumber || "Invoice", 4: `N${Number(paidAmount).toLocaleString()}`,
-        },
+        phone,
+        text: message,
+        contentSid,
+        contentVariables,
       },
     });
     await markInvoiceNotificationPrepared(db, invoice._id, result.status || "queued");
-    return { sent: true, status: result.status || "queued", provider: "twilio", messageId: result.messageId, attachmentSent: false };
+    return {
+      sent: true,
+      status: result.status || "queued",
+      provider: "twilio",
+      messageId: result.messageId,
+      attachmentSent: Boolean(receiptMediaUrl && receiptContentSid),
+      attachmentUrl: receiptMediaUrl && receiptContentSid ? receiptMediaUrl : "",
+    };
   }
 
   const browserConfig = resolveBrowserWhatsAppConfig(owner || {});

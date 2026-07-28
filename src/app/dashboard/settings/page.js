@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import QRCode from "qrcode";
+import { FiChevronDown } from "react-icons/fi";
 import { useConfirm } from "../../../components/AppFeedback";
 import { authFetch } from "../../../lib/authFetch";
 import {
@@ -179,6 +180,7 @@ const EMPTY_SETTINGS = {
       invoiceContentSid: "",
       reminderContentSid: "",
       paymentContentSid: "",
+      paymentReceiptContentSid: "",
       receiptRejectionContentSid: "",
       generalContentSid: "",
       managedSubaccountsAvailable: false,
@@ -247,6 +249,7 @@ export default function SettingsPage() {
   const [creatingTwilioSubaccount, setCreatingTwilioSubaccount] = useState(false);
   const [verifyingTwilio, setVerifyingTwilio] = useState(false);
   const [editingBusinessProfile, setEditingBusinessProfile] = useState(false);
+  const [selectedSetupSection, setSelectedSetupSection] = useState("");
   const [openSections, setOpenSections] = useState({
     appearance: false,
     gateway: false,
@@ -526,6 +529,26 @@ export default function SettingsPage() {
       ...current,
       [sectionKey]: !current[sectionKey],
     }));
+  };
+
+  const openSetupSection = (item) => {
+    setSelectedSetupSection(item.sectionKey);
+
+    if (item.sectionKey === "businessProfile") {
+      setEditingBusinessProfile(true);
+    } else {
+      setOpenSections((current) => ({
+        ...current,
+        [item.sectionKey]: true,
+      }));
+    }
+
+    window.setTimeout(() => {
+      document.getElementById(item.href.slice(1))?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 50);
   };
 
   const handleLogoUpload = async (event) => {
@@ -995,6 +1018,7 @@ export default function SettingsPage() {
       title: "Business profile",
       detail: "Name, contact details, address and logo",
       ready: businessProfileConfigured,
+      sectionKey: "businessProfile",
     },
     {
       href: "#payment-method",
@@ -1002,6 +1026,7 @@ export default function SettingsPage() {
       title: "Payment method",
       detail: selectedGateway.name,
       ready: gatewayConfigured,
+      sectionKey: "gateway",
     },
     {
       href: "#whatsapp",
@@ -1009,6 +1034,7 @@ export default function SettingsPage() {
       title: "WhatsApp delivery",
       detail: selectedWhatsAppProvider.name,
       ready: whatsAppConfigured,
+      sectionKey: "whatsapp",
     },
     {
       href: "#qr-payments",
@@ -1017,6 +1043,7 @@ export default function SettingsPage() {
       detail: `${quickPayProfiles.length} saved QR ${quickPayProfiles.length === 1 ? "profile" : "profiles"}`,
       ready: quickPayProfiles.length > 0,
       optional: true,
+      sectionKey: "quickPay",
     },
   ];
   if (loading) {
@@ -1054,36 +1081,53 @@ export default function SettingsPage() {
           </p>
         </div>
         <nav className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Settings sections">
-          {setupItems.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className="flex min-h-24 items-start gap-3 rounded-lg border border-slate-200 bg-white p-4 transition hover:border-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-600"
-            >
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white dark:bg-white dark:text-slate-950">
-                {item.step}
-              </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold text-slate-900 dark:text-white">
-                  {item.title}
+          {setupItems.map((item) => {
+            const isOpen = selectedSetupSection === item.sectionKey;
+
+            return (
+              <button
+                key={item.href}
+                type="button"
+                onClick={() => openSetupSection(item)}
+                aria-expanded={isOpen}
+                aria-controls={item.href.slice(1)}
+                className={`flex min-h-24 w-full items-start gap-3 rounded-lg border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-emerald-500/40 ${
+                  isOpen
+                    ? "border-emerald-400 bg-emerald-50/70 dark:border-emerald-700 dark:bg-emerald-950/20"
+                    : "border-slate-200 bg-white hover:border-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-600"
+                }`}
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white dark:bg-white dark:text-slate-950">
+                  {item.step}
                 </span>
-                <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">
-                  {item.detail}
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="block text-sm font-semibold text-slate-900 dark:text-white">
+                      {item.title}
+                    </span>
+                    <FiChevronDown
+                      className={`shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                      aria-hidden="true"
+                    />
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">
+                    {item.detail}
+                  </span>
+                  <span
+                    className={`mt-2 inline-block text-xs font-semibold ${
+                      item.ready
+                        ? "text-emerald-700 dark:text-emerald-300"
+                        : item.optional
+                          ? "text-slate-500 dark:text-slate-400"
+                          : "text-amber-700 dark:text-amber-300"
+                    }`}
+                  >
+                    {item.ready ? "Ready" : item.optional ? "Optional" : "Needs attention"}
+                  </span>
                 </span>
-                <span
-                  className={`mt-2 inline-block text-xs font-semibold ${
-                    item.ready
-                      ? "text-emerald-700 dark:text-emerald-300"
-                      : item.optional
-                        ? "text-slate-500 dark:text-slate-400"
-                        : "text-amber-700 dark:text-amber-300"
-                  }`}
-                >
-                  {item.ready ? "Ready" : item.optional ? "Optional" : "Needs attention"}
-                </span>
-              </span>
-            </a>
-          ))}
+              </button>
+            );
+          })}
         </nav>
       </section>
 
@@ -1100,7 +1144,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <section id="business-profile" className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
+      <section id="business-profile" className={`${selectedSetupSection === "businessProfile" ? "" : "hidden"} rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900`}>
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Business profile</h2>
@@ -1279,7 +1323,7 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <section id="payment-method" className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
+      <section id="payment-method" className={`${selectedSetupSection === "gateway" ? "" : "hidden"} rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900`}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Payment method</h2>
@@ -1577,7 +1621,7 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <section id="whatsapp" className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
+      <section id="whatsapp" className={`${selectedSetupSection === "whatsapp" ? "" : "hidden"} rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900`}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">WhatsApp delivery</h2>
@@ -2042,7 +2086,8 @@ export default function SettingsPage() {
                   {[
                     ["invoiceContentSid", "Invoice message"],
                     ["reminderContentSid", "Payment reminder"],
-                    ["paymentContentSid", "Payment confirmation"],
+                    ["paymentContentSid", "Payment confirmation (text only)"],
+                    ["paymentReceiptContentSid", "Payment confirmation with PDF"],
                     ["receiptRejectionContentSid", "Receipt rejection"],
                     ["generalContentSid", "General and bulk message"],
                   ].map(([fieldKey, label]) => (
@@ -2058,6 +2103,7 @@ export default function SettingsPage() {
                     </div>
                   ))}
                 </div>
+                <p className="mt-4 text-xs leading-5 text-slate-500 dark:text-slate-400">For the PDF option, create a WhatsApp-approved Document template. Use variables 1 customer, 2 business, 3 invoice number, 4 amount, and 5 for the public PDF media URL.</p>
               </div>
 
               <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50 p-5 lg:flex-row lg:items-end dark:border-slate-800 dark:bg-slate-950/60">
@@ -2153,7 +2199,7 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <section id="qr-payments" className="rounded-2xl border border-gray-200 bg-white p-8 space-y-6 dark:border-slate-800 dark:bg-slate-900">
+      <section id="qr-payments" className={`${selectedSetupSection === "quickPay" ? "" : "hidden"} space-y-6 rounded-2xl border border-gray-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900`}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">QR payment setup</h2>

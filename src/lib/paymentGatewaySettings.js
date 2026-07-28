@@ -73,6 +73,7 @@ export const DEFAULT_WHATSAPP_PROVIDERS = Object.freeze({
     invoiceContentSid: "",
     reminderContentSid: "",
     paymentContentSid: "",
+    paymentReceiptContentSid: "",
     receiptRejectionContentSid: "",
     generalContentSid: "",
     managedSubaccountsAvailable: false,
@@ -683,6 +684,7 @@ export function resolveTwilioWhatsAppConfig(user = {}) {
     invoiceContentSid: normalizeText(provider.invoiceContentSid),
     reminderContentSid: normalizeText(provider.reminderContentSid),
     paymentContentSid: normalizeText(provider.paymentContentSid),
+    paymentReceiptContentSid: normalizeText(provider.paymentReceiptContentSid),
     receiptRejectionContentSid: normalizeText(provider.receiptRejectionContentSid),
     generalContentSid: normalizeText(provider.generalContentSid),
   };
