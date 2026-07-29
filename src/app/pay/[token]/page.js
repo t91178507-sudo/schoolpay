@@ -446,7 +446,13 @@ export default function PaymentPage() {
     );
   }
 
-  if (customer?.businessVerified === false) {
+  if (
+    customer?.businessVerified === false &&
+    !(
+      customer.defaultPaymentGateway === "receiptUpload" &&
+      customer.receiptUpload?.enabled
+    )
+  ) {
     return (
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6">
         <div className="w-full max-w-sm rounded-2xl border border-amber-200 bg-white p-7 text-center shadow-sm">
@@ -888,13 +894,12 @@ function ReceiptUploadModal({
             </span>
             <input
               type="file"
-              accept="image/jpeg,image/png,application/pdf"
               onChange={(event) => setReceiptFile(event.target.files?.[0] || null)}
               className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
               required
             />
             <span className="mt-1 block text-xs text-slate-400">
-              JPG, PNG, or PDF. Maximum 10 MB.
+              Select the receipt file you want to submit.
             </span>
           </label>
 

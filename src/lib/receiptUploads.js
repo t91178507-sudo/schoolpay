@@ -9,12 +9,6 @@ import {
   deliverReceiptRejection,
 } from "./whatsappNotifications";
 
-const MAX_RECEIPT_SIZE = 10 * 1024 * 1024;
-const ALLOWED_RECEIPT_TYPES = new Map([
-  ["image/jpeg", "jpg"],
-  ["image/png", "png"],
-  ["application/pdf", "pdf"],
-]);
 const NIGERIAN_BANKS = [
   { name: "Access Bank", aliases: ["access bank", "access"] },
   { name: "Alpha Morgan Bank", aliases: ["alpha morgan bank", "alpha morgan"] },
@@ -106,16 +100,8 @@ export function decryptReceiptBuffer(receipt) {
 }
 
 export function validateReceiptFile(file) {
-  if (!file || typeof file.arrayBuffer !== "function") {
+  if (!file || typeof file.arrayBuffer !== "function" || !file.size) {
     throw new Error("Upload a receipt file.");
-  }
-
-  if (!ALLOWED_RECEIPT_TYPES.has(file.type)) {
-    throw new Error("Receipt must be JPG, PNG, or PDF.");
-  }
-
-  if (Number(file.size || 0) > MAX_RECEIPT_SIZE) {
-    throw new Error("Receipt file must be 10 MB or less.");
   }
 }
 

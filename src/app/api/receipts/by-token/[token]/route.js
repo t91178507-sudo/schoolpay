@@ -1,13 +1,10 @@
 import { createHash } from "crypto";
 import { ObjectId } from "mongodb";
 import { connectDB } from "../../../../../lib/mongodb";
-import { requireVerifiedOwnerBusiness } from "../../../../../lib/businessVerification";
 import {
   analyzeReceiptFile,
   encryptReceiptBuffer,
   logReceiptAudit,
-  normalizeAccountName,
-  receiptNameMatchesConfigured,
   validateReceiptFile,
 } from "../../../../../lib/receiptUploads";
 
@@ -23,7 +20,7 @@ function hashReceiptBuffer(buffer) {
   return createHash("sha256").update(buffer).digest("hex");
 }
 
-async function findDuplicateReceipt(db, { ownerId, invoiceId, fileHash, transactionReference }) {
+async function findDuplicateReceipt(db, { ownerId, fileHash, transactionReference }) {
   const duplicateQueries = [];
 
   if (fileHash) {
@@ -37,12 +34,6 @@ async function findDuplicateReceipt(db, { ownerId, invoiceId, fileHash, transact
     });
   }
 
-  if (invoiceId) {
-    duplicateQueries.push({
-      invoiceId,
-      status: "pending",
-    });
-  }
 
   if (!duplicateQueries.length) {
     return null;
@@ -113,19 +104,6 @@ export async function POST(req, context) {
       return Response.json({ error: "Invoice not found" }, { status: 404 });
     }
 
-    await requireVerifiedOwnerBusiness(db, invoice.ownerId, invoice.businessId);
-
-    const owner = invoice.ownerId
-      ? await db.collection("users").findOne({ _id: new ObjectId(invoice.ownerId) })
-      : null;
-    const receiptSettings = owner?.paymentGateways?.receiptUpload || {};
-
-    if (!receiptSettings.enabled) {
-      return Response.json(
-        { error: "Receipt upload is not enabled for this invoice." },
-        { status: 400 }
-      );
-    }
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const fileHash = hashReceiptBuffer(buffer);
@@ -149,7 +127,6 @@ export async function POST(req, context) {
     const recipientName = extracted.recipientName || "";
     const duplicate = await findDuplicateReceipt(db, {
       ownerId: invoice.ownerId,
-      invoiceId: String(invoice._id),
       fileHash,
       transactionReference,
     });
@@ -158,52 +135,9 @@ export async function POST(req, context) {
       const duplicateReason =
         duplicate.fileHash === fileHash
           ? "This receipt file has already been uploaded."
-          : duplicate.transactionReference === transactionReference
-            ? "This transaction ID has already been used for another receipt."
-            : "A receipt is already awaiting validation for this invoice.";
+          : "This transaction ID has already been used for another receipt.";
 
       return Response.json({ error: duplicateReason }, { status: 409 });
-    }
-
-    const configuredAccountName = String(receiptSettings.accountName || "").trim();
-    const receiptNameCandidates = [
-      recipientName,
-      extracted.recipientName,
-    ]
-      .map((value) => String(value || "").trim())
-      .filter(Boolean);
-    const nameRejected =
-      configuredAccountName &&
-      !receiptNameCandidates.some((value) =>
-        receiptNameMatchesConfigured(value, configuredAccountName)
-      );
-
-    if (nameRejected) {
-      const rejectionReason = `Account name mismatch. Expected ${
-        normalizeAccountName(configuredAccountName) || configuredAccountName
-      }.`;
-
-      await logReceiptAudit(db, {
-        ownerId: invoice.ownerId,
-        receiptId: null,
-        invoiceId: String(invoice._id),
-        userId: "customer",
-        ipAddress: getIp(req),
-        action: "Receipt Upload Rejected",
-        reason: rejectionReason,
-        fileHash,
-        transactionReference,
-      });
-
-      return Response.json(
-        {
-          error: rejectionReason,
-          rejected: true,
-          expectedAccountName:
-            normalizeAccountName(configuredAccountName) || configuredAccountName,
-        },
-        { status: 422 }
-      );
     }
 
     const receipt = {
