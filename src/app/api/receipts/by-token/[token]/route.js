@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { ObjectId } from "mongodb";
+import { after } from "next/server";
 import { connectDB } from "../../../../../lib/mongodb";
 import {
   analyzeReceiptFile,
@@ -7,6 +8,8 @@ import {
   logReceiptAudit,
   validateReceiptFile,
 } from "../../../../../lib/receiptUploads";
+
+export const maxDuration = 60;
 
 function getIp(req) {
   return (
@@ -20,7 +23,10 @@ function hashReceiptBuffer(buffer) {
   return createHash("sha256").update(buffer).digest("hex");
 }
 
-async function findDuplicateReceipt(db, { ownerId, fileHash, transactionReference }) {
+async function findDuplicateReceipt(
+  db,
+  { ownerId, fileHash, transactionReference, excludeReceiptId }
+) {
   const duplicateQueries = [];
 
   if (fileHash) {
@@ -28,18 +34,20 @@ async function findDuplicateReceipt(db, { ownerId, fileHash, transactionReferenc
   }
 
   if (transactionReference) {
-    duplicateQueries.push({
-      ownerId,
-      transactionReference,
-    });
+    duplicateQueries.push({ ownerId, transactionReference });
   }
-
 
   if (!duplicateQueries.length) {
     return null;
   }
 
-  return db.collection("receiptUploads").findOne({ $or: duplicateQueries });
+  const query = { $or: duplicateQueries };
+
+  if (excludeReceiptId) {
+    query._id = { $ne: excludeReceiptId };
+  }
+
+  return db.collection("receiptUploads").findOne(query);
 }
 
 async function tokenCanAccessInvoice(db, invoice, token) {
@@ -88,6 +96,138 @@ async function findReceiptInvoice(db, { invoiceId, token }) {
   return db.collection("invoices").findOne({ token });
 }
 
+async function processReceiptAnalysis({
+  receiptId,
+  buffer,
+  mimeType,
+  invoice,
+  submittedFields,
+}) {
+  const db = await connectDB();
+
+  try {
+    const extracted = await analyzeReceiptFile(buffer, mimeType, invoice);
+    const transactionReference =
+      submittedFields.transactionReference || extracted.transactionReference || "";
+    const paymentDate =
+      submittedFields.paymentDate || extracted.transactionDate || "";
+    const senderName = submittedFields.senderName || extracted.senderName || "";
+    const duplicate = transactionReference
+      ? await findDuplicateReceipt(db, {
+          ownerId: invoice.ownerId,
+          transactionReference,
+          excludeReceiptId: receiptId,
+        })
+      : null;
+    const now = new Date();
+
+    if (duplicate) {
+      const rejectionReason =
+        "This transaction ID has already been used for another receipt.";
+
+      await db.collection("receiptUploads").updateOne(
+        { _id: receiptId, analysisStatus: "processing" },
+        {
+          $set: {
+            amount: Number(extracted.amount || 0),
+            transactionReference,
+            paymentDate,
+            paymentTime: extracted.transactionTime || "",
+            senderName,
+            recipientName: extracted.recipientName || "",
+            extracted,
+            analysisStatus: "duplicate",
+            analysisCompletedAt: now,
+            analysisError: rejectionReason,
+            status: "rejected",
+            rejectionReason,
+            rejectedAt: now,
+            rejectedBy: "automated-duplicate-check",
+            updatedAt: now,
+          },
+        }
+      );
+
+      await db.collection("invoices").updateOne(
+        { _id: invoice._id, receiptUploadId: receiptId },
+        {
+          $set: {
+            status: submittedFields.invoiceStatusBeforeReceipt || "Unpaid",
+            paymentStatus:
+              submittedFields.invoicePaymentStatusBeforeReceipt || "unpaid",
+            receiptValidationStatus: "rejected",
+            receiptUploadId: "",
+            updatedAt: now,
+          },
+        }
+      );
+
+      await logReceiptAudit(db, {
+        ownerId: invoice.ownerId,
+        receiptId,
+        invoiceId: String(invoice._id),
+        userId: "system",
+        ipAddress: "",
+        action: "Receipt Duplicate Detected",
+      });
+      return;
+    }
+
+    await db.collection("receiptUploads").updateOne(
+      { _id: receiptId, analysisStatus: "processing" },
+      {
+        $set: {
+          amount: Number(extracted.amount || 0),
+          transactionReference,
+          paymentDate,
+          paymentTime: extracted.transactionTime || "",
+          senderName,
+          recipientName: extracted.recipientName || "",
+          extracted,
+          analysisStatus: "completed",
+          analysisCompletedAt: now,
+          analysisError: "",
+          updatedAt: now,
+        },
+      }
+    );
+
+    await logReceiptAudit(db, {
+      ownerId: invoice.ownerId,
+      receiptId,
+      invoiceId: String(invoice._id),
+      userId: "system",
+      ipAddress: "",
+      action: "Receipt Analysis Completed",
+    });
+  } catch (error) {
+    console.error("RECEIPT BACKGROUND OCR ERROR:", error);
+    const now = new Date();
+
+    await db.collection("receiptUploads").updateOne(
+      { _id: receiptId, analysisStatus: "processing" },
+      {
+        $set: {
+          analysisStatus: "failed",
+          analysisCompletedAt: now,
+          analysisError:
+            "Automated reading could not be completed. Review the receipt manually.",
+          updatedAt: now,
+        },
+      }
+    );
+
+    await logReceiptAudit(db, {
+      ownerId: invoice.ownerId,
+      receiptId,
+      invoiceId: String(invoice._id),
+      userId: "system",
+      ipAddress: "",
+      action: "Receipt Analysis Failed",
+    });
+  }
+}
+
 export async function POST(req, context) {
   try {
     const { token } = await context.params;
@@ -104,61 +244,65 @@ export async function POST(req, context) {
       return Response.json({ error: "Invoice not found" }, { status: 404 });
     }
 
-
     const buffer = Buffer.from(await file.arrayBuffer());
     const fileHash = hashReceiptBuffer(buffer);
     const encrypted = encryptReceiptBuffer(buffer);
-    const extracted = await analyzeReceiptFile(buffer, file.type, invoice);
-    const now = new Date();
-
-    const transactionReference =
-      String(formData.get("transactionReference") || "").trim() ||
-      extracted.transactionReference ||
-      "";
-    const paymentDate =
-      String(formData.get("paymentDate") || "").trim() ||
-      extracted.transactionDate ||
-      "";
-    const paymentTime = extracted.transactionTime || "";
-    const senderName =
-      String(formData.get("senderName") || "").trim() ||
-      extracted.senderName ||
-      "";
-    const recipientName = extracted.recipientName || "";
     const duplicate = await findDuplicateReceipt(db, {
       ownerId: invoice.ownerId,
       fileHash,
-      transactionReference,
     });
 
     if (duplicate) {
-      const duplicateReason =
-        duplicate.fileHash === fileHash
-          ? "This receipt file has already been uploaded."
-          : "This transaction ID has already been used for another receipt.";
-
-      return Response.json({ error: duplicateReason }, { status: 409 });
+      return Response.json(
+        { error: "This receipt file has already been uploaded." },
+        { status: 409 }
+      );
     }
 
+    const now = new Date();
+    const submittedFields = {
+      transactionReference: String(
+        formData.get("transactionReference") || ""
+      ).trim(),
+      paymentDate: String(formData.get("paymentDate") || "").trim(),
+      senderName: String(formData.get("senderName") || "").trim(),
+      invoiceStatusBeforeReceipt: invoice.status || "Unpaid",
+      invoicePaymentStatusBeforeReceipt: invoice.paymentStatus || "unpaid",
+    };
     const receipt = {
       ownerId: invoice.ownerId,
       businessId: String(invoice.businessId || ""),
       invoiceId: String(invoice._id),
       invoiceNumber: invoice.invoiceNumber || "",
-      customerName: invoice.customer || invoice.customerName || invoice.student || "",
-      amount: Number(extracted.amount || invoice.balanceDue || invoice.amount || 0),
+      customerName:
+        invoice.customer || invoice.customerName || invoice.student || "",
+      amount: 0,
       fileName: file.name || "receipt",
       fileType: file.type,
       fileSize: file.size || buffer.length,
       fileHash,
       ...encrypted,
-      transactionReference,
-      paymentDate,
-      paymentTime,
-      senderName,
-      recipientName,
+      transactionReference: submittedFields.transactionReference,
+      paymentDate: submittedFields.paymentDate,
+      paymentTime: "",
+      senderName: submittedFields.senderName,
+      recipientName: "",
       phoneNumber: String(formData.get("phoneNumber") || "").trim(),
-      extracted,
+      extracted: {
+        amount: 0,
+        bankName: "",
+        transactionReference: "",
+        transactionDate: "",
+        transactionTime: "",
+        senderName: "",
+        recipientName: "",
+        confidence: 0,
+        checks: [],
+      },
+      analysisStatus: "processing",
+      analysisStartedAt: now,
+      analysisCompletedAt: null,
+      analysisError: "",
       status: "pending",
       rejectionReason: "",
       rejectedAt: null,
@@ -191,15 +335,34 @@ export async function POST(req, context) {
       action: "Receipt Uploaded",
     });
 
-    return Response.json({
-      success: true,
-      message: "Receipt received and awaiting validation.",
-    });
+    after(() =>
+      processReceiptAnalysis({
+        receiptId: insert.insertedId,
+        buffer,
+        mimeType: file.type,
+        invoice,
+        submittedFields,
+      })
+    );
+
+    return Response.json(
+      {
+        success: true,
+        receiptId: String(insert.insertedId),
+        analysisStatus: "processing",
+        message: "Receipt uploaded. Payment details are being read.",
+      },
+      { status: 202 }
+    );
   } catch (error) {
     console.error("RECEIPT UPLOAD ERROR:", error);
 
     return Response.json(
-      { error: error.message || "Unable to upload receipt", code: error.code || "", verificationUrl: error.verificationUrl || "" },
+      {
+        error: error.message || "Unable to upload receipt",
+        code: error.code || "",
+        verificationUrl: error.verificationUrl || "",
+      },
       { status: error.status || 500 }
     );
   }

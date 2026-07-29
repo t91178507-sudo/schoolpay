@@ -21,6 +21,25 @@ export async function GET(req) {
     const userId = access.ownerId;
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
+    const staleAnalysisThreshold = new Date(Date.now() - 2 * 60 * 1000);
+
+    await db.collection("receiptUploads").updateMany(
+      {
+        ownerId: userId,
+        analysisStatus: "processing",
+        analysisStartedAt: { $lt: staleAnalysisThreshold },
+      },
+      {
+        $set: {
+          analysisStatus: "failed",
+          analysisCompletedAt: new Date(),
+          analysisError:
+            "Automated reading took too long. Review the receipt manually.",
+          updatedAt: new Date(),
+        },
+      }
+    );
+
     const query = { ownerId: userId };
 
     if (status && status !== "all") {

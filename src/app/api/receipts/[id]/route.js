@@ -102,6 +102,13 @@ export async function PATCH(req, context) {
     }
 
     if (action === "approve") {
+      if (receipt.analysisStatus === "processing") {
+        return Response.json(
+          { error: "Receipt details are still being read. Try again shortly." },
+          { status: 409 }
+        );
+      }
+
       const invoice = await approveReceiptUpload(db, receipt, {
         userId,
         ipAddress: getIp(req),

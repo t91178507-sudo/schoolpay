@@ -30,6 +30,10 @@ function getReceiptAmount(receipt) {
   return extractedAmount > 0 ? extractedAmount : Number(receipt?.amount || 0);
 }
 
+function isReceiptProcessing(receipt) {
+  return receipt?.analysisStatus === "processing";
+}
+
 function formatDate(value) {
   if (!value) return "-";
   const date = new Date(value);
@@ -105,6 +109,32 @@ export default function ReceiptValidationPage() {
     return () => clearTimeout(initialLoad);
   }, [isHydrated, isSchoolBusiness, router]);
 
+  const hasProcessingReceipts = receipts.some(isReceiptProcessing);
+
+  useEffect(() => {
+    if (!isSchoolBusiness || !hasProcessingReceipts) return undefined;
+
+    const refreshTimer = window.setInterval(
+      () => loadReceipts({ silent: true }),
+      3000
+    );
+    return () => window.clearInterval(refreshTimer);
+  }, [hasProcessingReceipts, isSchoolBusiness]);
+  const displayedActiveReceipt = useMemo(() => {
+    if (!activeReceipt) return null;
+
+    const refreshedReceipt = receipts.find(
+      (receipt) => receipt._id === activeReceipt._id
+    );
+
+    return refreshedReceipt
+      ? {
+          ...activeReceipt,
+          ...refreshedReceipt,
+          invoice: refreshedReceipt.invoice || activeReceipt.invoice,
+        }
+      : activeReceipt;
+  }, [activeReceipt, receipts]);
   const stats = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     const completed = receipts.filter(
@@ -328,13 +358,13 @@ export default function ReceiptValidationPage() {
         )}
       </SurfaceCard>
 
-      {activeReceipt ? (
+      {displayedActiveReceipt ? (
         <ReceiptDrawer
-          receipt={activeReceipt}
+          receipt={displayedActiveReceipt}
           previewUrl={receiptPreviewUrl}
           onClose={closeReceipt}
-          onApprove={() => updateReceipt(activeReceipt, "approve")}
-          onReject={() => setRejecting(activeReceipt)}
+          onApprove={() => updateReceipt(displayedActiveReceipt, "approve")}
+          onReject={() => setRejecting(displayedActiveReceipt)}
           busy={busy}
         />
       ) : null}
@@ -392,6 +422,9 @@ function FeedbackBanner({ tone, message }) {
 
 function ReceiptRow({ receipt, onOpen }) {
   const confidence = Number(receipt.extracted?.confidence || 0);
+  const processing = isReceiptProcessing(receipt);
+  const analysisFailed = receipt.analysisStatus === "failed";
+
   return (
     <div className="grid gap-4 px-5 py-4 transition hover:bg-slate-50/80 dark:hover:bg-slate-800/40 lg:grid-cols-[1.15fr_1.15fr_.75fr_1fr_.65fr_.8fr_auto] lg:items-center lg:gap-5">
       <div className="min-w-0">
@@ -400,26 +433,43 @@ function ReceiptRow({ receipt, onOpen }) {
       </div>
       <div className="min-w-0">
         <p className="truncate text-sm font-medium text-slate-900 dark:text-white">{receipt.customerName || "Unknown customer"}</p>
-        <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{receipt.transactionReference || receipt.extracted?.transactionReference || "No transaction reference"}</p>
+        <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{processing ? "Reading transaction reference" : receipt.transactionReference || receipt.extracted?.transactionReference || "No transaction reference"}</p>
       </div>
       <div>
-        <p className="text-sm font-semibold text-slate-950 dark:text-white">{formatCurrency(getReceiptAmount(receipt))}</p>
+        {processing ? (
+          <span className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-300"><FiRefreshCw className="animate-spin" />Reading...</span>
+        ) : (
+          <p className="text-sm font-semibold text-slate-950 dark:text-white">{getReceiptAmount(receipt) > 0 ? formatCurrency(getReceiptAmount(receipt)) : "Not detected"}</p>
+        )}
       </div>
       <p className="text-sm text-slate-500 dark:text-slate-400">{formatDate(receipt.createdAt)}</p>
       <div>
-        <span className={`text-sm font-semibold ${confidence >= 75 ? "text-emerald-600" : confidence > 0 ? "text-amber-600" : "text-slate-400"}`}>{confidence ? `${confidence}%` : "-"}</span>
+        {processing ? (
+          <span className="text-sm font-medium text-blue-600 dark:text-blue-300">Processing</span>
+        ) : analysisFailed ? (
+          <span className="text-sm font-medium text-amber-600 dark:text-amber-300">Manual review</span>
+        ) : (
+          <span className={`text-sm font-semibold ${confidence >= 75 ? "text-emerald-600" : confidence > 0 ? "text-amber-600" : "text-slate-400"}`}>{confidence ? `${confidence}%` : "-"}</span>
+        )}
       </div>
-      <div><StatusBadge tone={getStatusTone(receipt.status)}>{formatStatus(receipt.status)}</StatusBadge></div>
+      <div>
+        {processing ? (
+          <StatusBadge tone="blue">Reading receipt</StatusBadge>
+        ) : analysisFailed ? (
+          <StatusBadge tone="orange">Needs review</StatusBadge>
+        ) : (
+          <StatusBadge tone={getStatusTone(receipt.status)}>{formatStatus(receipt.status)}</StatusBadge>
+        )}
+      </div>
       <div className="flex justify-start lg:justify-end">
         <button type="button" onClick={onOpen} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-white dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
           <FiEye />
-          {receipt.status === "pending" ? "Review" : "View"}
+          {processing ? "View" : receipt.status === "pending" ? "Review" : "View"}
         </button>
       </div>
     </div>
   );
 }
-
 function ReceiptLoadingRows() {
   return (
     <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -455,7 +505,9 @@ function ReceiptDrawer({ receipt, previewUrl, onClose, onApprove, onReject, busy
   const invoice = receipt.invoice || {};
   const extracted = receipt.extracted || {};
   const confidence = Number(extracted.confidence || 0);
-  const canReview = receipt.status === "pending";
+  const processing = isReceiptProcessing(receipt);
+  const analysisFailed = receipt.analysisStatus === "failed";
+  const canReview = receipt.status === "pending" && !processing;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/70 p-2 sm:p-4" role="dialog" aria-modal="true" aria-label="Receipt review">
@@ -504,29 +556,43 @@ function ReceiptDrawer({ receipt, previewUrl, onClose, onApprove, onReject, busy
             ]} />
 
             <section className="border-t border-slate-200 py-5 dark:border-slate-800">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-semibold text-slate-950 dark:text-white">OCR validation</h3>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Use this as guidance and confirm against the receipt.</p>
-                </div>
-                <span className={`text-lg font-semibold ${confidence >= 75 ? "text-emerald-600" : "text-amber-600"}`}>{confidence}%</span>
-              </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                <div className={`h-full rounded-full ${confidence >= 75 ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${Math.min(Math.max(confidence, 0), 100)}%` }} />
-              </div>
-              <div className="mt-4 space-y-2">
-                {(extracted.checks || []).length ? (extracted.checks || []).map((check) => (
-                  <div key={check.label} className="flex items-start gap-2 text-sm">
-                    {check.ok ? <FiCheckCircle className="mt-0.5 shrink-0 text-emerald-600" /> : <FiAlertTriangle className="mt-0.5 shrink-0 text-amber-600" />}
-                    <span className="text-slate-700 dark:text-slate-300">{check.label}</span>
+              {processing ? (
+                <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
+                  <FiRefreshCw className="mt-0.5 shrink-0 animate-spin" />
+                  <div>
+                    <h3 className="font-semibold">Reading payment details</h3>
+                    <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">The receipt is safely uploaded. Amount, date, sender and transaction reference will appear automatically.</p>
                   </div>
-                )) : <p className="text-sm text-slate-500 dark:text-slate-400">No automated checks were returned.</p>}
-              </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-950 dark:text-white">OCR validation</h3>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{analysisFailed ? receipt.analysisError || "Automated reading failed. Review the receipt manually." : "Use this as guidance and confirm against the receipt."}</p>
+                    </div>
+                    <span className={`text-lg font-semibold ${confidence >= 75 ? "text-emerald-600" : "text-amber-600"}`}>{confidence}%</span>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div className={`h-full rounded-full ${confidence >= 75 ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${Math.min(Math.max(confidence, 0), 100)}%` }} />
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    {(extracted.checks || []).length ? (extracted.checks || []).map((check) => (
+                      <div key={check.label} className="flex items-start gap-2 text-sm">
+                        {check.ok ? <FiCheckCircle className="mt-0.5 shrink-0 text-emerald-600" /> : <FiAlertTriangle className="mt-0.5 shrink-0 text-amber-600" />}
+                        <span className="text-slate-700 dark:text-slate-300">{check.label}</span>
+                      </div>
+                    )) : <p className="text-sm text-slate-500 dark:text-slate-400">No automated checks were returned. Review the receipt manually.</p>}
+                  </div>
+                </>
+              )}
             </section>
           </div>
 
           <div className="border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900 sm:px-6">
-            {canReview ? (
+            {processing ? (
+              <div className="flex min-h-11 items-center justify-center gap-2 text-sm font-medium text-slate-500 dark:text-slate-400"><FiRefreshCw className="animate-spin" />Payment details are still being read</div>
+            ) : canReview ? (
               <div className="grid gap-3 sm:grid-cols-2">
                 <button type="button" onClick={onReject} disabled={!previewUrl || Boolean(busy)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-200 px-4 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"><FiXCircle />Reject</button>
                 <button type="button" onClick={onApprove} disabled={!previewUrl || busy === `${receipt._id}-approve`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"><FiCheck />{busy === `${receipt._id}-approve` ? "Approving..." : "Approve payment"}</button>
