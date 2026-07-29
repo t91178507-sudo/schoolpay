@@ -169,7 +169,6 @@ export async function POST(req, context) {
     const receiptNameCandidates = [
       recipientName,
       extracted.recipientName,
-      extracted.textSnippet,
     ]
       .map((value) => String(value || "").trim())
       .filter(Boolean);
@@ -213,7 +212,7 @@ export async function POST(req, context) {
       invoiceId: String(invoice._id),
       invoiceNumber: invoice.invoiceNumber || "",
       customerName: invoice.customer || invoice.customerName || invoice.student || "",
-      amount: Number(invoice.balanceDue || invoice.amount || 0),
+      amount: Number(extracted.amount || invoice.balanceDue || invoice.amount || 0),
       fileName: file.name || "receipt",
       fileType: file.type,
       fileSize: file.size || buffer.length,

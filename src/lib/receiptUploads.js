@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
-import { createRequire } from "module";
+import path from "path";
 import { ObjectId } from "mongodb";
 import { parseAmount } from "./monnify";
 import { markInvoicePaid } from "./paymentLifecycle";
@@ -9,7 +9,6 @@ import {
   deliverReceiptRejection,
 } from "./whatsappNotifications";
 
-const require = createRequire(import.meta.url);
 const MAX_RECEIPT_SIZE = 10 * 1024 * 1024;
 const ALLOWED_RECEIPT_TYPES = new Map([
   ["image/jpeg", "jpg"],
@@ -260,23 +259,64 @@ function extractRecipientName(text) {
   ];
 
   for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index].toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
+    const line = lines[index]
+      .toLowerCase()
+      .replace(/[^a-z ]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     const label = labels.find((candidate) => line === candidate);
 
     if (label) {
-      return lines[index + 1]?.replace(/\s+/g, " ").trim() || "";
+      const candidate = lines[index + 1]?.replace(/\s+/g, " ").trim() || "";
+      if (isLikelyAccountName(candidate)) {
+        return candidate;
+      }
     }
 
     const sameLineMatch = lines[index].match(
       /^(?:beneficiary|receiver|recipient)(?:\s+name)?\s*[:\-]\s*(.+)$/i
     );
 
-    if (sameLineMatch?.[1]) {
+    if (sameLineMatch?.[1] && isLikelyAccountName(sameLineMatch[1])) {
       return sameLineMatch[1].replace(/\s+/g, " ").trim();
     }
   }
 
+  const dateLineIndex = lines.findIndex((line) =>
+    /\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)?[,]?\s*\d{1,2}\s+[a-z]{3,9}\s+\d{4}\b/i.test(
+      line
+    )
+  );
+
+  if (dateLineIndex > 0) {
+    for (
+      let index = dateLineIndex - 1;
+      index >= Math.max(0, dateLineIndex - 3);
+      index -= 1
+    ) {
+      if (isLikelyAccountName(lines[index])) {
+        return lines[index].replace(/\s+/g, " ").trim();
+      }
+    }
+  }
+
   return "";
+}
+
+function isLikelyAccountName(value) {
+  const normalized = String(value || "")
+    .replace(/[^A-Za-z .'-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const tokens = normalized.split(" ").filter(Boolean);
+  const blocked = /\b(success|successful|amount|ngn|naira|bank|account|beneficiary|sender|receiver|recipient|transaction|narration|payment|transfer|local|friday|monday|tuesday|wednesday|thursday|saturday|sunday)\b/i;
+
+  return Boolean(
+    tokens.length >= 2 &&
+      tokens.length <= 8 &&
+      normalized.length >= 5 &&
+      !blocked.test(normalized)
+  );
 }
 
 function normalizeReceiptText(text) {
@@ -323,14 +363,21 @@ function normalizeTimezone(value) {
 
 function findNigerianBank(text) {
   const normalized = String(text || "").toLowerCase();
+  const compactText = normalized.replace(/[^a-z0-9]/g, "");
 
   for (const bank of NIGERIAN_BANKS) {
     if (
-      bank.aliases.some((alias) =>
-        new RegExp(`(^|[^a-z0-9])${escapeRegExp(alias)}([^a-z0-9]|$)`, "i").test(
-          normalized
-        )
-      )
+      bank.aliases.some((alias) => {
+        const boundaryMatch = new RegExp(
+          `(^|[^a-z0-9])${escapeRegExp(alias)}([^a-z0-9]|$)`,
+          "i"
+        ).test(normalized);
+        const compactAlias = alias.replace(/[^a-z0-9]/gi, "").toLowerCase();
+        const compactMatch =
+          compactAlias.length >= 5 && compactText.includes(compactAlias);
+
+        return boundaryMatch || compactMatch;
+      })
     ) {
       return bank.name;
     }
@@ -409,11 +456,17 @@ async function readImageTextWithOcr(buffer) {
 
   try {
     const { createWorker } = await import("tesseract.js");
-    const englishData = require("@tesseract.js-data/eng");
+    const englishLangPath = path.join(
+      process.cwd(),
+      "node_modules",
+      "@tesseract.js-data",
+      "eng",
+      "4.0.0"
+    );
 
     worker = await createWorker("eng", undefined, {
-      langPath: englishData.langPath,
-      gzip: englishData.gzip,
+      langPath: englishLangPath,
+      gzip: true,
       cacheMethod: "readOnly",
       logger: () => {},
     });

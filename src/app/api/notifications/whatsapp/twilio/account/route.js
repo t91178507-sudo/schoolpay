@@ -5,6 +5,8 @@ import { connectDB } from "../../../../../../lib/mongodb";
 import {
   encryptSettingsSecret,
   findUserById,
+  getPlatformSettings,
+  resolveManagedTwilioPlatformConfig,
   resolveTwilioWhatsAppConfig,
 } from "../../../../../../lib/paymentGatewaySettings";
 import {
@@ -31,6 +33,9 @@ export async function GET(req) {
     }
 
     const config = resolveTwilioWhatsAppConfig(user);
+    const platformTwilio = resolveManagedTwilioPlatformConfig(
+      (await getPlatformSettings(db)) || {}
+    );
     return Response.json({
       mode: config.mode,
       configured: isTwilioWhatsAppConfigured(config),
@@ -38,9 +43,7 @@ export async function GET(req) {
       senderConfigured: Boolean(config.whatsappNumber),
       whatsappNumber: config.whatsappNumber,
       statusCallbackUrl: config.statusCallbackUrl || getStatusCallbackUrl(req),
-      managedSubaccountsAvailable: Boolean(
-        process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
-      ),
+      managedSubaccountsAvailable: platformTwilio.configured,
     });
   } catch (error) {
     return Response.json(
@@ -64,9 +67,12 @@ export async function POST(req) {
     }
 
     if (action === "create_subaccount") {
-      const masterSid = process.env.TWILIO_ACCOUNT_SID || "";
-      const masterToken = process.env.TWILIO_AUTH_TOKEN || "";
-      if (!masterSid || !masterToken) {
+      const platformTwilio = resolveManagedTwilioPlatformConfig(
+        (await getPlatformSettings(db)) || {}
+      );
+      const masterSid = platformTwilio.accountSid;
+      const masterToken = platformTwilio.authToken;
+      if (!platformTwilio.configured) {
         return Response.json(
           {
             error:
@@ -87,6 +93,8 @@ export async function POST(req) {
       const subaccount = await createTwilioSubaccount({
         accountSid: masterSid,
         authToken: masterToken,
+        apiKeySid: platformTwilio.apiKeySid,
+        apiKeySecret: platformTwilio.apiKeySecret,
         friendlyName: `InvoiceHub - ${user.businessName || user.fullName || userId}`,
       });
       const statusCallbackUrl = getStatusCallbackUrl(req);

@@ -95,8 +95,17 @@ const WHATSAPP_PROVIDERS = [
   {
     key: "twilio",
     name: "Twilio WhatsApp",
-    blurb: "Use the official WhatsApp Business Platform with your own Twilio account or an InvoiceHub-managed subaccount.",
+    blurb: "Use the official WhatsApp Business Platform through an isolated InvoiceHub-managed subaccount.",
   },
+];
+
+const TWILIO_TEMPLATE_FIELDS = [
+  ["invoiceContentSid", "Invoice message"],
+  ["reminderContentSid", "Payment reminder"],
+  ["paymentContentSid", "Payment confirmation (text only)"],
+  ["paymentReceiptContentSid", "Payment confirmation with PDF"],
+  ["receiptRejectionContentSid", "Receipt rejection"],
+  ["generalContentSid", "General and bulk message"],
 ];
 
 const EMPTY_SETTINGS = {
@@ -170,7 +179,7 @@ const EMPTY_SETTINGS = {
     },
     twilio: {
       enabled: false,
-      mode: "own",
+      mode: "managed",
       accountSid: "",
       authToken: "",
       subaccountSid: "",
@@ -492,7 +501,11 @@ export default function SettingsPage() {
       whatsappProviders: Object.fromEntries(
         Object.entries(current.whatsappProviders).map(([key, provider]) => [
           key,
-          { ...provider, enabled: key === providerKey },
+          {
+            ...provider,
+            enabled: key === providerKey,
+            ...(key === "twilio" ? { mode: "managed" } : {}),
+          },
         ])
       ),
     }));
@@ -1007,6 +1020,11 @@ export default function SettingsPage() {
   const businessProfileConfigured = Boolean(
     settings.businessName && (settings.businessEmail || settings.businessPhone)
   );
+  const configuredTwilioTemplateCount = TWILIO_TEMPLATE_FIELDS.filter(([fieldKey]) =>
+    Boolean(settings.whatsappProviders?.twilio?.[fieldKey])
+  ).length;
+  const twilioTemplatesReady =
+    configuredTwilioTemplateCount === TWILIO_TEMPLATE_FIELDS.length;
   const whatsAppConfigured =
     selectedWhatsAppProvider.key === "browser" ||
     (selectedWhatsAppProvider.key === "whatsappWeb" && whatsAppWebStatus?.status === "ready") ||
@@ -1943,7 +1961,7 @@ export default function SettingsPage() {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Twilio WhatsApp</h3>
                 <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-slate-400">
-                  Official WhatsApp delivery with status callbacks. Each business can use its own Twilio account or an isolated managed subaccount.
+                  Official WhatsApp delivery through an isolated subaccount created for this business.
                 </p>
               </div>
               <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${twilioStatus?.configured ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
@@ -1952,97 +1970,33 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-6 p-6">
-              <div>
-                <p className="text-sm font-medium text-slate-900 dark:text-white">Account type</p>
-                <div className="mt-3 inline-flex rounded-xl border border-slate-300 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-950">
-                  {[
-                    ["own", "My Twilio account"],
-                    ["managed", "Managed subaccount"],
-                  ].map(([mode, label]) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => updateWhatsAppProviderField("twilio", "mode", mode)}
-                      className={`rounded-lg px-4 py-2 text-sm font-medium transition ${settings.whatsappProviders.twilio.mode === mode ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950" : "text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {settings.whatsappProviders.twilio.mode === "own" ? (
-                <div className="grid gap-5 md:grid-cols-2">
-                  {[
-                    ["accountSid", "Account SID", "text"],
-                    ["authToken", "Auth Token", "password"],
-                  ].map(([fieldKey, label, inputType]) => {
-                    const credentialKey = `twilio-${fieldKey}`;
-                    const configured = Boolean(settings.whatsappProviders.twilio[`${fieldKey}Configured`]);
-                    const replacing = Boolean(editingCredentials[credentialKey]);
-                    return (
-                      <div key={fieldKey}>
-                        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{label}</label>
-                        {configured && !replacing ? (
-                          <div className="flex min-h-12 items-center justify-between rounded-xl border border-slate-200 px-4 dark:border-slate-700">
-                            <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">Saved</span>
-                            <button type="button" onClick={() => startReplacingCredential(credentialKey)} className="text-sm font-semibold text-blue-700 dark:text-blue-300">Replace</button>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="relative">
-                              <input
-                                type={inputType === "password" && !visibleSecrets[credentialKey] ? "password" : "text"}
-                                value={settings.whatsappProviders.twilio[fieldKey] || ""}
-                                onChange={(event) => updateWhatsAppProviderField("twilio", fieldKey, event.target.value)}
-                                placeholder={fieldKey === "accountSid" ? "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" : "Enter auth token"}
-                                className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 pr-16 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                              />
-                              {inputType === "password" && (
-                                <button type="button" onClick={() => toggleSecretVisibility(credentialKey)} className="absolute inset-y-0 right-4 text-sm font-medium text-slate-600 dark:text-slate-300">
-                                  {visibleSecrets[credentialKey] ? "Hide" : "Show"}
-                                </button>
-                              )}
-                            </div>
-                            {configured && replacing && (
-                              <button type="button" onClick={() => cancelReplacingWhatsAppCredential("twilio", fieldKey, credentialKey)} className="mt-2 text-xs font-semibold text-slate-600 dark:text-slate-300">Cancel replacement</button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/60">
-                  {settings.whatsappProviders.twilio.subaccountSid ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/60">
+                {settings.whatsappProviders.twilio.subaccountSid ? (
+                  <div>
+                    <p className="font-medium text-emerald-700 dark:text-emerald-300">Business subaccount ready</p>
+                    <p className="mt-1 break-all text-sm text-slate-600 dark:text-slate-300">{settings.whatsappProviders.twilio.subaccountSid}</p>
+                    <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">Add the WhatsApp sender approved for this business below, save the settings, then verify the connection.</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="font-medium text-emerald-700 dark:text-emerald-300">Managed subaccount created</p>
-                      <p className="mt-1 break-all text-sm text-slate-600 dark:text-slate-300">{settings.whatsappProviders.twilio.subaccountSid}</p>
+                      <p className="font-medium text-slate-900 dark:text-white">Create your business subaccount</p>
+                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">InvoiceHub will create an isolated Twilio account for this business using the platform account configured by the Admin.</p>
                     </div>
-                  ) : (
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="font-medium text-slate-900 dark:text-white">Create an isolated account for this business</p>
-                        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                          InvoiceHub creates the subaccount. WhatsApp sender registration is completed separately through Twilio and Meta.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={createManagedTwilioSubaccount}
-                        disabled={creatingTwilioSubaccount || !twilioStatus?.managedSubaccountsAvailable}
-                        className="min-h-11 shrink-0 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950"
-                      >
-                        {creatingTwilioSubaccount ? "Creating..." : "Create subaccount"}
-                      </button>
-                    </div>
-                  )}
-                  {!twilioStatus?.managedSubaccountsAvailable && !settings.whatsappProviders.twilio.subaccountSid && (
-                    <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">Managed subaccounts must first be enabled by the InvoiceHub Admin.</p>
-                  )}
-                </div>
-              )}
+                    <button
+                      type="button"
+                      onClick={createManagedTwilioSubaccount}
+                      disabled={creatingTwilioSubaccount || !twilioStatus?.managedSubaccountsAvailable}
+                      className="min-h-11 shrink-0 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950"
+                    >
+                      {creatingTwilioSubaccount ? "Creating..." : "Create subaccount"}
+                    </button>
+                  </div>
+                )}
+                {!twilioStatus?.managedSubaccountsAvailable && !settings.whatsappProviders.twilio.subaccountSid ? (
+                  <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">The InvoiceHub Admin must configure and verify the parent Twilio account first.</p>
+                ) : null}
+              </div>
 
               <div className="grid gap-5 md:grid-cols-2">
                 <div>
@@ -2068,43 +2022,36 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Message status callback</label>
-                <input
-                  type="url"
-                  value={settings.whatsappProviders.twilio.statusCallbackUrl || ""}
-                  onChange={(event) => updateWhatsAppProviderField("twilio", "statusCallbackUrl", event.target.value)}
-                  placeholder="https://your-domain.com/api/notifications/whatsapp/twilio/status"
-                  className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                />
-              </div>
 
-              <div className="rounded-xl border border-slate-200 p-5 dark:border-slate-800">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">Approved Content templates</p>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Add Twilio Content SIDs for business-initiated messages sent outside WhatsApp&apos;s customer service window.</p>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  {[
-                    ["invoiceContentSid", "Invoice message"],
-                    ["reminderContentSid", "Payment reminder"],
-                    ["paymentContentSid", "Payment confirmation (text only)"],
-                    ["paymentReceiptContentSid", "Payment confirmation with PDF"],
-                    ["receiptRejectionContentSid", "Receipt rejection"],
-                    ["generalContentSid", "General and bulk message"],
-                  ].map(([fieldKey, label]) => (
-                    <div key={fieldKey}>
-                      <label className="mb-2 block text-xs font-medium text-slate-600 dark:text-slate-400">{label}</label>
-                      <input
-                        type="text"
-                        value={settings.whatsappProviders.twilio[fieldKey] || ""}
-                        onChange={(event) => updateWhatsAppProviderField("twilio", fieldKey, event.target.value)}
-                        placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                        className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                      />
-                    </div>
-                  ))}
+              <details className="rounded-xl border border-slate-200 dark:border-slate-800">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">Advanced messaging setup</p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">WhatsApp-approved templates for proactive messages.</p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${twilioTemplatesReady ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"}`}>
+                    {twilioTemplatesReady ? "Messaging ready" : configuredTwilioTemplateCount ? `${configuredTwilioTemplateCount} of ${TWILIO_TEMPLATE_FIELDS.length} templates` : "Templates required"}
+                  </span>
+                </summary>
+                <div className="border-t border-slate-200 px-5 py-5 dark:border-slate-800">
+                  <p className="text-sm text-slate-600 dark:text-slate-300">Add Content SIDs after the templates for this business have been approved by WhatsApp.</p>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    {TWILIO_TEMPLATE_FIELDS.map(([fieldKey, label]) => (
+                      <div key={fieldKey}>
+                        <label className="mb-2 block text-xs font-medium text-slate-600 dark:text-slate-400">{label}</label>
+                        <input
+                          type="text"
+                          value={settings.whatsappProviders.twilio[fieldKey] || ""}
+                          onChange={(event) => updateWhatsAppProviderField("twilio", fieldKey, event.target.value)}
+                          placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                          className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-4 text-xs leading-5 text-slate-500 dark:text-slate-400">For the PDF option, use a WhatsApp-approved Document template with variables 1 customer, 2 business, 3 invoice number, 4 amount, and 5 public PDF media URL.</p>
                 </div>
-                <p className="mt-4 text-xs leading-5 text-slate-500 dark:text-slate-400">For the PDF option, create a WhatsApp-approved Document template. Use variables 1 customer, 2 business, 3 invoice number, 4 amount, and 5 for the public PDF media URL.</p>
-              </div>
+              </details>
 
               <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50 p-5 lg:flex-row lg:items-end dark:border-slate-800 dark:bg-slate-950/60">
                 <div className="flex-1">
@@ -2118,7 +2065,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <button type="button" onClick={verifyTwilioConnection} disabled={verifyingTwilio} className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200">
-                  {verifyingTwilio ? "Verifying..." : "Verify account"}
+                  {verifyingTwilio ? "Verifying..." : "Verify subaccount"}
                 </button>
                 <button type="button" onClick={handleSendWhatsAppTest} disabled={testingWhatsApp} className="min-h-11 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white disabled:opacity-50 dark:bg-white dark:text-slate-950">
                   {testingWhatsApp ? "Sending..." : "Send test"}

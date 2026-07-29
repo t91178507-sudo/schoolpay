@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { FiX } from "react-icons/fi";
 import {
   EmptyState,
   InputField,
@@ -866,55 +867,90 @@ export default function Payments() {
       </SurfaceCard>
 
       {selectedTransaction ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
-          <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-slate-900">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-2 sm:p-4" role="dialog" aria-modal="true" aria-label="Payment details">
+          <div className="flex max-h-[calc(100vh-1rem)] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-slate-900 sm:max-h-[calc(100vh-2rem)]">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800 sm:px-6">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-                  Transaction details
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Transaction record
                 </p>
-                <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">
+                <h2 className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
                   Payment details
                 </h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  {formatDateTime(selectedTransaction.happenedAt)}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedTransaction(null)}
-                className="rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800"
+                aria-label="Close payment details"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               >
-                ×
+                <FiX className="text-lg" />
               </button>
             </div>
-            <div className="grid gap-4 px-6 py-6 sm:grid-cols-2">
-              {[
-                ["Transaction ID", selectedTransaction.transactionId],
-                ["Reference", selectedTransaction.reference || "-"],
-                ["Customer", selectedTransaction.customerName],
-                ["Phone", selectedTransaction.phone || "-"],
-                ["Amount", formatCurrency(selectedTransaction.amount)],
-                ["Status", formatPaymentStatus(selectedTransaction.status)],
-                ["Notification", formatNotificationStatus(selectedTransaction.notificationStatus)],
-                ["Provider", selectedTransaction.provider || selectedTransaction.sourceLabel || "-"],
-                ["Invoice number", selectedTransaction.invoiceNumber || "-"],
-                ["Channel", selectedTransaction.sourceLabel],
-                ["Created", formatDateTime(selectedTransaction.happenedAt)],
-                ["Balance due", selectedTransaction.balanceDue ? formatCurrency(selectedTransaction.balanceDue) : "N0"],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{label}</p>
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{value}</p>
-                  </div>
-                </div>
-              ))}
+
+            <div className="grid border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60 sm:grid-cols-3">
+              <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800 sm:border-b-0 sm:border-r sm:px-6">
+                <p className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">Amount paid</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-950 dark:text-white">{formatCurrency(selectedTransaction.amount)}</p>
+              </div>
+              <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800 sm:border-b-0 sm:border-r sm:px-6">
+                <p className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">Payment status</p>
+                <div className="mt-2"><StatusBadge tone={getStatusTone(selectedTransaction.status)}>{formatPaymentStatus(selectedTransaction.status)}</StatusBadge></div>
+              </div>
+              <div className="px-5 py-4 sm:px-6">
+                <p className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">Balance due</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-slate-950 dark:text-white">{selectedTransaction.balanceDue ? formatCurrency(selectedTransaction.balanceDue) : "N0"}</p>
+              </div>
             </div>
-            <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4 dark:border-slate-800">
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-2 sm:px-6 sm:py-3">
+              <div className="grid gap-x-10 sm:grid-cols-2">
+                <section>
+                  <h3 className="py-3 text-sm font-semibold text-slate-950 dark:text-white">Transaction</h3>
+                  <dl className="divide-y divide-slate-200 border-y border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+                    {[
+                      ["Transaction ID", selectedTransaction.transactionId],
+                      ["Reference", selectedTransaction.reference || "-"],
+                      ["Invoice number", selectedTransaction.invoiceNumber || "-"],
+                      ["Provider", selectedTransaction.provider || selectedTransaction.sourceLabel || "-"],
+                    ].map(([label, value]) => (
+                      <div key={label} className="grid grid-cols-[120px_minmax(0,1fr)] gap-4 py-3 text-sm">
+                        <dt className="text-slate-500 dark:text-slate-400">{label}</dt>
+                        <dd className="break-all text-right font-medium text-slate-900 dark:text-slate-100" title={String(value)}>{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+
+                <section>
+                  <h3 className="py-3 text-sm font-semibold text-slate-950 dark:text-white">Customer and delivery</h3>
+                  <dl className="divide-y divide-slate-200 border-y border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+                    {[
+                      ["Customer", selectedTransaction.customerName],
+                      ["Phone", selectedTransaction.phone || "-"],
+                      ["Channel", selectedTransaction.sourceLabel || "-"],
+                      ["Notification", formatNotificationStatus(selectedTransaction.notificationStatus)],
+                    ].map(([label, value]) => (
+                      <div key={label} className="grid grid-cols-[100px_minmax(0,1fr)] gap-4 py-3 text-sm">
+                        <dt className="text-slate-500 dark:text-slate-400">{label}</dt>
+                        <dd className="break-words text-right font-medium capitalize text-slate-900 dark:text-slate-100">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t border-slate-200 px-5 py-3 dark:border-slate-800 sm:px-6">
               <button
                 type="button"
                 onClick={() => setSelectedTransaction(null)}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
               >
-                OK
+                Close
               </button>
             </div>
           </div>

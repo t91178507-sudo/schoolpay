@@ -62,7 +62,7 @@ export const DEFAULT_WHATSAPP_PROVIDERS = Object.freeze({
   },
   twilio: {
     enabled: false,
-    mode: "own",
+    mode: "managed",
     accountSid: "",
     authToken: "",
     subaccountSid: "",
@@ -391,9 +391,8 @@ export function buildSettingsPayload(user = {}, platformSettings = {}) {
       ),
       twilio: {
         ...buildWhatsAppPayload("twilio", whatsappProviders.twilio, user, platformSettings),
-        managedSubaccountsAvailable: Boolean(
-          process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
-        ),
+        mode: "managed",
+        managedSubaccountsAvailable: resolveManagedTwilioPlatformConfig(platformSettings).configured,
       },
     },
   };
@@ -459,6 +458,13 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
   const normalizeWhatsAppProvider = (providerKey) => {
     const currentProvider = whatsappProviders[providerKey] || {};
     const existingProvider = existingWhatsAppProviders[providerKey] || {};
+    const managedTwilioFields = new Set([
+      "subaccountSid",
+      "subaccountAuthToken",
+      "accountFriendlyName",
+      "accountStatus",
+      "createdAt",
+    ]);
     const defaultProvider =
       providerKey === "whatsappWeb"
         ? buildDefaultWhatsAppWebProvider(existingUser)
@@ -477,6 +483,9 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
         continue;
       }
 
+      if (providerKey === "twilio" && managedTwilioFields.has(fieldKey)) {
+        continue;
+      }
       if (isWhatsAppSecretField(providerKey, fieldKey)) {
         const incoming = normalizeText(fieldValue);
         nextProvider[fieldKey] = incoming
@@ -549,7 +558,7 @@ export function sanitizeSettingsInput(body = {}, existingUser = {}) {
       whatsappWeb: normalizeWhatsAppProvider("whatsappWeb"),
       twilio: {
         ...normalizeWhatsAppProvider("twilio"),
-        mode: whatsappProviders.twilio?.mode === "managed" ? "managed" : "own",
+        mode: "managed",
       },
     },
   };
@@ -665,7 +674,7 @@ export async function resolveWhatsAppWebConfigForUser(db, user = {}) {
 
 export function resolveTwilioWhatsAppConfig(user = {}) {
   const provider = user.whatsappProviders?.twilio || {};
-  const mode = provider.mode === "managed" ? "managed" : "own";
+  const mode = "managed";
   const accountSid = mode === "managed"
     ? normalizeText(provider.subaccountSid)
     : decryptGatewayValue(provider, "accountSid");
@@ -696,4 +705,51 @@ export function encryptSettingsSecret(value) {
 
 export function decryptSettingsSecret(value) {
   return decryptValue(value);
+}
+
+export function resolveManagedTwilioPlatformConfig(platformSettings = {}) {
+  const saved = platformSettings.twilioManaged || {};
+  const savedAuthToken = decryptSettingsSecret(saved.authToken);
+  const savedApiKeySid = decryptSettingsSecret(saved.apiKeySid);
+  const savedApiKeySecret = decryptSettingsSecret(saved.apiKeySecret);
+  const savedCredentialType = normalizeText(saved.credentialType);
+  const credentialType = ["authToken", "apiKey"].includes(savedCredentialType)
+    ? savedCredentialType
+    : savedApiKeySid && savedApiKeySecret
+      ? "apiKey"
+      : savedAuthToken
+        ? "authToken"
+        : normalizeText(process.env.TWILIO_API_KEY_SID) &&
+            normalizeText(process.env.TWILIO_API_KEY_SECRET)
+          ? "apiKey"
+          : normalizeText(process.env.TWILIO_AUTH_TOKEN)
+            ? "authToken"
+            : "";
+  const accountSid =
+    decryptSettingsSecret(saved.accountSid) ||
+    normalizeText(process.env.TWILIO_ACCOUNT_SID);
+  const authToken = credentialType === "authToken"
+    ? savedAuthToken || normalizeText(process.env.TWILIO_AUTH_TOKEN)
+    : "";
+  const apiKeySid = credentialType === "apiKey"
+    ? savedApiKeySid || normalizeText(process.env.TWILIO_API_KEY_SID)
+    : "";
+  const apiKeySecret = credentialType === "apiKey"
+    ? savedApiKeySecret || normalizeText(process.env.TWILIO_API_KEY_SECRET)
+    : "";
+  const hasApiKey = Boolean(apiKeySid && apiKeySecret);
+
+  return {
+    accountSid,
+    authToken,
+    apiKeySid,
+    apiKeySecret,
+    credentialType,
+    configured: Boolean(
+      accountSid &&
+        (credentialType === "apiKey" ? hasApiKey : credentialType === "authToken" && authToken)
+    ),
+    verifiedAt: saved.verifiedAt || null,
+    updatedAt: saved.updatedAt || null,
+  };
 }

@@ -526,7 +526,7 @@ export default function PaymentPage() {
   const showBackButton = unpaidInvoices.length > 1;
   const customerName =
     activeInvoice.customer || activeInvoice.customerName || activeInvoice.student;
-  const invoiceCategory = activeInvoice.category || activeInvoice.class || "-";
+  const invoiceCategory = activeInvoice.category || activeInvoice.class || "";
   const invoiceDescription =
     activeInvoice.description || activeInvoice.category || activeInvoice.class || "-";
   const outstandingAmount = getOutstandingAmount(activeInvoice);
@@ -571,7 +571,7 @@ export default function PaymentPage() {
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-slate-900">
-          <div className="border-b border-slate-100 px-4 pb-4 pt-4 dark:border-slate-800 sm:px-8 sm:pb-7 sm:pt-8">
+          <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800 sm:px-8 sm:py-6">
             <p className="text-[12px] font-medium text-slate-500 uppercase tracking-wide">
               Amount to pay
             </p>
@@ -583,7 +583,7 @@ export default function PaymentPage() {
             </p>
           </div>
 
-          <div className="space-y-2.5 px-4 py-3 sm:px-8 sm:py-6 sm:space-y-4">
+          <div className="space-y-2 px-4 py-2.5 sm:px-8 sm:py-5 sm:space-y-3">
             {customer.businessLogo ? (
               <div className="mb-1 flex justify-center sm:mb-2">
                 <Image
@@ -601,7 +601,7 @@ export default function PaymentPage() {
               label="Invoice number"
               value={activeInvoice.invoiceNumber || "-"}
             />
-            <DetailRow label="Category" value={invoiceCategory} />
+            {invoiceCategory ? <DetailRow label="Category" value={invoiceCategory} /> : null}
             <DetailRow label="Description" value={invoiceDescription} />
             <DetailRow
               label="Due date"
@@ -611,35 +611,19 @@ export default function PaymentPage() {
                   : "-"
               }
             />
-            <div className="mt-3">
-              <a
-                href={`/api/invoices/by-token/${token}/pdf`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800"
-              >
-                Download invoice PDF
-              </a>
-            </div>
           </div>
 
           {receiptUploadEnabled || accountDetailsEnabled ? (
-            <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/60 sm:px-8 sm:py-6">
+            <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-950/60 sm:px-8 sm:py-5">
               <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-slate-600">
                 Bank transfer details
-              </p>
-              <div className="mt-2.5 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:mt-4 sm:p-4">
-                <p className="text-[13px] leading-5 text-slate-600 dark:text-slate-300">
-                  Open the payment details popup to view the bank name, account name, and account number.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setPaymentDetailsOpen(true)}
-                  className="mt-3 w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800"
-                >
-                  View payment details
-                </button>
-              </div>
+              </p>              <button
+                type="button"
+                onClick={() => setPaymentDetailsOpen(true)}
+                className="mt-2.5 w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 sm:mt-3"
+              >
+                View bank details
+              </button>
               {(customer.receiptUpload?.paymentInstructions ||
                 customer.accountDetails?.paymentInstructions) ? (
                 <p className="mt-2.5 text-[12px] leading-5 text-slate-500 sm:mt-3 sm:text-sm sm:leading-6">
@@ -673,7 +657,7 @@ export default function PaymentPage() {
           </div>
           )}
 
-          <div className="px-4 pb-4 pt-1.5 sm:px-8 sm:pb-8 sm:pt-2">
+          <div className="px-4 pb-3 pt-2 sm:px-8 sm:pb-6 sm:pt-2">
             {receiptUploadEnabled ? (
               <>
                 <button
@@ -962,8 +946,8 @@ function ReceiptField({
 function DetailRow({ label, value, align = "center", emphasis = "default", action = null }) {
   return (
     <div
-      className={`flex flex-col gap-0.5 md:flex-row md:justify-between md:gap-4 ${
-        align === "top" ? "md:items-start" : "md:items-center"
+      className={`flex items-start justify-between gap-4 ${
+        align === "top" ? "" : "sm:items-center"
       }`}
     >
       <span
@@ -977,9 +961,9 @@ function DetailRow({ label, value, align = "center", emphasis = "default", actio
       >
         {label}
       </span>
-      <div className="flex flex-col gap-2 md:items-end">
+      <div className="min-w-0 flex flex-col items-end gap-2">
         <span
-          className={`break-words text-[13px] font-medium text-slate-900 dark:text-slate-100 md:text-right sm:text-[14px] ${
+          className={`break-words text-[13px] font-medium text-slate-900 dark:text-slate-100 text-right sm:text-[14px] ${
             emphasis === "strong"
               ? "font-mono text-[0.98rem] font-bold tracking-[0.08em] text-emerald-950 dark:text-emerald-100 sm:text-[1.05rem]"
               : emphasis === "medium"

@@ -25,6 +25,11 @@ function formatCurrency(value) {
   return `N${Number(value || 0).toLocaleString()}`;
 }
 
+function getReceiptAmount(receipt) {
+  const extractedAmount = Number(receipt?.extracted?.amount || 0);
+  return extractedAmount > 0 ? extractedAmount : Number(receipt?.amount || 0);
+}
+
 function formatDate(value) {
   if (!value) return "-";
   const date = new Date(value);
@@ -398,7 +403,7 @@ function ReceiptRow({ receipt, onOpen }) {
         <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{receipt.transactionReference || receipt.extracted?.transactionReference || "No transaction reference"}</p>
       </div>
       <div>
-        <p className="text-sm font-semibold text-slate-950 dark:text-white">{formatCurrency(receipt.amount)}</p>
+        <p className="text-sm font-semibold text-slate-950 dark:text-white">{formatCurrency(getReceiptAmount(receipt))}</p>
       </div>
       <p className="text-sm text-slate-500 dark:text-slate-400">{formatDate(receipt.createdAt)}</p>
       <div>

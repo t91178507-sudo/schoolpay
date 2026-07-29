@@ -18,12 +18,17 @@ function buildTwilioError(data = {}, fallback = "Twilio request failed", status 
 async function twilioRequest({
   accountSid,
   authToken,
+  apiKeySid,
+  apiKeySecret,
   path,
   method = "GET",
   form,
 }) {
-  if (!accountSid || !authToken) {
-    const error = new Error("Twilio Account SID and Auth Token are required.");
+  const username = apiKeySid || accountSid;
+  const password = apiKeySecret || authToken;
+
+  if (!accountSid || !username || !password) {
+    const error = new Error("Twilio account credentials are required.");
     error.status = 422;
     error.code = "TWILIO_NOT_CONFIGURED";
     throw error;
@@ -32,7 +37,7 @@ async function twilioRequest({
   const response = await fetch(`${TWILIO_API_BASE}${path}`, {
     method,
     headers: {
-      Authorization: basicAuthorization(accountSid, authToken),
+      Authorization: basicAuthorization(username, password),
       ...(form ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
     },
     body: form ? new URLSearchParams(form) : undefined,
@@ -69,6 +74,8 @@ export async function verifyTwilioAccount(config = {}) {
   const account = await twilioRequest({
     accountSid: config.accountSid,
     authToken: config.authToken,
+    apiKeySid: config.apiKeySid,
+    apiKeySecret: config.apiKeySecret,
     path: `/Accounts/${encodeURIComponent(config.accountSid)}.json`,
   });
 
@@ -83,11 +90,15 @@ export async function verifyTwilioAccount(config = {}) {
 export async function createTwilioSubaccount({
   accountSid,
   authToken,
+  apiKeySid,
+  apiKeySecret,
   friendlyName,
 }) {
   return twilioRequest({
     accountSid,
     authToken,
+    apiKeySid,
+    apiKeySecret,
     path: "/Accounts.json",
     method: "POST",
     form: {
