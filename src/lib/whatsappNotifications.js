@@ -126,10 +126,7 @@ export async function deliverInvoiceMessage({
         : "Payment Link";
   const invoiceAmount = Number(invoice.amount || 0);
   const outstandingAmount = getOutstandingAmount(invoice);
-  const pendingBalance =
-    isReminder && outstandingAmount > 0 && outstandingAmount < invoiceAmount
-      ? outstandingAmount
-      : null;
+  const pendingBalance = isReminder ? outstandingAmount : null;
   const message = buildInvoiceMessage({
     businessLogo: invoice.businessLogo || owner?.businessLogo || "",
     businessName: invoice.businessName || owner?.businessName || "",
@@ -157,15 +154,31 @@ export async function deliverInvoiceMessage({
       ? getTwilioTemplate(twilioConfig, "reminderPdf")
       : "";
     const hasReminderPdfTemplate = Boolean(reminderMediaUrl && reminderPdfContentSid);
-    const contentVariables = {
-      1: customerName,
-      2: invoice.businessName || owner?.businessName || "InvoiceHub",
-      3: invoice.invoiceNumber || "Invoice",
-      4: `N${Number(pendingBalance || outstandingAmount || invoice.amount || 0).toLocaleString()}`,
-      5: invoice.description || invoice.category || invoice.class || "Invoice payment",
-      6: `${origin}/pay/${invoice.token}`,
-      ...(hasReminderPdfTemplate ? { 7: reminderMediaUrl } : {}),
-    };
+    const businessName = invoice.businessName || owner?.businessName || "InvoiceHub";
+    const formattedInvoiceAmount = `N${Number(invoice.amount || 0).toLocaleString()}`;
+    const formattedBalance = `N${Number(outstandingAmount || 0).toLocaleString()}`;
+    const description =
+      invoice.description || invoice.category || invoice.class || "Invoice payment";
+    const paymentLink = `${origin}/pay/${invoice.token}`;
+    const contentVariables = hasReminderPdfTemplate
+      ? {
+          1: customerName,
+          2: businessName,
+          3: invoice.invoiceNumber || "Invoice",
+          4: formattedInvoiceAmount,
+          5: formattedBalance,
+          6: description,
+          7: paymentLink,
+          8: reminderMediaUrl,
+        }
+      : {
+          1: customerName,
+          2: businessName,
+          3: invoice.invoiceNumber || "Invoice",
+          4: formattedBalance,
+          5: description,
+          6: paymentLink,
+        };
     const result = await sendTrackedTwilioWhatsAppMessage({
       db,
       user: owner,

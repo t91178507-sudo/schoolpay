@@ -2081,7 +2081,7 @@ export default function SettingsPage() {
                       </div>
                     ))}
                   </div>
-                  <p className="mt-4 text-xs leading-5 text-slate-500 dark:text-slate-400">For payment receipts, use a Document template with variables 1 customer, 2 business, 3 invoice number, 4 amount, and 5 PDF URL. For reminder PDFs, use variables 1 customer, 2 business, 3 invoice number, 4 balance, 5 description, 6 payment link, and 7 PDF URL.</p>
+                  <p className="mt-4 text-xs leading-5 text-slate-500 dark:text-slate-400">For payment receipts, use a Document template with variables 1 customer, 2 business, 3 invoice number, 4 amount, and 5 PDF URL. For reminder PDFs, use variables 1 customer, 2 business, 3 invoice number, 4 original amount, 5 balance pending, 6 description, 7 payment link, and 8 PDF URL.</p>
                 </div>
               </details>
 
