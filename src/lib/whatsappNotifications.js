@@ -256,13 +256,15 @@ export async function deliverPaymentConfirmation({
     const paidAmount = amount ?? invoice.paidAmount ?? invoice.amount ?? 0;
     const receiptMediaUrl = buildPaymentReceiptMediaUrl(invoice, twilioConfig);
     const receiptContentSid = getTwilioTemplate(twilioConfig, "paymentReceipt");
-    const contentSid =
-      receiptMediaUrl && receiptContentSid
-        ? receiptContentSid
+    const hasReceiptTemplate = Boolean(receiptMediaUrl && receiptContentSid);
+    const contentSid = hasReceiptTemplate
+      ? receiptContentSid
+      : receiptMediaUrl
+        ? ""
         : getTwilioTemplate(twilioConfig, "payment");
     const businessName = invoice.businessName || owner?.businessName || "InvoiceHub";
     const contentVariables =
-      receiptMediaUrl && receiptContentSid
+      hasReceiptTemplate
         ? {
             1: customerName,
             2: businessName,
@@ -287,6 +289,7 @@ export async function deliverPaymentConfirmation({
         text: message,
         contentSid,
         contentVariables,
+        mediaUrl: receiptMediaUrl && !hasReceiptTemplate ? receiptMediaUrl : "",
       },
     });
     await markInvoiceNotificationPrepared(db, invoice._id, result.status || "queued");
@@ -295,8 +298,8 @@ export async function deliverPaymentConfirmation({
       status: result.status || "queued",
       provider: "twilio",
       messageId: result.messageId,
-      attachmentSent: Boolean(receiptMediaUrl && receiptContentSid),
-      attachmentUrl: receiptMediaUrl && receiptContentSid ? receiptMediaUrl : "",
+      attachmentSent: Boolean(receiptMediaUrl),
+      attachmentUrl: receiptMediaUrl,
     };
   }
 
@@ -314,7 +317,6 @@ export async function deliverPaymentConfirmation({
 
   if (isWhatsAppWebConfigured(whatsAppWebConfig)) {
     try {
-      await sendWhatsAppWebMessage(whatsAppWebConfig, { phone, text: message });
       const attachment = buildPaymentReceiptAttachment({
         invoice,
         owner,
@@ -325,12 +327,13 @@ export async function deliverPaymentConfirmation({
       try {
         await sendWhatsAppWebDocument(whatsAppWebConfig, {
           phone,
-          caption: "Payment receipt attached.",
+          caption: message,
           attachment,
         });
         attachmentSent = true;
       } catch (attachmentError) {
         console.error("PAYMENT RECEIPT PDF SEND ERROR:", attachmentError);
+        await sendWhatsAppWebMessage(whatsAppWebConfig, { phone, text: message });
       }
 
       await markInvoiceNotificationPrepared(db, invoice._id, "sent");
