@@ -235,6 +235,7 @@ export function getTwilioTemplate(config = {}, type = "general") {
   const key = {
     invoice: "invoiceContentSid",
     reminder: "reminderContentSid",
+    reminderPdf: "reminderPdfContentSid",
     payment: "paymentContentSid",
     paymentReceipt: "paymentReceiptContentSid",
     receiptRejection: "receiptRejectionContentSid",
