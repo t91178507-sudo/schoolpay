@@ -149,28 +149,39 @@ export async function deliverInvoiceMessage({
       throw new Error("Twilio WhatsApp is selected but its account or sender is not configured.");
     }
     const templateType = isReminder ? "reminder" : "invoice";
-    const reminderMediaUrl = isReminder ? buildInvoicePdfMediaUrl(invoice, origin) : "";
-    const reminderPdfContentSid = isReminder
-      ? getTwilioTemplate(twilioConfig, "reminderPdf")
-      : "";
-    const hasReminderPdfTemplate = Boolean(reminderMediaUrl && reminderPdfContentSid);
+    const documentMediaUrl = buildInvoicePdfMediaUrl(invoice, origin);
+    const documentContentSid = getTwilioTemplate(
+      twilioConfig,
+      isReminder ? "reminderPdf" : "invoicePdf"
+    );
+    const hasDocumentTemplate = Boolean(documentMediaUrl && documentContentSid);
     const businessName = invoice.businessName || owner?.businessName || "InvoiceHub";
     const formattedInvoiceAmount = `N${Number(invoice.amount || 0).toLocaleString()}`;
     const formattedBalance = `N${Number(outstandingAmount || 0).toLocaleString()}`;
     const description =
       invoice.description || invoice.category || invoice.class || "Invoice payment";
     const paymentLink = `${origin}/pay/${invoice.token}`;
-    const contentVariables = hasReminderPdfTemplate
-      ? {
-          1: customerName,
-          2: businessName,
-          3: invoice.invoiceNumber || "Invoice",
-          4: formattedInvoiceAmount,
-          5: formattedBalance,
-          6: description,
-          7: paymentLink,
-          8: reminderMediaUrl,
-        }
+    const contentVariables = hasDocumentTemplate
+      ? isReminder
+        ? {
+            1: customerName,
+            2: businessName,
+            3: invoice.invoiceNumber || "Invoice",
+            4: formattedInvoiceAmount,
+            5: formattedBalance,
+            6: description,
+            7: paymentLink,
+            8: documentMediaUrl,
+          }
+        : {
+            1: customerName,
+            2: businessName,
+            3: invoice.invoiceNumber || "Invoice",
+            4: formattedInvoiceAmount,
+            5: description,
+            6: paymentLink,
+            7: documentMediaUrl,
+          }
       : {
           1: customerName,
           2: businessName,
@@ -188,13 +199,13 @@ export async function deliverInvoiceMessage({
       message: {
         phone,
         text: message,
-        contentSid: hasReminderPdfTemplate
-          ? reminderPdfContentSid
-          : reminderMediaUrl
+        contentSid: hasDocumentTemplate
+          ? documentContentSid
+          : documentMediaUrl
             ? ""
             : getTwilioTemplate(twilioConfig, templateType),
         contentVariables,
-        mediaUrl: reminderMediaUrl && !hasReminderPdfTemplate ? reminderMediaUrl : "",
+        mediaUrl: documentMediaUrl && !hasDocumentTemplate ? documentMediaUrl : "",
       },
     });
     await markInvoiceNotificationPrepared(db, invoice._id, result.status || "queued");
@@ -218,30 +229,21 @@ export async function deliverInvoiceMessage({
       const attachment = buildInvoiceAttachment({ invoice, owner, origin });
       let attachmentSent = false;
 
-      if (isReminder) {
-        try {
-          await sendWhatsAppWebDocument(whatsAppWebConfig, {
-            phone,
-            caption: message,
-            attachment,
-          });
-          attachmentSent = true;
-        } catch (attachmentError) {
-          console.error("WHATSAPP REMINDER PDF SEND ERROR:", attachmentError);
-          await sendWhatsAppWebMessage(whatsAppWebConfig, { phone, text: message });
-        }
-      } else {
+      try {
+        await sendWhatsAppWebDocument(whatsAppWebConfig, {
+          phone,
+          caption: message,
+          attachment,
+        });
+        attachmentSent = true;
+      } catch (attachmentError) {
+        console.error(
+          isReminder
+            ? "WHATSAPP REMINDER PDF SEND ERROR:"
+            : "WHATSAPP INVOICE PDF SEND ERROR:",
+          attachmentError
+        );
         await sendWhatsAppWebMessage(whatsAppWebConfig, { phone, text: message });
-        try {
-          await sendWhatsAppWebDocument(whatsAppWebConfig, {
-            phone,
-            caption: "Invoice PDF attached.",
-            attachment,
-          });
-          attachmentSent = true;
-        } catch (attachmentError) {
-          console.error("WHATSAPP INVOICE PDF SEND ERROR:", attachmentError);
-        }
       }
 
       await markInvoiceNotificationPrepared(db, invoice._id, "sent");

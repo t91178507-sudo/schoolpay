@@ -234,6 +234,7 @@ export function validateTwilioSignature({
 export function getTwilioTemplate(config = {}, type = "general") {
   const key = {
     invoice: "invoiceContentSid",
+    invoicePdf: "invoicePdfContentSid",
     reminder: "reminderContentSid",
     reminderPdf: "reminderPdfContentSid",
     payment: "paymentContentSid",

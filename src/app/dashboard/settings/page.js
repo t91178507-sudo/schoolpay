@@ -100,7 +100,8 @@ const WHATSAPP_PROVIDERS = [
 ];
 
 const TWILIO_TEMPLATE_FIELDS = [
-  ["invoiceContentSid", "Invoice message"],
+  ["invoiceContentSid", "Invoice message (text only)"],
+  ["invoicePdfContentSid", "Invoice message with PDF"],
   ["reminderContentSid", "Payment reminder (text only)"],
   ["reminderPdfContentSid", "Payment reminder with PDF"],
   ["paymentContentSid", "Payment confirmation (text only)"],
@@ -188,6 +189,7 @@ const EMPTY_SETTINGS = {
       messagingServiceSid: "",
       statusCallbackUrl: "",
       invoiceContentSid: "",
+      invoicePdfContentSid: "",
       reminderContentSid: "",
       reminderPdfContentSid: "",
       paymentContentSid: "",
@@ -2081,7 +2083,7 @@ export default function SettingsPage() {
                       </div>
                     ))}
                   </div>
-                  <p className="mt-4 text-xs leading-5 text-slate-500 dark:text-slate-400">For payment receipts, use a Document template with variables 1 customer, 2 business, 3 invoice number, 4 amount, and 5 PDF URL. For reminder PDFs, use variables 1 customer, 2 business, 3 invoice number, 4 original amount, 5 balance pending, 6 description, 7 payment link, and 8 PDF URL.</p>
+                  <p className="mt-4 text-xs leading-5 text-slate-500 dark:text-slate-400">For invoice PDFs, use variables 1 customer, 2 business, 3 invoice number, 4 amount, 5 description, 6 payment link, and 7 PDF URL. For reminder PDFs, add 5 balance pending and use 8 for the PDF URL. Payment receipt PDFs use variables 1 customer, 2 business, 3 invoice number, 4 amount, and 5 PDF URL.</p>
                 </div>
               </details>
 
