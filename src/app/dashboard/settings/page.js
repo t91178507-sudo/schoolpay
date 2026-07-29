@@ -274,6 +274,7 @@ export default function SettingsPage() {
     WHATSAPP_PROVIDERS[0];
 
   const applyResolvedWhatsAppWebState = useCallback((data = {}) => {
+    if (data.provider && data.provider !== "whatsappWeb") return;
     setWhatsAppWebStatus(data.status || null);
     setWhatsAppWebLogs(Array.isArray(data.logs) ? data.logs : []);
 

@@ -2,7 +2,6 @@ import { requireAuth } from "../../../../../../lib/auth";
 import { connectDB } from "../../../../../../lib/mongodb";
 import {
   findUserById,
-  resolveTwilioWhatsAppConfig,
   resolveWhatsAppWebConfigForUser,
 } from "../../../../../../lib/paymentGatewaySettings";
 import {
@@ -14,7 +13,6 @@ import {
   isLocalWhatsAppBridgeUrl,
   requestWhatsAppWebPairingCode,
 } from "../../../../../../lib/whatsappWebBridge";
-import { isTwilioWhatsAppConfigured } from "../../../../../../lib/twilioWhatsApp";
 
 function buildLocalFallbackConfig(config = {}) {
   return {
@@ -66,29 +64,6 @@ export async function GET(req) {
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
-    if (user.defaultWhatsAppProvider === "twilio") {
-      const twilioConfig = resolveTwilioWhatsAppConfig(user);
-      const configured = isTwilioWhatsAppConfigured(twilioConfig);
-      return Response.json({
-        success: configured,
-        bridgeReachable: configured,
-        provider: "twilio",
-        status: {
-          status: configured ? "ready" : "not_configured",
-          connectedNumber: twilioConfig.whatsappNumber || "",
-          sessionName: twilioConfig.mode === "managed" ? "Managed Twilio subaccount" : "Twilio account",
-          qrAvailable: false,
-          lastError: configured ? "" : "Complete Twilio account and sender setup.",
-          lastUpdatedAt: new Date().toISOString(),
-        },
-        logs: [],
-        resolvedConfig: {
-          provider: "twilio",
-          senderPhoneNumber: twilioConfig.whatsappNumber || "",
-          accountConfigured: Boolean(twilioConfig.accountSid && twilioConfig.authToken),
-        },
-      });
-    }
 
     const config = await resolveWhatsAppWebConfigForUser(db, user);
 
@@ -129,11 +104,13 @@ export async function GET(req) {
 
       return Response.json({
         success: true,
+        provider: "whatsappWeb",
         ...snapshot,
       });
     } catch (bridgeError) {
       return Response.json({
         success: false,
+        provider: "whatsappWeb",
         bridgeReachable: false,
         status: {
           status: "offline",
@@ -179,29 +156,6 @@ export async function POST(req) {
       return Response.json({ error: "Phone number is required" }, { status: 400 });
     }
 
-    if (user.defaultWhatsAppProvider === "twilio") {
-      const twilioConfig = resolveTwilioWhatsAppConfig(user);
-      const configured = isTwilioWhatsAppConfigured(twilioConfig);
-      return Response.json({
-        success: configured,
-        bridgeReachable: configured,
-        provider: "twilio",
-        status: {
-          status: configured ? "ready" : "not_configured",
-          connectedNumber: twilioConfig.whatsappNumber || "",
-          sessionName: twilioConfig.mode === "managed" ? "Managed Twilio subaccount" : "Twilio account",
-          qrAvailable: false,
-          lastError: configured ? "" : "Complete Twilio account and sender setup.",
-          lastUpdatedAt: new Date().toISOString(),
-        },
-        logs: [],
-        resolvedConfig: {
-          provider: "twilio",
-          senderPhoneNumber: twilioConfig.whatsappNumber || "",
-          accountConfigured: Boolean(twilioConfig.accountSid && twilioConfig.authToken),
-        },
-      });
-    }
 
     const config = await resolveWhatsAppWebConfigForUser(db, user);
 
