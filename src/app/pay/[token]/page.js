@@ -68,6 +68,7 @@ export default function PaymentPage() {
     phoneNumber: "",
   });
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [receiptUploadProgress, setReceiptUploadProgress] = useState(0);
   const [receiptSubmitted, setReceiptSubmitted] = useState(false);
   const [sdkReady, setSdkReady] = useState(
     () => typeof window !== "undefined" && Boolean(window.MonnifySDK)
@@ -80,6 +81,7 @@ export default function PaymentPage() {
     setPayAmount(getOutstandingAmount(invoice));
     setPayazaAccount(null);
     setReceiptFormOpen(false);
+    setReceiptUploadProgress(0);
     setReceiptSubmitted(false);
   };
 
@@ -370,6 +372,7 @@ export default function PaymentPage() {
     }
 
     setUploadingReceipt(true);
+    setReceiptUploadProgress(1);
 
     try {
       const body = new FormData();
@@ -377,19 +380,53 @@ export default function PaymentPage() {
       body.append("receipt", receiptFile);
       body.append("phoneNumber", receiptFields.phoneNumber);
 
-      const res = await fetch(`/api/receipts/by-token/${token}`, {
-        method: "POST",
-        body,
-      });
-      const data = await res.json().catch(() => ({}));
+      const { status, data } = await new Promise((resolve, reject) => {
+        const request = new XMLHttpRequest();
+        let processingTimer;
 
-      if (!res.ok) {
+        request.open("POST", `/api/receipts/by-token/${token}`);
+        request.upload.onprogress = (progressEvent) => {
+          if (!progressEvent.lengthComputable) return;
+
+          const uploaded = progressEvent.loaded / progressEvent.total;
+          setReceiptUploadProgress(Math.max(2, Math.round(uploaded * 68)));
+        };
+        request.upload.onload = () => {
+          setReceiptUploadProgress(72);
+          processingTimer = window.setInterval(() => {
+            setReceiptUploadProgress((current) =>
+              current >= 95 ? current : current + 1
+            );
+          }, 250);
+        };
+        request.onerror = () => {
+          window.clearInterval(processingTimer);
+          reject(new Error("Unable to upload receipt"));
+        };
+        request.onload = () => {
+          window.clearInterval(processingTimer);
+          let responseData = {};
+
+          try {
+            responseData = JSON.parse(request.responseText || "{}");
+          } catch {
+            responseData = {};
+          }
+
+          resolve({ status: request.status, data: responseData });
+        };
+        request.send(body);
+      });
+
+      if (status < 200 || status >= 300) {
         throw new Error(data.error || "Unable to upload receipt");
       }
 
+      setReceiptUploadProgress(100);
       setReceiptSubmitted(true);
     } catch (uploadError) {
       toast("error", uploadError.message || "Unable to upload receipt");
+      setReceiptUploadProgress(0);
     } finally {
       setUploadingReceipt(false);
     }
@@ -742,6 +779,7 @@ export default function PaymentPage() {
           receiptFile={receiptFile}
           setReceiptFile={setReceiptFile}
           uploading={uploadingReceipt}
+          uploadProgress={receiptUploadProgress}
           submitted={receiptSubmitted}
           onClose={() => setReceiptFormOpen(false)}
           onSubmit={submitReceipt}
@@ -835,6 +873,7 @@ function ReceiptUploadModal({
   receiptFile,
   setReceiptFile,
   uploading,
+  uploadProgress,
   submitted,
   onClose,
   onSubmit,
@@ -916,8 +955,32 @@ function ReceiptUploadModal({
           disabled={uploading || !receiptFile}
           className="mt-6 w-full rounded-xl bg-slate-900 py-3 text-sm font-medium text-white disabled:bg-slate-300"
         >
-          {uploading ? "Submitting..." : "Submit receipt"}
+          {uploading ? `Loading ${uploadProgress}%` : "Submit receipt"}
         </button>
+        {uploading && (
+          <div className="mt-3" aria-live="polite">
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+              <span>
+                {uploadProgress < 72
+                  ? "Loading receipt"
+                  : "Reading payment details"}
+              </span>
+              <span>{uploadProgress}%</span>
+            </div>
+            <div
+              className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
+              role="progressbar"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow={uploadProgress}
+            >
+              <div
+                className="h-full rounded-full bg-emerald-500 transition-[width] duration-200"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
       </form>
     </div>
   );

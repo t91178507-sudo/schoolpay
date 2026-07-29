@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FiX } from "react-icons/fi";
+import { FiEye, FiX } from "react-icons/fi";
 import {
   EmptyState,
   InputField,
@@ -717,34 +717,46 @@ export default function Payments() {
       </SurfaceCard>
 
       <SurfaceCard className="overflow-hidden border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="border-b border-slate-200 bg-slate-50 px-5 py-5 dark:border-slate-800 dark:bg-slate-950/60 sm:px-6">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div className="border-b border-slate-200 px-5 py-5 dark:border-slate-800 sm:px-6">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
                 Collection ledger
               </p>
-              <h2 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
+              <h2 className="mt-1.5 text-xl font-semibold text-slate-950 dark:text-white">
                 Payment transactions
               </h2>
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                {filteredRows.length} record{filteredRows.length === 1 ? "" : "s"} visible
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                A complete record of received payments and customer notifications.
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-950">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Collected</p>
-                <p className="mt-2 text-lg font-semibold text-slate-950 dark:text-white">{formatCurrency(totalCollected)}</p>
+            <dl className="grid min-w-full grid-cols-3 divide-x divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950/70 xl:min-w-[32rem]">
+              <div className="px-4 py-3.5">
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                  Collected
+                </dt>
+                <dd className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
+                  {formatCurrency(totalCollected)}
+                </dd>
               </div>
-              <div className="rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-950">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Notifications</p>
-                <p className="mt-2 text-lg font-semibold text-slate-950 dark:text-white">{sentNotifications}</p>
+              <div className="px-4 py-3.5">
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                  Notifications sent
+                </dt>
+                <dd className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
+                  {sentNotifications}
+                </dd>
               </div>
-              <div className="rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-950">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Pending</p>
-                <p className="mt-2 text-lg font-semibold text-slate-950 dark:text-white">{pendingCount}</p>
+              <div className="px-4 py-3.5">
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                  Pending
+                </dt>
+                <dd className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
+                  {pendingCount}
+                </dd>
               </div>
-            </div>
+            </dl>
           </div>
         </div>
 
@@ -760,76 +772,90 @@ export default function Payments() {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="min-w-full border-separate border-spacing-0 text-sm">
-                <thead className="bg-slate-50 text-left text-xs uppercase tracking-[0.16em] text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+              <table className="min-w-[980px] table-fixed border-separate border-spacing-0 text-sm xl:min-w-full">
+                <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 dark:bg-slate-950/70 dark:text-slate-400">
                   <tr>
-                    <th className="w-[18%] px-5 py-3.5">Transaction</th>
-                    <th className="w-[18%] px-5 py-3.5">{customerLabels.singularTitle}</th>
-                    <th className="w-[22%] px-5 py-3.5">Description</th>
-                    <th className="w-[14%] px-5 py-3.5">Channel</th>
-                    <th className="w-[10%] px-5 py-3.5 text-right">Amount</th>
-                    <th className="w-[10%] px-5 py-3.5">Date</th>
-                    <th className="w-[8%] px-5 py-3.5">Action</th>
+                    <th className="w-[19%] px-5 py-3.5">Transaction</th>
+                    <th className="w-[17%] px-5 py-3.5">{customerLabels.singularTitle}</th>
+                    <th className="w-[22%] px-5 py-3.5">Payment details</th>
+                    <th className="w-[15%] px-5 py-3.5">Source</th>
+                    <th className="w-[11%] px-5 py-3.5 text-right">Amount</th>
+                    <th className="w-[10%] px-5 py-3.5">Received</th>
+                    <th className="w-[6%] px-5 py-3.5 text-center">Details</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
                   {filteredRows.map((row) => (
-                    <tr key={row.id} className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-950/50">
-                      <td className="px-5 py-4 align-top">
-                        <p className="truncate font-semibold text-slate-900 dark:text-white" title={row.transactionId}>
+                    <tr key={row.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-950/40">
+                      <td className="px-5 py-4 align-middle">
+                        <p className="truncate font-mono text-xs font-semibold text-slate-900 dark:text-white" title={row.transactionId}>
                           {row.transactionId}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                          {formatPaymentStatus(row.status)} • {row.sourceLabel}
-                        </p>
+                        <div className="mt-2">
+                          <StatusBadge tone={getStatusTone(row.status)}>
+                            {formatPaymentStatus(row.status)}
+                          </StatusBadge>
+                        </div>
                       </td>
 
-                      <td className="px-5 py-4 align-top">
+                      <td className="px-5 py-4 align-middle">
                         <p className="truncate font-semibold text-slate-900 dark:text-white" title={row.customerName}>
                           {row.customerName}
                         </p>
                         <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
-                          {row.phone || "No phone"}
+                          {row.phone || "No phone number"}
                         </p>
                       </td>
 
-                      <td className="px-5 py-4 align-top">
-                        <p className="truncate text-sm text-slate-700 dark:text-slate-200" title={row.description}>
+                      <td className="px-5 py-4 align-middle">
+                        <p className="truncate font-medium text-slate-800 dark:text-slate-200" title={row.description}>
                           {row.description || "Invoice payment"}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                          Invoice {row.invoiceNumber || "-"}
+                        <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+                          {row.invoiceNumber ? `Invoice ${row.invoiceNumber}` : "No invoice number"}
                         </p>
                       </td>
 
-                      <td className="px-5 py-4 align-top">
-                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                      <td className="px-5 py-4 align-middle">
+                        <p className="truncate font-semibold text-slate-900 dark:text-white">
                           {row.provider || row.sourceLabel || "-"}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                          {row.notificationStatus ? formatNotificationStatus(row.notificationStatus) : "No status"}
-                        </p>
+                        <div className="mt-2">
+                          <StatusBadge tone={getNotificationTone(row.notificationStatus)}>
+                            {row.notificationStatus
+                              ? `Message ${formatNotificationStatus(row.notificationStatus).toLowerCase()}`
+                              : "No message status"}
+                          </StatusBadge>
+                        </div>
                       </td>
 
-                      <td className="px-5 py-4 text-right align-top">
-                        <p className="whitespace-nowrap font-semibold text-slate-900 dark:text-white">
+                      <td className="px-5 py-4 text-right align-middle">
+                        <p className="whitespace-nowrap text-base font-semibold text-slate-950 dark:text-white">
                           {formatCurrency(row.amount)}
                         </p>
                       </td>
 
-                      <td className="px-5 py-4 align-top">
-                        <p className="text-sm text-slate-700 dark:text-slate-300">
-                          {formatDateTime(row.happenedAt)}
+                      <td className="px-5 py-4 align-middle">
+                        <p className="whitespace-nowrap font-medium text-slate-800 dark:text-slate-200">
+                          {new Date(row.happenedAt).toLocaleDateString()}
+                        </p>
+                        <p className="mt-1 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
+                          {new Date(row.happenedAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                         </p>
                       </td>
 
-                      <td className="px-5 py-4 align-top">
+                      <td className="px-5 py-4 text-center align-middle">
                         <button
                           type="button"
                           onClick={() => setSelectedTransaction(row)}
-                          className="rounded-lg border border-slate-200 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800 dark:border-slate-700"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                          aria-label={`View transaction ${row.transactionId}`}
+                          title="View transaction"
                         >
-                          View
+                          <FiEye aria-hidden="true" />
                         </button>
                       </td>
                     </tr>
@@ -838,29 +864,8 @@ export default function Payments() {
               </table>
             </div>
 
-            <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-              <p>
-                Showing <span className="font-semibold text-slate-900 dark:text-white">{filteredRows.length}</span> transaction{filteredRows.length === 1 ? "" : "s"}
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-500 transition disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400"
-                >
-                  Prev
-                </button>
-                <span className="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-full bg-blue-600 px-3 text-xs font-semibold text-white">
-                  1
-                </span>
-                <button
-                  type="button"
-                  disabled
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-500 transition disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400"
-                >
-                  Next
-                </button>
-              </div>
+            <div className="border-t border-slate-200 bg-slate-50 px-5 py-3.5 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-400 sm:px-6">
+              Showing <span className="font-semibold text-slate-900 dark:text-white">{filteredRows.length}</span> transaction{filteredRows.length === 1 ? "" : "s"}
             </div>
           </>
         )}

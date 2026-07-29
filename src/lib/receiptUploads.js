@@ -437,40 +437,59 @@ async function readPdfText(buffer) {
   }
 }
 
+const OCR_WORKER_PROMISE_KEY = "__invoiceHubReceiptOcrWorkerPromise";
+const OCR_QUEUE_KEY = "__invoiceHubReceiptOcrQueue";
+
+async function getReceiptOcrWorker() {
+  if (!globalThis[OCR_WORKER_PROMISE_KEY]) {
+    globalThis[OCR_WORKER_PROMISE_KEY] = (async () => {
+      const { createWorker } = await import("tesseract.js");
+      const englishLangPath = path.join(
+        process.cwd(),
+        "node_modules",
+        "@tesseract.js-data",
+        "eng",
+        "4.0.0"
+      );
+
+      const worker = await createWorker("eng", undefined, {
+        langPath: englishLangPath,
+        gzip: true,
+        cacheMethod: "readOnly",
+        logger: () => {},
+      });
+      await worker.setParameters({
+        preserve_interword_spaces: "1",
+        tessedit_char_blacklist: "|",
+      });
+
+      return worker;
+    })().catch((error) => {
+      globalThis[OCR_WORKER_PROMISE_KEY] = null;
+      throw error;
+    });
+  }
+
+  return globalThis[OCR_WORKER_PROMISE_KEY];
+}
+
 async function readImageTextWithOcr(buffer) {
-  let worker;
-
-  try {
-    const { createWorker } = await import("tesseract.js");
-    const englishLangPath = path.join(
-      process.cwd(),
-      "node_modules",
-      "@tesseract.js-data",
-      "eng",
-      "4.0.0"
-    );
-
-    worker = await createWorker("eng", undefined, {
-      langPath: englishLangPath,
-      gzip: true,
-      cacheMethod: "readOnly",
-      logger: () => {},
-    });
-    await worker.setParameters({
-      preserve_interword_spaces: "1",
-      tessedit_char_blacklist: "|",
-    });
-
+  const recognize = async () => {
+    const worker = await getReceiptOcrWorker();
     const result = await worker.recognize(buffer);
     return normalizeReceiptText(result?.data?.text || "");
+  };
+  const previous = globalThis[OCR_QUEUE_KEY] || Promise.resolve();
+  const current = previous.then(recognize, recognize);
+  globalThis[OCR_QUEUE_KEY] = current.catch(() => {});
+
+  try {
+    return await current;
   } catch (error) {
     console.error("RECEIPT OCR ERROR:", error);
     return "";
-  } finally {
-    await worker?.terminate?.();
   }
 }
-
 export async function analyzeReceiptFile(buffer, mimeType, invoice = {}) {
   let text = "";
   let ocrText = "";
