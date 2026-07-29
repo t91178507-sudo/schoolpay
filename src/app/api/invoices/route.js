@@ -13,23 +13,22 @@ function isSchoolBusiness(user = {}) {
 }
 
 function normalizeInvoiceForBusiness(body = {}, user = {}) {
-  if (isSchoolBusiness(user)) {
-    return body;
-  }
-
-  const firstItem = Array.isArray(body.items) ? body.items[0] || {} : {};
-  const amount = Number(body.amount || body.subtotal || firstItem.unitPrice || 0);
+  const submittedItems = sanitizeInvoiceItems(body.items || []);
+  const firstItem = submittedItems[0] || {};
   const description =
     String(body.description || firstItem.description || "Invoice payment").trim() ||
     "Invoice payment";
-  const items = sanitizeInvoiceItems([
-    {
-      ...firstItem,
-      description,
-      quantity: 1,
-      unitPrice: amount,
-    },
-  ]);
+  const fallbackAmount = Number(body.amount || body.subtotal || 0);
+  const items =
+    submittedItems.length > 0
+      ? submittedItems
+      : sanitizeInvoiceItems([
+          {
+            description,
+            quantity: 1,
+            unitPrice: fallbackAmount,
+          },
+        ]);
   const total = calculateInvoiceTotal(items);
 
   return {

@@ -74,20 +74,6 @@ function formatMessageDate(date = new Date()) {
   );
 }
 
-function formatLineItems(items = []) {
-  const sanitized = sanitizeInvoiceItems(items);
-
-  if (sanitized.length === 0) {
-    return "";
-  }
-
-  return sanitized
-    .map(
-      (item, index) =>
-        `${index + 1}. ${item.description} x${item.quantity} - ${formatCurrency(item.lineTotal)}`
-    )
-    .join("\n");
-}
 
 function formatLogoLine(businessLogo = "") {
   if (typeof businessLogo === "string" && /^https?:\/\//i.test(businessLogo)) {
@@ -106,13 +92,11 @@ export function buildInvoiceMessage({
   amount,
   pendingBalance,
   description,
-  items = [],
   paymentLink,
   paymentLinkLabel = "Payment Link",
   date = new Date(),
   isReminder = false,
 }) {
-  const lines = formatLineItems(items);
   const reminderLine = isReminder ? "\nPayment Reminder\n" : "";
   const normalizedPendingBalance = Number(pendingBalance);
   const pendingBalanceLine =
@@ -127,7 +111,6 @@ ${customerLabel}: ${customerName}
 Amount: ${formatCurrency(amount)}${pendingBalanceLine}
 Description: ${description || "Invoice payment"}
 Date: ${formatMessageDate(date)}
-${lines ? `\nItems:\n${lines}\n` : ""}
 ${paymentLinkLabel}:
 ${paymentLink}`;
 }

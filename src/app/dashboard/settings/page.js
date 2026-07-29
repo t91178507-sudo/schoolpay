@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import QRCode from "qrcode";
-import { FiChevronDown } from "react-icons/fi";
+import { FiChevronDown, FiLock } from "react-icons/fi";
 import { useConfirm } from "../../../components/AppFeedback";
 import { authFetch } from "../../../lib/authFetch";
 import {
@@ -546,6 +546,12 @@ export default function SettingsPage() {
   };
 
   const openSetupSection = (item) => {
+    if (item.requiresVerification && session.businessVerified !== true) {
+      setSelectedSetupSection("");
+      setError("Verify your business to access payment and WhatsApp settings.");
+      return;
+    }
+
     setSelectedSetupSection(item.sectionKey);
 
     if (item.sectionKey === "businessProfile") {
@@ -712,7 +718,17 @@ export default function SettingsPage() {
       const res = await authFetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(
+          session.businessVerified
+            ? settings
+            : (({
+                paymentGateways,
+                whatsappProviders,
+                defaultPaymentGateway,
+                defaultWhatsAppProvider,
+                ...profileSettings
+              }) => profileSettings)(settings)
+        ),
       });
 
       const data = await res.json();
@@ -1046,6 +1062,7 @@ export default function SettingsPage() {
       detail: selectedGateway.name,
       ready: gatewayConfigured,
       sectionKey: "gateway",
+      requiresVerification: true,
     },
     {
       href: "#whatsapp",
@@ -1054,6 +1071,7 @@ export default function SettingsPage() {
       detail: selectedWhatsAppProvider.name,
       ready: whatsAppConfigured,
       sectionKey: "whatsapp",
+      requiresVerification: true,
     },
     {
       href: "#qr-payments",
@@ -1101,19 +1119,24 @@ export default function SettingsPage() {
         </div>
         <nav className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Settings sections">
           {setupItems.map((item) => {
-            const isOpen = selectedSetupSection === item.sectionKey;
+            const isLocked = item.requiresVerification && session.businessVerified !== true;
+            const isOpen = !isLocked && selectedSetupSection === item.sectionKey;
 
             return (
               <button
                 key={item.href}
                 type="button"
                 onClick={() => openSetupSection(item)}
+                disabled={isLocked}
                 aria-expanded={isOpen}
                 aria-controls={item.href.slice(1)}
+                title={isLocked ? "Verify your business to access this setting" : undefined}
                 className={`flex min-h-24 w-full items-start gap-3 rounded-lg border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-emerald-500/40 ${
-                  isOpen
-                    ? "border-emerald-400 bg-emerald-50/70 dark:border-emerald-700 dark:bg-emerald-950/20"
-                    : "border-slate-200 bg-white hover:border-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-600"
+                  isLocked
+                    ? "cursor-not-allowed border-slate-200 bg-slate-100 opacity-65 dark:border-slate-800 dark:bg-slate-900/50"
+                    : isOpen
+                      ? "border-emerald-400 bg-emerald-50/70 dark:border-emerald-700 dark:bg-emerald-950/20"
+                      : "border-slate-200 bg-white hover:border-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-600"
                 }`}
               >
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white dark:bg-white dark:text-slate-950">
@@ -1124,24 +1147,30 @@ export default function SettingsPage() {
                     <span className="block text-sm font-semibold text-slate-900 dark:text-white">
                       {item.title}
                     </span>
-                    <FiChevronDown
-                      className={`shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
-                      aria-hidden="true"
-                    />
+                    {isLocked ? (
+                      <FiLock className="shrink-0 text-slate-400" aria-hidden="true" />
+                    ) : (
+                      <FiChevronDown
+                        className={`shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                        aria-hidden="true"
+                      />
+                    )}
                   </span>
                   <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">
                     {item.detail}
                   </span>
                   <span
                     className={`mt-2 inline-block text-xs font-semibold ${
-                      item.ready
-                        ? "text-emerald-700 dark:text-emerald-300"
-                        : item.optional
-                          ? "text-slate-500 dark:text-slate-400"
-                          : "text-amber-700 dark:text-amber-300"
+                      isLocked
+                        ? "text-slate-500 dark:text-slate-400"
+                        : item.ready
+                          ? "text-emerald-700 dark:text-emerald-300"
+                          : item.optional
+                            ? "text-slate-500 dark:text-slate-400"
+                            : "text-amber-700 dark:text-amber-300"
                     }`}
                   >
-                    {item.ready ? "Ready" : item.optional ? "Optional" : "Needs attention"}
+                    {isLocked ? "Verification required" : item.ready ? "Ready" : item.optional ? "Optional" : "Needs attention"}
                   </span>
                 </span>
               </button>

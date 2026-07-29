@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { FiCheck, FiChevronDown, FiEye, FiEyeOff } from "react-icons/fi";
+
+const COUNTRIES = ["Nigeria", "Ghana", "Kenya", "South Africa", "United Kingdom", "United States"];
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -11,38 +14,37 @@ export default function Register() {
     email: "",
     password: "",
     confirmPassword: "",
-    country: "",
+    country: "Nigeria",
     acceptTerms: false,
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
   const router = useRouter();
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
+  const handleChange = (event) => {
+    const { name, value, type, checked } = event.target;
+    setFormData((current) => ({
+      ...current,
       [name]: type === "checkbox" ? checked : value,
-    });
+    }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError("");
 
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
+      setError("Passwords do not match.");
       return;
     }
     if (formData.password.length < 8) {
-      setError("Password must be at least 8 characters");
+      setError("Password must be at least 8 characters.");
       return;
     }
     if (!formData.acceptTerms) {
-      setError("Please accept the Terms & Conditions");
+      setError("Please accept the Terms and Conditions and Privacy Policy.");
       return;
     }
 
@@ -54,12 +56,12 @@ export default function Register() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fullName: `${formData.firstName} ${formData.lastName}`.trim(),
-          email: formData.email,
+          email: formData.email.trim(),
           password: formData.password,
+          country: formData.country,
           role: "Admin",
         }),
       });
-
       const data = await res.json();
 
       if (res.ok && data.success) {
@@ -79,172 +81,208 @@ export default function Register() {
     }
   };
 
+  const inputClass =
+    "mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-700 focus:ring-2 focus:ring-sky-700/15";
+
   return (
-    <div className="min-h-screen flex">
-      <div className="hidden lg:flex w-1/2 bg-[#123B5D] text-white relative overflow-hidden flex-col justify-center p-12">
-        <div className="absolute top-10 left-10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-2xl font-bold">
-              ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¦
-            </div>
-            <span className="text-3xl font-bold tracking-tight">InvoiceHub</span>
-          </div>
-        </div>
+    <main className="min-h-screen bg-slate-50 lg:grid lg:h-screen lg:grid-cols-[minmax(0,0.9fr)_minmax(32rem,1.1fr)] lg:overflow-hidden">
+      <section className="relative hidden overflow-hidden bg-[#123B5D] px-12 py-10 text-white lg:flex lg:flex-col lg:justify-between" aria-label="About InvoiceHub">
+        <Link href="/" className="inline-flex w-fit items-center gap-3" aria-label="InvoiceHub home">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-xl font-bold">N</span>
+          <span className="text-2xl font-bold">InvoiceHub</span>
+        </Link>
 
-        <div className="max-w-lg mt-20">
-          <h1 className="text-5xl font-bold leading-tight mb-6">
-            Set up billing that feels
-            <span className="text-emerald-300"> organized from day one</span>
+        <div className="max-w-xl py-10">
+          <p className="text-sm font-semibold uppercase text-emerald-300">Built for clearer collections</p>
+          <h1 className="mt-4 text-4xl font-bold leading-tight xl:text-5xl">
+            Manage invoices, payments, and customer follow-ups in one place.
           </h1>
+          <p className="mt-5 max-w-lg text-base leading-7 text-slate-200">
+            Keep a reliable view of what has been billed, what has been paid, and what still needs attention.
+          </p>
 
-          <div className="bg-[#0E2E48] rounded-3xl p-8 mt-16 relative">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 bg-slate-300 rounded-full"></div>
-              <div>
-                <p className="font-semibold">Samuel Okoye</p>
-                <p className="text-sm text-emerald-300">Finance Lead, Oakline Studio</p>
-              </div>
-            </div>
-
-            <p className="italic text-lg leading-relaxed">
-              &ldquo;We went from scattered follow-ups to a clear invoice workflow the whole team could trust.&rdquo;
-            </p>
-
-            <div className="absolute bottom-6 right-8 text-6xl opacity-20">&quot;</div>
-          </div>
+          <ul className="mt-8 space-y-4 text-sm text-slate-100">
+            {[
+              "Create and share professional invoices",
+              "Track full and partial payments",
+              "Send payment updates and reminders through WhatsApp",
+            ].map((benefit) => (
+              <li key={benefit} className="flex items-center gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-300">
+                  <FiCheck className="h-4 w-4" />
+                </span>
+                {benefit}
+              </li>
+            ))}
+          </ul>
         </div>
-      </div>
 
-      <div className="flex-1 flex items-center justify-center p-6 bg-gray-50">
-        <div className="w-full max-w-lg">
-          <div className="bg-white rounded-3xl shadow-xl p-10">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900">Create your InvoiceHub account</h2>
-              <p className="text-gray-600 mt-2 text-sm">
-                Create your owner account. You will add your business details after login.
+        <p className="text-xs text-slate-300">InvoiceHub keeps your billing workflow organised from invoice to confirmation.</p>
+      </section>
+
+      <section className="flex min-h-screen items-center justify-center overflow-y-auto px-4 py-8 sm:px-8 lg:min-h-0 lg:px-12">
+        <div className="w-full max-w-xl">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <div className="mb-7">
+              <p className="text-sm font-semibold text-sky-800">Create account</p>
+              <h2 className="mt-1 text-3xl font-bold text-slate-950">Start with InvoiceHub</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Create your owner account. You will add your business profile after signing in.
               </p>
             </div>
 
-
             <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  name="firstName"
-                  placeholder="First Name"
-                  value={formData.firstName}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
-                />
-                <input
-                  type="text"
-                  name="lastName"
-                  placeholder="Last Name"
-                  value={formData.lastName}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
-                />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="text-sm font-medium text-slate-700">
+                  First name
+                  <input
+                    type="text"
+                    name="firstName"
+                    autoComplete="given-name"
+                    placeholder="Enter first name"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    required
+                    className={inputClass}
+                  />
+                </label>
+                <label className="text-sm font-medium text-slate-700">
+                  Last name
+                  <input
+                    type="text"
+                    name="lastName"
+                    autoComplete="family-name"
+                    placeholder="Enter last name"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    required
+                    className={inputClass}
+                  />
+                </label>
               </div>
 
-              <input
-                type="email"
-                name="email"
-                placeholder="Email Address"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
-              />
-
-              <input
-                type="text"
-                name="country"
-                placeholder="Country"
-                value={formData.country}
-                onChange={handleChange}
-                required
-                className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
-              />
-
-              <div className="relative">
+              <label className="block text-sm font-medium text-slate-700">
+                Email address
                 <input
-                  type={showPassword ? "text" : "password"}
+                  type="email"
+                  name="email"
+                  autoComplete="email"
+                  placeholder="name@business.com"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  className={inputClass}
+                />
+              </label>
+
+              <label className="block text-sm font-medium text-slate-700">
+                Country
+                <span className="relative mt-2 block">
+                  <select
+                    name="country"
+                    autoComplete="country-name"
+                    value={formData.country}
+                    onChange={handleChange}
+                    required
+                    className="w-full appearance-none rounded-lg border border-slate-300 bg-white px-4 py-3 pr-11 text-sm text-slate-950 outline-none transition focus:border-sky-700 focus:ring-2 focus:ring-sky-700/15"
+                  >
+                    {COUNTRIES.map((country) => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </select>
+                  <FiChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden="true" />
+                </span>
+              </label>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <PasswordField
+                  label="Password"
                   name="password"
-                  placeholder="Password"
                   value={formData.password}
                   onChange={handleChange}
-                  required
-                  className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
+                  visible={showPassword}
+                  onToggle={() => setShowPassword((current) => !current)}
+                  autoComplete="new-password"
+                  inputClass={inputClass}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-500"
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </button>
-              </div>
-
-              <div className="relative">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
+                <PasswordField
+                  label="Confirm password"
                   name="confirmPassword"
-                  placeholder="Confirm Password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  required
-                  className="w-full px-5 py-3.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-700"
+                  visible={showConfirmPassword}
+                  onToggle={() => setShowConfirmPassword((current) => !current)}
+                  autoComplete="new-password"
+                  inputClass={inputClass}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-500"
-                >
-                  {showConfirmPassword ? "Hide" : "Show"}
-                </button>
               </div>
+              <p className="-mt-2 text-xs text-slate-500">Use at least 8 characters.</p>
 
-              {error && (
-                <p className="text-red-600 text-sm bg-red-50 p-4 rounded-2xl text-center">
+              {error ? (
+                <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {error}
                 </p>
-              )}
+              ) : null}
 
-              <div className="flex items-center gap-3">
+              <label className="flex items-start gap-3 text-sm leading-6 text-slate-600">
                 <input
                   type="checkbox"
                   name="acceptTerms"
                   checked={formData.acceptTerms}
                   onChange={handleChange}
-                  className="w-5 h-5 accent-sky-700"
+                  className="mt-1 h-4 w-4 shrink-0 accent-sky-800"
                   required
                 />
-                <label className="text-sm text-gray-600">
-                  Accept <span className="text-sky-800">Terms & Conditions</span> and{" "}
-                  <span className="text-sky-800">Privacy Policy</span>
-                </label>
-              </div>
+                <span>
+                  I agree to the <Link href="/terms" className="font-medium text-sky-800 hover:underline">Terms and Conditions</Link> and <Link href="/privacy" className="font-medium text-sky-800 hover:underline">Privacy Policy</Link>.
+                </span>
+              </label>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 bg-[#123B5D] hover:bg-[#0E2E48] disabled:bg-sky-300 text-white font-semibold rounded-2xl text-lg transition-all"
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-[#123B5D] px-5 text-sm font-semibold text-white transition hover:bg-[#0E2E48] disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                {loading ? "Creating Account..." : "Create my account"}
+                {loading ? "Creating account..." : "Create account"}
               </button>
             </form>
 
-            <p className="text-center text-sm text-gray-600 mt-8">
-              Have an account?{" "}
-              <Link href="/auth/login" className="text-sky-800 font-medium hover:underline">
-                Log in
-              </Link>
+            <p className="mt-6 text-center text-sm text-slate-600">
+              Already have an account? <Link href="/auth/login" className="font-semibold text-sky-800 hover:underline">Log in</Link>
             </p>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
+  );
+}
+
+function PasswordField({ label, name, value, onChange, visible, onToggle, autoComplete, inputClass }) {
+  return (
+    <label className="text-sm font-medium text-slate-700">
+      {label}
+      <span className="relative mt-2 block">
+        <input
+          type={visible ? "text" : "password"}
+          name={name}
+          value={value}
+          onChange={onChange}
+          autoComplete={autoComplete}
+          placeholder="Enter password"
+          minLength={8}
+          required
+          className={`${inputClass.replace("mt-2 ", "")} pr-11`}
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          className="absolute inset-y-0 right-0 inline-flex w-11 items-center justify-center text-slate-500 transition hover:text-slate-900"
+          aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+          title={visible ? "Hide password" : "Show password"}
+        >
+          {visible ? <FiEyeOff className="h-4 w-4" /> : <FiEye className="h-4 w-4" />}
+        </button>
+      </span>
+    </label>
   );
 }

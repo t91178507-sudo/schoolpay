@@ -15,12 +15,6 @@ const STATUS_VIEW = {
 
 export default function VerificationPage() {
   const [data, setData] = useState(null);
-  const [form, setForm] = useState({
-    bankAccountName: "",
-    accountNumber: "",
-    bankName: "",
-    taxIdentificationNumber: "",
-  });
   const [files, setFiles] = useState({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -39,13 +33,6 @@ export default function VerificationPage() {
         localStorage.setItem("businessVerified", String(result.business.isVerified === true));
         emitSessionChange();
       }
-      const business = result.business || {};
-      setForm({
-        bankAccountName: business.bankAccountName || "",
-        accountNumber: business.accountNumber || "",
-        bankName: business.bankName || "",
-        taxIdentificationNumber: business.taxIdentificationNumber || "",
-      });
     } catch (loadError) {
       setError(loadError.message);
     } finally {
@@ -63,7 +50,6 @@ export default function VerificationPage() {
     try {
       const payload = new FormData();
       payload.set("intent", "submit");
-      Object.entries(form).forEach(([key, value]) => payload.set(key, value));
       Object.entries(files).forEach(([key, value]) => value && payload.set(key, value));
       const response = await authFetch("/api/businesses/verification", { method: "POST", body: payload });
       const result = await response.json().catch(() => ({}));
@@ -105,7 +91,6 @@ export default function VerificationPage() {
           <div>
             <h2 className="font-semibold text-slate-950">{status.label}</h2>
             <p className="mt-1 text-sm text-slate-700">{status.detail}</p>
-            {!business.isVerified ? <p className="mt-2 text-sm text-slate-600">You can create customers and invoices now. Sending invoices, payment links, QR codes, WhatsApp messages, gateway connections, staff invitations, and public payments unlock after approval.</p> : null}
             {business.rejectionReason ? <p className="mt-3 rounded-lg bg-white/70 px-3 py-2 text-sm font-medium text-red-700">Reason: {business.rejectionReason}</p> : null}
             {business.informationRequest?.requestedDocument ? <p className="mt-3 rounded-lg bg-white/70 px-3 py-2 text-sm text-amber-900">Requested: <strong>{business.informationRequest.requestedDocument}</strong>. {business.informationRequest.reason}{business.informationRequest.deadline ? ` Upload by ${business.informationRequest.deadline}.` : ""}</p> : null}
           </div>
@@ -118,20 +103,10 @@ export default function VerificationPage() {
             <h2 className="text-lg font-semibold text-slate-950">Verification documents</h2>
             <p className="mt-1 text-sm text-slate-500">PDF, JPG, or PNG. Maximum 10 MB per file.</p>
           </div>
-          <div className="grid gap-4 lg:grid-cols-3">
-            <UploadField label="Valid Government ID" required current={uploaded.get("governmentId")} disabled={locked} onChange={(file) => setFiles((value) => ({ ...value, governmentId: file }))} />
-            <UploadField label="CAC Certificate" required={data.requirements?.cacCertificateRequired} current={uploaded.get("cacCertificate")} disabled={locked} onChange={(file) => setFiles((value) => ({ ...value, cacCertificate: file }))} />
-            <UploadField label="Proof of Business Address" current={uploaded.get("proofOfAddress")} disabled={locked} onChange={(file) => setFiles((value) => ({ ...value, proofOfAddress: file }))} />
+          <div className="max-w-xl">
+            <UploadField label="Electricity Bill" required current={uploaded.get("electricityBill")} disabled={locked} onChange={(file) => setFiles((value) => ({ ...value, electricityBill: file }))} />
           </div>
 
-          <div className="my-7 border-t border-slate-100" />
-          <h2 className="text-lg font-semibold text-slate-950">Business bank details</h2>
-          <div className="mt-4 grid gap-5 sm:grid-cols-2">
-            <Input label="Business Bank Account Name" name="bankAccountName" value={form.bankAccountName} setForm={setForm} disabled={locked} required />
-            <Input label="Business Account Number" name="accountNumber" value={form.accountNumber} setForm={setForm} disabled={locked} required />
-            <Input label="Bank Name" name="bankName" value={form.bankName} setForm={setForm} disabled={locked} required />
-            <Input label="Tax Identification Number" name="taxIdentificationNumber" value={form.taxIdentificationNumber} setForm={setForm} disabled={locked} />
-          </div>
 
           {message ? <p className="mt-5 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</p> : null}
           {error ? <p className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
@@ -174,14 +149,6 @@ function UploadField({ label, required, current, disabled, onChange }) {
       <span className="mt-2 block truncate text-xs text-slate-500">{current?.fileName || "No document uploaded"}</span>
       {!disabled ? <span className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-blue-700"><FiUpload />Choose file</span> : null}
       <input type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={disabled} onChange={(event) => onChange(event.target.files?.[0] || null)} className="sr-only" />
-    </label>
-  );
-}
-
-function Input({ label, name, value, setForm, disabled, required }) {
-  return (
-    <label className="text-sm font-medium text-slate-800">{label}{required ? <span className="text-red-500"> *</span> : <span className="font-normal text-slate-400"> (Optional)</span>}
-      <input name={name} value={value} disabled={disabled} required={required} onChange={(event) => setForm((form) => ({ ...form, [name]: event.target.value }))} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 outline-none focus:border-blue-500 disabled:bg-slate-100" />
     </label>
   );
 }

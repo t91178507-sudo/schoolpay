@@ -8,6 +8,7 @@ export async function POST(req) {
     const db = await connectDB();
     const body = await req.json();
     const email = String(body.email || "").trim().toLowerCase();
+    const country = String(body.country || "Nigeria").trim() || "Nigeria";
     const username = String(body.username || email.split("@")[0] || "")
       .trim()
       .toLowerCase();
@@ -43,6 +44,7 @@ export async function POST(req) {
       fullName: body.fullName,
       email,
       username,
+      country,
       password: hashedPassword,
       requiresBusinessSetup: true,
       role: "Owner",

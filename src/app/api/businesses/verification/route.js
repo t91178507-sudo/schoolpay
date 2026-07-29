@@ -14,15 +14,7 @@ import {
 } from "../../../../lib/businessVerification";
 import { connectDB } from "../../../../lib/mongodb";
 
-const DOCUMENT_FIELDS = [
-  ["cacCertificate", "CAC Certificate"],
-  ["governmentId", "Valid Government ID"],
-  ["proofOfAddress", "Proof of Business Address"],
-];
-
-function requiresCacCertificate(type = "") {
-  return /\b(company|limited|ltd|registered|corporation)\b/i.test(type);
-}
+const DOCUMENT_FIELDS = [["electricityBill", "Electricity Bill"]];
 
 export async function GET(req) {
   try {
@@ -45,10 +37,7 @@ export async function GET(req) {
 
     return Response.json({
       business: serializeBusinessVerification(business, documents),
-      requirements: {
-        governmentIdRequired: true,
-        cacCertificateRequired: requiresCacCertificate(business.type),
-      },
+      requirements: { electricityBillRequired: true },
     });
   } catch (error) {
     return Response.json(
@@ -73,19 +62,6 @@ export async function POST(req) {
 
     const formData = await req.formData();
     const submitForReview = String(formData.get("intent") || "submit") === "submit";
-    const bankAccountName = String(formData.get("bankAccountName") || "").trim();
-    const accountNumber = String(formData.get("accountNumber") || "").replace(/\s+/g, "");
-    const bankName = String(formData.get("bankName") || "").trim();
-    const taxIdentificationNumber = String(
-      formData.get("taxIdentificationNumber") || ""
-    ).trim();
-
-    if (!bankAccountName || !accountNumber || !bankName) {
-      return Response.json(
-        { error: "Bank account name, account number, and bank name are required." },
-        { status: 400 }
-      );
-    }
 
     const now = new Date();
     const uploadedTypes = [];
@@ -133,20 +109,9 @@ export async function POST(req) {
       .toArray();
     const storedTypes = new Set(storedDocuments.map((document) => document.documentType));
 
-    if (submitForReview && !storedTypes.has("governmentId")) {
+    if (submitForReview && !storedTypes.has("electricityBill")) {
       return Response.json(
-        { error: "Upload a valid government ID before submitting." },
-        { status: 400 }
-      );
-    }
-
-    if (
-      submitForReview &&
-      requiresCacCertificate(business.type) &&
-      !storedTypes.has("cacCertificate")
-    ) {
-      return Response.json(
-        { error: "A CAC certificate is required for this business type." },
+        { error: "Upload an electricity bill before submitting." },
         { status: 400 }
       );
     }
@@ -168,10 +133,6 @@ export async function POST(req) {
       {
         $set: {
           verificationStatus: nextStatus,
-          bankAccountName,
-          accountNumber,
-          bankName,
-          taxIdentificationNumber,
           rejectionReason: "",
           updatedAt: now,
           ...(submitForReview ? { verificationSubmittedAt: now } : {}),

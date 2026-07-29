@@ -1,6 +1,7 @@
 import { ObjectId } from "mongodb";
 import { requireAuth } from "../../../lib/auth";
 import { connectDB } from "../../../lib/mongodb";
+import { requireVerifiedOwnerBusiness } from "../../../lib/businessVerification";
 import {
   buildSettingsPayload,
   getPlatformSettings,
@@ -45,7 +46,30 @@ export async function PUT(req) {
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
-    const payload = sanitizeSettingsInput(body, existingUser);
+    const restrictedKeys = [
+      "defaultPaymentGateway",
+      "paymentGateways",
+      "defaultWhatsAppProvider",
+      "whatsappProviders",
+    ];
+    const includesRestrictedSettings = restrictedKeys.some((key) =>
+      Object.prototype.hasOwnProperty.call(body, key)
+    );
+
+    if (includesRestrictedSettings) {
+      await requireVerifiedOwnerBusiness(db, userId);
+    }
+
+    const settingsInput = includesRestrictedSettings
+      ? body
+      : {
+          ...body,
+          defaultPaymentGateway: existingUser.defaultPaymentGateway,
+          paymentGateways: existingUser.paymentGateways,
+          defaultWhatsAppProvider: existingUser.defaultWhatsAppProvider,
+          whatsappProviders: existingUser.whatsappProviders,
+        };
+    const payload = sanitizeSettingsInput(settingsInput, existingUser);
 
     if (!payload.businessName) {
       return Response.json(

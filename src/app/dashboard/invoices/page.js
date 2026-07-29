@@ -613,8 +613,12 @@ export default function Invoices() {
       recurringSearch
     )
   );
-  const totalAmount = actionableInvoices.reduce(
-    (sum, invoice) => sum + Number(getOutstandingAmount(invoice) || 0),
+  const totalInvoiceAmount = actionableInvoices.reduce(
+    (sum, invoice) => sum + getOriginalInvoiceAmount(invoice),
+    0
+  );
+  const balancePendingAmount = actionableInvoices.reduce(
+    (sum, invoice) => sum + getOutstandingAmount(invoice),
     0
   );
   const unpaidCount = actionableInvoices.length;
@@ -805,11 +809,12 @@ export default function Invoices() {
         )}
       </div>
 
-      <StatGrid className={activePage === "invoices" ? "xl:!grid-cols-3" : ""}>
+      <StatGrid>
         {activePage === "invoices" ? (
           <>
             <StatCard label="Total invoices" value={actionableInvoices.length} tone="slate" />
-            <StatCard label="Balance pending" value={`N${totalAmount.toLocaleString()}`} tone="orange" />
+            <StatCard label="Total amount" value={`N${totalInvoiceAmount.toLocaleString()}`} tone="blue" />
+            <StatCard label="Balance pending" value={`N${balancePendingAmount.toLocaleString()}`} tone="orange" />
             <StatCard label="Unpaid" value={unpaidCount} tone="orange" />
           </>
         ) : (

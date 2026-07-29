@@ -129,7 +129,6 @@ export async function deliverInvoiceMessage({
     pendingBalance,
     description:
       invoice.description || invoice.category || invoice.class || "Invoice payment",
-    items: invoice.items || [],
     paymentLink: `${origin}/pay/${invoice.token}`,
     paymentLinkLabel,
     date: invoice.date ? new Date(invoice.date) : new Date(),
