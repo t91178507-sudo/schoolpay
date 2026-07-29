@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { FiArrowLeft, FiArrowRight, FiEdit2, FiPlus, FiSearch, FiTrash2, FiUpload, FiUsers } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import AddCustomerModal from "../../../components/AddCustomerModal";
 import { useConfirm, useToast } from "../../../components/AppFeedback";
@@ -667,201 +668,199 @@ export default function CategoriesPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 py-4 sm:py-5">
       <div className="w-full px-3 sm:px-4 lg:px-5">
-        <div className="mb-4 overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_-36px_rgba(15,23,42,0.28)] dark:border-slate-800 dark:bg-slate-900">
-          <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-blue-50/70 px-5 py-4 dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900 sm:px-6 lg:px-7">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-              <div className="max-w-3xl">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                  Category workspace
-                </p>
-                <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-50 sm:text-3xl">
-                  {customerLabels.singularTitle} categories
-                </h1>
-                <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  Organize {customerLabels.plural} into billing groups, import records faster,
-                  and generate individual or category-wide invoices from one clean view.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2.5 sm:flex-row xl:flex-col xl:items-end">
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="inline-flex h-10 items-center justify-center rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-blue-600 dark:hover:bg-blue-500"
-                >
-                  Add new {customerLabels.singular}
-                </button>
-              </div>
-            </div>
+        <header className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">
+              {customerLabels.singularTitle} categories
+            </h1>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Manage billing groups and create invoices for individuals or entire categories.
+            </p>
           </div>
-
-        </div>
-
+          <button
+            type="button"
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:ring-offset-slate-950"
+          >
+            <FiPlus className="h-4 w-4" aria-hidden="true" />
+            Add {customerLabels.singular}
+          </button>
+        </header>
         {selectedCategory && (
           <button
             onClick={() => setSelectedCategory(null)}
-            className="mb-4 inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
           >
-            ← Back to All Categories
+            <FiArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to all categories
           </button>
         )}
 
-        <div className="mb-4 rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
-          <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center">
-            <div className="min-w-0 flex-1">
-              <label htmlFor="student-category-search" className="sr-only">
-                Search {selectedCategory ? customerLabels.plural : "categories"}
-              </label>
-              <input
-                id="student-category-search"
-                type="search"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder={
-                  selectedCategory
-                    ? `Search ${customerLabels.plural}, phone, email, or token`
-                    : `Search categories or ${customerLabels.plural}`
-                }
-                className="w-full rounded-2xl border border-slate-300 px-4 py-2.5 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-800"
-              />
+        <div className="mb-5 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center">
+          <div className="relative min-w-0 flex-1">
+            <FiSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <label htmlFor="student-category-search" className="sr-only">
+              Search {selectedCategory ? customerLabels.plural : "categories"}
+            </label>
+            <input
+              id="student-category-search"
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder={
+                selectedCategory
+                  ? `Search ${customerLabels.plural}, phone, email, or token`
+                  : `Search categories or ${customerLabels.plural}`
+              }
+              className="h-10 w-full rounded-md border border-slate-300 bg-white pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-blue-950"
+            />
+          </div>
+          <div className="flex items-center gap-4 border-t border-slate-100 pt-3 text-sm sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0 dark:border-slate-800">
+            <div>
+              <span className="font-semibold text-slate-900 dark:text-white">{visibleCategoryList.length}</span>
+              <span className="ml-1 text-slate-500 dark:text-slate-400">categories</span>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
-                {visibleCategoryList.length} categories
+            <div>
+              <span className="font-semibold text-slate-900 dark:text-white">
+                {selectedCategory ? visibleSelectedCustomers.length : customers.length}
               </span>
-              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
-                {selectedCategory
-                  ? `${visibleSelectedCustomers.length} visible ${customerLabels.plural}`
-                  : `${customers.length} total ${customerLabels.plural}`}
+              <span className="ml-1 text-slate-500 dark:text-slate-400">
+                {selectedCategory ? `visible ${customerLabels.plural}` : customerLabels.plural}
               </span>
             </div>
           </div>
         </div>
-
         {!selectedCategory ? (
-          <div>
-            <h2 className="mb-4 text-lg font-medium text-gray-700 dark:text-slate-300">
-              All categories ({visibleCategoryList.length})
-            </h2>
+          <section aria-labelledby="category-list-heading">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 id="category-list-heading" className="text-sm font-semibold text-slate-900 dark:text-white">
+                Categories
+              </h2>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {visibleCategoryList.length} shown
+              </span>
+            </div>
 
             {visibleCategoryList.length === 0 ? (
-              <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white px-6 py-16 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-2xl font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                  {customerLabels.singularTitle.slice(0, 1)}
+              <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-12 text-center dark:border-slate-700 dark:bg-slate-900">
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <FiUsers className="h-5 w-5" aria-hidden="true" />
                 </div>
-                <h3 className="mt-5 text-xl font-semibold text-slate-900 dark:text-white">
+                <h3 className="mt-4 text-base font-semibold text-slate-900 dark:text-white">
                   {categoryList.length === 0
                     ? `No ${customerLabels.plural} added yet`
-                    : "No matching categories found"}
+                    : "No matching categories"}
                 </h3>
-                <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+                <p className="mx-auto mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">
                   {categoryList.length === 0
-                    ? `Add your first ${customerLabels.singular} and InvoiceHub will automatically group them into categories.`
-                    : "Try another search term or clear the current filter to show more category groups."}
+                    ? `Add your first ${customerLabels.singular} to create a billing category.`
+                    : "Try a different search term."}
                 </p>
                 {categoryList.length === 0 ? (
                   <button
+                    type="button"
                     onClick={() => setShowAddModal(true)}
-                    className="mt-6 inline-flex h-11 items-center justify-center rounded-2xl bg-slate-900 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-blue-600 dark:hover:bg-blue-500"
+                    className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-500"
                   >
-                    Add first {customerLabels.singular}
+                    <FiPlus className="h-4 w-4" aria-hidden="true" />
+                    Add {customerLabels.singular}
                   </button>
                 ) : null}
               </div>
             ) : (
-               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {visibleCategoryList.map((category) => {
-                  const count = grouped[category]?.length || 0;
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="hidden grid-cols-[minmax(0,1fr)_160px_230px] border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold uppercase text-slate-500 md:grid dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400">
+                  <span>Category</span>
+                  <span>Members</span>
+                  <span className="text-right">Actions</span>
+                </div>
+                <div className="divide-y divide-slate-200 dark:divide-slate-800">
+                  {visibleCategoryList.map((category) => {
+                    const count = grouped[category]?.length || 0;
 
-                  return (
-                    <div
-                      key={category}
-                      onClick={() => setSelectedCategory(category)}
-                      className="group cursor-pointer overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white p-0 transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_20px_50px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
-                    >
-                      <div className="mb-4 flex items-center gap-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-5 py-4 dark:border-slate-800 dark:from-slate-950 dark:to-slate-900 sm:px-6">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-base font-semibold text-white dark:bg-slate-800">
-                          {category.slice(0, 1).toUpperCase()}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                            Category
-                          </p>
-                          <h3 className="truncate text-lg font-semibold text-slate-900 dark:text-slate-100">
-                            {category}
-                          </h3>
-                        </div>
-                      </div>
-
-                      <div className="px-5 pb-4 sm:px-6">
-                        <div className="flex items-end justify-between gap-4">
-                        <div>
-                          <p className="text-sm text-slate-500 dark:text-slate-400">{customerLabels.pluralTitle}</p>
-                          <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-slate-100 sm:text-4xl">
-                            {count}
-                          </p>
-                        </div>
-                        <div className="hidden text-right text-slate-500 text-sm font-medium group-hover:translate-x-1 transition-transform">
-                          View {customerLabels.pluralTitle} →
-                        </div>
-                      </div>
-
-                        <div className="mt-3 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
-                          <span>Shared billing view</span>
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                            Open
+                    return (
+                      <div
+                        key={category}
+                        className="grid gap-3 px-4 py-3 transition hover:bg-slate-50 md:grid-cols-[minmax(0,1fr)_160px_230px] md:items-center dark:hover:bg-slate-950/50"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCategory(category)}
+                          className="flex min-w-0 items-center gap-3 text-left"
+                        >
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                            {category.slice(0, 1).toUpperCase()}
                           </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-slate-900 dark:text-white">
+                              {category}
+                            </span>
+                            <span className="block text-xs text-slate-500 dark:text-slate-400">
+                              Billing category
+                            </span>
+                          </span>
+                        </button>
+
+                        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                          <FiUsers className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                          <span className="font-semibold text-slate-900 dark:text-white">{count}</span>
+                          <span>{count === 1 ? customerLabels.singular : customerLabels.plural}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2 md:justify-end">
+                          <button
+                            type="button"
+                            onClick={() => renameCategory(category)}
+                            title="Rename category"
+                            aria-label={`Rename ${category}`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                          >
+                            <FiEdit2 className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteCategory(category)}
+                            title="Delete category"
+                            aria-label={`Delete ${category}`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:text-red-400 dark:hover:bg-red-950/30"
+                          >
+                            <FiTrash2 className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCategory(category)}
+                            className="ml-auto inline-flex h-9 items-center justify-center gap-2 rounded-md bg-slate-900 px-3 text-xs font-semibold text-white transition hover:bg-slate-800 md:ml-1 dark:bg-blue-600 dark:hover:bg-blue-500"
+                          >
+                            View group
+                            <FiArrowRight className="h-4 w-4" aria-hidden="true" />
+                          </button>
                         </div>
                       </div>
-
-                      <div className="flex gap-2 border-t border-slate-100 px-5 py-3 dark:border-slate-800 sm:px-6">
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            renameCategory(category);
-                          }}
-                          className="flex-1 rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                        >
-                          Rename
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            deleteCategory(category);
-                          }}
-                          className="flex-1 rounded-xl border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:text-red-400 dark:hover:bg-red-950/30"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
-          </div>
+          </section>
         ) : (
-            <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800 dark:bg-slate-900">
-              <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-5 py-6 text-white sm:px-8 lg:px-10">
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex items-center gap-4">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-2xl font-semibold">
+            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex flex-col gap-4 border-b border-slate-200 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between dark:border-slate-800">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-100 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                     {selectedCategory.slice(0, 1).toUpperCase()}
                   </div>
-                  <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">
-                        Selected category
-                      </p>
-                      <h2 className="mt-2 text-3xl font-semibold sm:text-4xl">{selectedCategory}</h2>
-                    <p className="text-slate-300 mt-1 text-lg">
-                      {visibleSelectedCustomers.length} {visibleSelectedCustomers.length === 1 ? customerLabels.singularTitle : customerLabels.pluralTitle}
+                  <div className="min-w-0">
+                    <h2 className="truncate text-lg font-semibold text-slate-900 dark:text-white">
+                      {selectedCategory}
+                    </h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      {visibleSelectedCustomers.length} {visibleSelectedCustomers.length === 1 ? customerLabels.singular : customerLabels.plural}
                     </p>
                   </div>
                 </div>
 
-                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => {
                       setBulkDescription(
                         selectedCategory ? `${selectedCategory} invoice` : "Category invoice"
@@ -870,24 +869,12 @@ export default function CategoriesPage() {
                       setBulkError("");
                       setShowBulkModal(true);
                     }}
-                    className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-500"
+                    className="inline-flex h-9 items-center justify-center rounded-md bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-500"
                   >
-                    Generate Invoice for All
+                    Generate invoices
                   </button>
-
-                  <button
-                    onClick={() => renameCategory(selectedCategory)}
-                    className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/20"
-                  >
-                    Rename Category
-                  </button>
-                  <button
-                    onClick={() => deleteCategory(selectedCategory)}
-                    className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-500/80"
-                  >
-                    Delete Category
-                  </button>
-                  <label className="cursor-pointer rounded-xl bg-white/10 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/20">
+                  <label className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                    <FiUpload className="h-4 w-4" aria-hidden="true" />
                     {importingStudents ? "Importing..." : "Import"}
                     <input
                       type="file"
@@ -897,10 +884,26 @@ export default function CategoriesPage() {
                       className="hidden"
                     />
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => renameCategory(selectedCategory)}
+                    title="Rename category"
+                    aria-label={`Rename ${selectedCategory}`}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    <FiEdit2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteCategory(selectedCategory)}
+                    title="Delete category"
+                    aria-label={`Delete ${selectedCategory}`}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:text-red-400 dark:hover:bg-red-950/30"
+                  >
+                    <FiTrash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
                 </div>
               </div>
-            </div>
-
             {visibleSelectedCustomers.length === 0 ? (
               <div className="p-10 text-center text-gray-500 dark:text-slate-400">
                 No matching {customerLabels.plural} found.
@@ -971,14 +974,14 @@ export default function CategoriesPage() {
                         {customer.name}
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-slate-400">
-                        {customer.phone || "—"}
+                        {customer.phone || "â€”"}
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-slate-400">
-                        {customer.email || "—"}
+                        {customer.email || "â€”"}
                       </td>
                       <td className="px-4 py-3">
                         <span className="font-mono text-xs bg-gray-100 dark:bg-slate-800 dark:text-slate-300 px-3 py-1 rounded-full">
-                          {customer.token ? `${customer.token.substring(0, 15)}...` : "—"}
+                          {customer.token ? `${customer.token.substring(0, 15)}...` : "â€”"}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -1020,7 +1023,7 @@ export default function CategoriesPage() {
             <div className="px-8 py-6 border-b dark:border-slate-800">
               <h2 className="text-2xl font-semibold text-gray-900 dark:text-slate-100">Generate Invoice</h2>
               <p className="text-gray-500 dark:text-slate-400 mt-1">
-                For {invoiceCustomer.name} · {invoiceCustomer.category}
+                For {invoiceCustomer.name} Â· {invoiceCustomer.category}
               </p>
             </div>
 
