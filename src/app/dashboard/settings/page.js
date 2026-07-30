@@ -228,6 +228,19 @@ function getQuickPayUrl(token) {
   const origin = getPublicAppOrigin();
   return origin ? `${origin}/pay/qr/${token}` : `/pay/qr/${token}`;
 }
+function openBrowserWhatsApp(phone, message = "") {
+  if (typeof window === "undefined") return;
+
+  const cleanPhone = String(phone || "").replace(/\D/g, "");
+  if (!cleanPhone) return;
+
+  const encodedMessage = encodeURIComponent(
+    message || "Hello, here is your InvoiceHub message."
+  );
+  const url = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+
+  window.open(url, "_blank", "noopener,noreferrer");
+}
 
 export default function SettingsPage() {
   const confirm = useConfirm();
@@ -883,10 +896,22 @@ export default function SettingsPage() {
     setMessage("QR payment page copied.");
   };
 
-  const handleSendWhatsAppTest = async () => {
-    setTestingWhatsApp(true);
+   const handleSendWhatsAppTest = async () => {
     setError("");
     setMessage("");
+
+    // Browser WhatsApp is client-side only — open wa.me directly
+    if (selectedWhatsAppProvider.key === "browser") {
+      if (!whatsAppTestPhone.trim()) {
+        setError("Enter a phone number to test Browser WhatsApp.");
+        return;
+      }
+      openBrowserWhatsApp(whatsAppTestPhone, "This is a test message from InvoiceHub.");
+      setMessage("Browser WhatsApp opened with the test message.");
+      return;
+    }
+
+    setTestingWhatsApp(true);
 
     try {
       const res = await authFetch("/api/notifications/whatsapp/test", {
@@ -894,6 +919,7 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phone: whatsAppTestPhone,
+          provider: selectedWhatsAppProvider.key,
         }),
       });
 
@@ -903,7 +929,13 @@ export default function SettingsPage() {
         throw new Error(data.error || "Unable to send test message");
       }
 
-      const providerLabel = data.provider === "twilio" ? "Twilio WhatsApp" : data.provider === "whatsappWeb" ? "WhatsApp Web" : "Browser WhatsApp";
+      const providerLabel =
+        data.provider === "twilio"
+          ? "Twilio WhatsApp"
+          : data.provider === "whatsappWeb"
+          ? "WhatsApp Web"
+          : "Browser WhatsApp";
+
       setMessage(`Test message sent successfully through ${providerLabel}.`);
     } catch (testError) {
       setError(testError.message || "Unable to send test message");

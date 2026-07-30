@@ -453,8 +453,8 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          <div className="h-[240px] min-w-[1px] px-2 py-2.5 sm:h-[260px] sm:px-3 xl:h-[280px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[240px] min-h-[240px] min-w-[1px] px-2 py-2.5 sm:h-[260px] sm:min-h-[260px] sm:px-3 xl:h-[280px] xl:min-h-[280px]">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={monthlyCollections} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
                 <defs>
                   <linearGradient id="monthlyRevenueFill" x1="0" y1="0" x2="0" y2="1">
@@ -514,8 +514,8 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          <div className="h-[240px] min-w-[1px] px-3 py-2.5 sm:h-[260px] sm:px-3 xl:h-[280px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[240px] min-h-[240px] min-w-[1px] px-3 py-2.5 sm:h-[260px] sm:min-h-[260px] sm:px-3 xl:h-[280px] xl:min-h-[280px]">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <LineChart data={yearlyCollections} margin={{ top: 12, right: 16, left: 8, bottom: 8 }}>
                 <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="4 4" />
                 <XAxis

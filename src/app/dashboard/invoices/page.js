@@ -96,6 +96,8 @@ function getNotificationTone(status) {
   return "slate";
 }
 function openExternalTab(url, notify) {
+  if (!url) return false;
+
   const opened = window.open(url, "_blank", "noopener,noreferrer");
 
   if (!opened) {
@@ -107,6 +109,26 @@ function openExternalTab(url, notify) {
   }
 
   return true;
+}
+
+function getBrowserWhatsAppUrlFromResponse(data = {}) {
+  return (
+    data?.delivery?.fallbackUrl ||
+    data?.notification?.fallbackUrl ||
+    data?.whatsapp?.fallbackUrl ||
+    data?.fallbackUrl ||
+    ""
+  );
+}
+
+function getWhatsAppProviderFromResponse(data = {}) {
+  return (
+    data?.delivery?.provider ||
+    data?.notification?.provider ||
+    data?.whatsapp?.provider ||
+    data?.provider ||
+    ""
+  );
 }
 
 export default function Invoices() {
@@ -297,55 +319,127 @@ export default function Invoices() {
   };
 
   const shareWhatsApp = async (invoice) => {
-    if (!invoice.phone) {
-      showNotice("error", "No phone number.");
+  if (!invoice.phone) {
+    showNotice("error", "No phone number.");
+    return;
+  }
+
+  if (
+    !invoice.token &&
+    !invoice.paymentUrl &&
+    !invoice.paymentLink &&
+    !invoice.checkoutUrl
+  ) {
+    showNotice("error", "This invoice does not have a payment link yet.");
+    return;
+  }
+
+  try {
+    const res = await authFetch("/api/notifications/whatsapp/invoice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        invoiceId: String(invoice._id),
+        origin: window.location.origin,
+      }),
+      cache: "no-store",
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      showNotice(
+        "error",
+        data.error || "Unable to prepare WhatsApp message."
+      );
       return;
     }
 
-    if (!invoice.token && !invoice.paymentUrl && !invoice.paymentLink && !invoice.checkoutUrl) {
-      showNotice("error", "This invoice does not have a payment link yet.");
-      return;
-    }
+    const provider = getWhatsAppProviderFromResponse(data);
+    const fallbackUrl = getBrowserWhatsAppUrlFromResponse(data);
 
-    try {
-      const res = await authFetch("/api/notifications/whatsapp/invoice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          invoiceId: String(invoice._id),
-          origin: window.location.origin,
-        }),
-      });
+    /*
+      Browser WhatsApp selected:
+      Open wa.me manually and do NOT show bridge error.
+    */
+    if (provider === "browser" && fallbackUrl) {
+      const opened = openExternalTab(fallbackUrl, showNotice);
 
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        showNotice("error", data.error || "Unable to send through the connected WhatsApp session.");
-        return;
-      }
-
-      if (data?.delivery?.queued) {
-        showNotice("info", "Message queued and will be sent through the connected WhatsApp session.");
-        return;
-      }
-
-      const sentThroughBridge =
-        data?.delivery?.sent === true &&
-        data?.delivery?.provider === "whatsappWeb";
-
-      if (!sentThroughBridge) {
+      if (opened) {
         showNotice(
-          "error",
-          "The connected WhatsApp session is unavailable. Check the connection in Settings and try again."
+          "success",
+          "Browser WhatsApp opened with the prepared invoice message."
         );
-        return;
       }
 
-      showNotice("success", "Sent through the connected WhatsApp session.");
-    } catch {
-      showNotice("error", "Unable to reach the WhatsApp service. Please try again.");
+      await loadInvoices();
+      return;
     }
-  };
+
+    /*
+      Some backend responses may use fallback status without provider.
+    */
+    if (fallbackUrl) {
+      const opened = openExternalTab(fallbackUrl, showNotice);
+
+      if (opened) {
+        showNotice(
+          "success",
+          "WhatsApp opened with the prepared invoice message."
+        );
+      }
+
+      await loadInvoices();
+      return;
+    }
+
+    /*
+      WhatsApp Web bridge selected and message sent.
+    */
+    if (
+      data?.delivery?.sent === true &&
+      data?.delivery?.provider === "whatsappWeb"
+    ) {
+      showNotice("success", "Sent through the connected WhatsApp session.");
+      await loadInvoices();
+      return;
+    }
+
+    /*
+      Twilio selected and message queued/sent.
+    */
+    if (
+      data?.delivery?.provider === "twilio" &&
+      ["queued", "sent", "accepted"].includes(String(data?.delivery?.status || ""))
+    ) {
+      showNotice("success", "Invoice message queued through Twilio WhatsApp.");
+      await loadInvoices();
+      return;
+    }
+
+    /*
+      Generic queued response.
+    */
+    if (data?.delivery?.queued) {
+      showNotice("info", "Message queued for WhatsApp delivery.");
+      await loadInvoices();
+      return;
+    }
+
+    /*
+      Final fallback only if there is truly no browser URL and no sent provider.
+    */
+    showNotice(
+      "error",
+      "WhatsApp message could not be sent or opened. Check your WhatsApp settings and try again."
+    );
+  } catch (error) {
+    showNotice(
+      "error",
+      error.message || "Unable to reach the WhatsApp service. Please try again."
+    );
+  }
+};
   const sendBulkReminders = async () => {
     if (actionableInvoices.length === 0) {
       showNotice("info", "There are no unpaid invoices to remind.");
