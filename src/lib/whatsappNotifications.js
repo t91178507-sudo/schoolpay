@@ -184,7 +184,7 @@ export async function deliverInvoiceMessage({
         : "Payment Link";
 
   const outstandingAmount = getOutstandingAmount(invoice);
-  const pendingBalance = isReminder ? outstandingAmount : null;
+  const pendingBalance = outstandingAmount;
 
   const baseMessage = buildInvoiceMessage({
     businessLogo: invoice.businessLogo || owner?.businessLogo || "",
