@@ -30,6 +30,28 @@ function getReceiptAmount(receipt) {
   return extractedAmount > 0 ? extractedAmount : Number(receipt?.amount || 0);
 }
 
+function getReceiptConfidence(receipt) {
+  return Number(
+    receipt?.verification?.score ||
+      receipt?.extracted?.verification?.score ||
+      receipt?.extracted?.confidence ||
+      0
+  );
+}
+
+function getReceiptVerification(receipt) {
+  return (
+    receipt?.verification ||
+    receipt?.extracted?.verification || {
+      score: getReceiptConfidence(receipt),
+      status: "pending",
+      possibleTampering: false,
+      failedReasons: [],
+      checks: receipt?.extracted?.checks || [],
+    }
+  );
+}
+
 function isReceiptProcessing(receipt) {
   return receipt?.analysisStatus === "processing";
 }
@@ -421,9 +443,11 @@ function FeedbackBanner({ tone, message }) {
 }
 
 function ReceiptRow({ receipt, onOpen }) {
-  const confidence = Number(receipt.extracted?.confidence || 0);
+  const confidence = getReceiptConfidence(receipt);
+  const verification = getReceiptVerification(receipt);
   const processing = isReceiptProcessing(receipt);
   const analysisFailed = receipt.analysisStatus === "failed";
+  const isFlagged = verification.status === "flagged";
 
   return (
     <div className="grid gap-4 px-5 py-4 transition hover:bg-slate-50/80 dark:hover:bg-slate-800/40 lg:grid-cols-[1.15fr_1.15fr_.75fr_1fr_.65fr_.8fr_auto] lg:items-center lg:gap-5">
@@ -449,7 +473,7 @@ function ReceiptRow({ receipt, onOpen }) {
         ) : analysisFailed ? (
           <span className="text-sm font-medium text-amber-600 dark:text-amber-300">Manual review</span>
         ) : (
-          <span className={`text-sm font-semibold ${confidence >= 75 ? "text-emerald-600" : confidence > 0 ? "text-amber-600" : "text-slate-400"}`}>{confidence ? `${confidence}%` : "-"}</span>
+          <span className={`text-sm font-semibold ${confidence >= 75 && !isFlagged ? "text-emerald-600" : confidence > 0 ? "text-amber-600" : "text-slate-400"}`}>{confidence ? `${confidence}%` : "-"}</span>
         )}
       </div>
       <div>
@@ -457,6 +481,8 @@ function ReceiptRow({ receipt, onOpen }) {
           <StatusBadge tone="blue">Reading receipt</StatusBadge>
         ) : analysisFailed ? (
           <StatusBadge tone="orange">Needs review</StatusBadge>
+        ) : isFlagged && receipt.status === "pending" ? (
+          <StatusBadge tone="orange">Flagged review</StatusBadge>
         ) : (
           <StatusBadge tone={getStatusTone(receipt.status)}>{formatStatus(receipt.status)}</StatusBadge>
         )}
@@ -504,7 +530,8 @@ function QueueEmptyState({ queue, hasSearch }) {
 function ReceiptDrawer({ receipt, previewUrl, onClose, onApprove, onReject, busy }) {
   const invoice = receipt.invoice || {};
   const extracted = receipt.extracted || {};
-  const confidence = Number(extracted.confidence || 0);
+  const verification = getReceiptVerification(receipt);
+  const confidence = getReceiptConfidence(receipt);
   const processing = isReceiptProcessing(receipt);
   const analysisFailed = receipt.analysisStatus === "failed";
   const canReview = receipt.status === "pending" && !processing;
@@ -551,8 +578,11 @@ function ReceiptDrawer({ receipt, previewUrl, onClose, onApprove, onReject, busy
               ["Payment date", receipt.paymentDate || extracted.transactionDate || "Not detected"],
               ["Payment time", receipt.paymentTime || extracted.transactionTime || "Not detected"],
               ["Sender", receipt.senderName || extracted.senderName || "Not detected"],
-              ["Recipient", receipt.recipientName || extracted.recipientName || "Not detected"],
+              ["Beneficiary", extracted.beneficiaryName || receipt.recipientName || extracted.recipientName || "Not detected"],
+              ["Account name", extracted.beneficiaryAccountName || extracted.accountName || "Not detected"],
+              ["Account number", extracted.accountNumber || "Not detected"],
               ["Bank", extracted.bankName || "Not detected"],
+              ["Transaction status", extracted.transactionStatus || "Not detected"],
             ]} />
 
             <section className="border-t border-slate-200 py-5 dark:border-slate-800">
@@ -568,19 +598,37 @@ function ReceiptDrawer({ receipt, previewUrl, onClose, onApprove, onReject, busy
                 <>
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <h3 className="font-semibold text-slate-950 dark:text-white">OCR validation</h3>
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{analysisFailed ? receipt.analysisError || "Automated reading failed. Review the receipt manually." : "Use this as guidance and confirm against the receipt."}</p>
+                      <h3 className="font-semibold text-slate-950 dark:text-white">Verification results</h3>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{analysisFailed ? receipt.analysisError || "Automated reading failed. Review the receipt manually." : "OpenAI Vision checked the receipt. Staff approval is still required."}</p>
                     </div>
-                    <span className={`text-lg font-semibold ${confidence >= 75 ? "text-emerald-600" : "text-amber-600"}`}>{confidence}%</span>
+                    <span className={`text-lg font-semibold ${confidence >= 75 && verification.status !== "flagged" ? "text-emerald-600" : "text-amber-600"}`}>{confidence}%</span>
                   </div>
                   <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div className={`h-full rounded-full ${confidence >= 75 ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${Math.min(Math.max(confidence, 0), 100)}%` }} />
+                    <div className={`h-full rounded-full ${confidence >= 75 && verification.status !== "flagged" ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${Math.min(Math.max(confidence, 0), 100)}%` }} />
+                  </div>
+                  <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-800 dark:bg-slate-950/50">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-slate-500 dark:text-slate-400">Possible tampering</span>
+                      <span className={`font-semibold ${verification.possibleTampering ? "text-red-600 dark:text-red-300" : "text-emerald-600 dark:text-emerald-300"}`}>
+                        {verification.possibleTampering ? "Yes" : "No"}
+                      </span>
+                    </div>
+                    {verification.tamperingReason ? (
+                      <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">{verification.tamperingReason}</p>
+                    ) : null}
                   </div>
                   <div className="mt-4 space-y-2">
-                    {(extracted.checks || []).length ? (extracted.checks || []).map((check) => (
-                      <div key={check.label} className="flex items-start gap-2 text-sm">
-                        {check.ok ? <FiCheckCircle className="mt-0.5 shrink-0 text-emerald-600" /> : <FiAlertTriangle className="mt-0.5 shrink-0 text-amber-600" />}
-                        <span className="text-slate-700 dark:text-slate-300">{check.label}</span>
+                    {(verification.checks || []).length ? (verification.checks || []).map((check) => (
+                      <div key={check.key || check.label} className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-800">
+                        <div className="flex items-start gap-2">
+                          {check.ok ? <FiCheckCircle className="mt-0.5 shrink-0 text-emerald-600" /> : <FiAlertTriangle className={`mt-0.5 shrink-0 ${check.severity === "critical" ? "text-red-600" : "text-amber-600"}`} />}
+                          <div className="min-w-0">
+                            <p className="font-medium text-slate-800 dark:text-slate-200">{check.label}</p>
+                            {!check.ok && check.reason ? (
+                              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{check.reason}</p>
+                            ) : null}
+                          </div>
+                        </div>
                       </div>
                     )) : <p className="text-sm text-slate-500 dark:text-slate-400">No automated checks were returned. Review the receipt manually.</p>}
                   </div>
@@ -594,8 +642,8 @@ function ReceiptDrawer({ receipt, previewUrl, onClose, onApprove, onReject, busy
               <div className="flex min-h-11 items-center justify-center gap-2 text-sm font-medium text-slate-500 dark:text-slate-400"><FiRefreshCw className="animate-spin" />Payment details are still being read</div>
             ) : canReview ? (
               <div className="grid gap-3 sm:grid-cols-2">
-                <button type="button" onClick={onReject} disabled={!previewUrl || Boolean(busy)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-200 px-4 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"><FiXCircle />Reject</button>
-                <button type="button" onClick={onApprove} disabled={!previewUrl || busy === `${receipt._id}-approve`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"><FiCheck />{busy === `${receipt._id}-approve` ? "Approving..." : "Approve payment"}</button>
+                <button type="button" onClick={onReject} disabled={!previewUrl || Boolean(busy)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-200 px-4 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"><FiXCircle />Reject receipt</button>
+                <button type="button" onClick={onApprove} disabled={!previewUrl || busy === `${receipt._id}-approve`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"><FiCheck />{busy === `${receipt._id}-approve` ? "Approving..." : "Approve receipt"}</button>
               </div>
             ) : (
               <p className="text-center text-sm text-slate-500 dark:text-slate-400">This receipt has already been {receipt.status}.</p>

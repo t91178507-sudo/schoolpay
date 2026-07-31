@@ -289,6 +289,36 @@ function extractRecipientName(text) {
   return "";
 }
 
+function extractAccountNumber(text) {
+  const normalized = normalizeReceiptText(text);
+  const labelled =
+    normalized.match(
+      /\b(?:beneficiary|recipient|receiver|destination)?\s*account(?:\s*number|\s*no|\s*#)?\s*[:\-]?\s*(\d{10,14})\b/i
+    )?.[1] || "";
+
+  if (labelled) return labelled;
+
+  return normalized.match(/\b(\d{10})\b/)?.[1] || "";
+}
+
+function extractTransactionStatus(text) {
+  const normalized = normalizeReceiptText(text);
+
+  if (/\b(successful|success|completed|approved|paid)\b/i.test(normalized)) {
+    return "Successful";
+  }
+
+  if (/\b(failed|declined|reversed|unsuccessful)\b/i.test(normalized)) {
+    return "Failed";
+  }
+
+  if (/\b(pending|processing)\b/i.test(normalized)) {
+    return "Pending";
+  }
+
+  return "";
+}
+
 function isLikelyAccountName(value) {
   const normalized = String(value || "")
     .replace(/[^A-Za-z .'-]/g, " ")
@@ -505,6 +535,264 @@ function cleanVisionValue(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeComparableText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokenizeName(value) {
+  return normalizeComparableText(value)
+    .split(" ")
+    .filter((token) => token.length > 1);
+}
+
+function namesMatch(detectedName, expectedName) {
+  const expectedTokens = tokenizeName(expectedName);
+  const detectedTokens = new Set(tokenizeName(detectedName));
+
+  return Boolean(
+    expectedTokens.length &&
+      expectedTokens.every((token) => detectedTokens.has(token))
+  );
+}
+
+function parseReceiptDate(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+
+  const directDate = new Date(raw);
+  if (!Number.isNaN(directDate.getTime())) {
+    return directDate;
+  }
+
+  const parts = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (parts) {
+    const first = Number(parts[1]);
+    const second = Number(parts[2]);
+    const year = Number(parts[3].length === 2 ? `20${parts[3]}` : parts[3]);
+    const day = first > 12 ? first : second;
+    const month = first > 12 ? second : first;
+    const parsed = new Date(year, month - 1, day);
+
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function sameDayOrAfter(candidate, baseline) {
+  const candidateDay = new Date(
+    candidate.getFullYear(),
+    candidate.getMonth(),
+    candidate.getDate()
+  ).getTime();
+  const baselineDay = new Date(
+    baseline.getFullYear(),
+    baseline.getMonth(),
+    baseline.getDate()
+  ).getTime();
+
+  return candidateDay >= baselineDay;
+}
+
+function sameDayOrBefore(candidate, baseline) {
+  const candidateDay = new Date(
+    candidate.getFullYear(),
+    candidate.getMonth(),
+    candidate.getDate()
+  ).getTime();
+  const baselineDay = new Date(
+    baseline.getFullYear(),
+    baseline.getMonth(),
+    baseline.getDate()
+  ).getTime();
+
+  return candidateDay <= baselineDay;
+}
+
+function isInvoicePaid(invoice = {}) {
+  const status = String(invoice.status || "").toLowerCase().trim();
+  const paymentStatus = String(invoice.paymentStatus || "").toLowerCase().trim();
+
+  return (
+    paymentStatus === "paid" ||
+    status === "paid" ||
+    status === "fully paid"
+  );
+}
+
+function makeValidationCheck(key, label, ok, reason, { severity = "warning" } = {}) {
+  return {
+    key,
+    label,
+    ok: Boolean(ok),
+    severity,
+    reason: ok ? "" : reason,
+  };
+}
+
+export function buildReceiptVerification({
+  extracted = {},
+  invoice = {},
+  configuredPayment = {},
+  duplicateTransaction = false,
+  duplicateReceipt = false,
+  invoiceStatusBeforeReceipt = "",
+  invoicePaymentStatusBeforeReceipt = "",
+} = {}) {
+  const expectedBeneficiary =
+    configuredPayment.beneficiaryName ||
+    configuredPayment.accountName ||
+    configuredPayment.businessName ||
+    "";
+  const expectedAccountName =
+    configuredPayment.accountName || configuredPayment.beneficiaryName || "";
+  const detectedBeneficiary =
+    extracted.beneficiaryName || extracted.recipientName || extracted.receiptText || "";
+  const detectedAccountName =
+    extracted.beneficiaryAccountName ||
+    extracted.accountName ||
+    extracted.recipientName ||
+    "";
+  const receiptDate = parseReceiptDate(
+    extracted.transactionDateTime || extracted.transactionDate
+  );
+  const invoiceDate = parseReceiptDate(
+    invoice.createdAt || invoice.invoiceDate || invoice.date
+  );
+  const now = new Date();
+  const alreadyPaidBeforeUpload =
+    isInvoicePaid({
+      status: invoiceStatusBeforeReceipt || invoice.status,
+      paymentStatus: invoicePaymentStatusBeforeReceipt || invoice.paymentStatus,
+    }) && String(invoicePaymentStatusBeforeReceipt || invoice.paymentStatus) !== "pending_receipt_validation";
+  const tampering = extracted.tampering || {};
+  const tamperingDetected = Boolean(tampering.possible);
+  const requiredDetails = [
+    ["bankName", "Bank name", extracted.bankName],
+    ["beneficiaryName", "Beneficiary name", detectedBeneficiary],
+    ["amount", "Amount", Number(extracted.amount || 0) > 0],
+    ["transactionReference", "Transaction reference", extracted.transactionReference],
+    ["transactionDate", "Date", extracted.transactionDate],
+    ["transactionStatus", "Transaction status", extracted.transactionStatus],
+  ];
+  const optionalAccountNumber = extracted.accountNumber || configuredPayment.accountNumber;
+
+  if (optionalAccountNumber) {
+    requiredDetails.splice(2, 0, ["accountNumber", "Account number", extracted.accountNumber]);
+  }
+
+  const completenessMissing = requiredDetails
+    .filter(([, , value]) => !value)
+    .map(([, label]) => label);
+  const validationChecks = [
+    makeValidationCheck(
+      "beneficiaryName",
+      "Beneficiary name matches",
+      Boolean(expectedBeneficiary) &&
+        namesMatch(detectedBeneficiary, expectedBeneficiary),
+      expectedBeneficiary
+        ? `Expected ${expectedBeneficiary}, but detected ${detectedBeneficiary || "nothing"}.`
+        : "No beneficiary name is configured under Settings > Payment."
+    ),
+    makeValidationCheck(
+      "beneficiaryAccountName",
+      "Account name matches",
+      Boolean(expectedAccountName) &&
+        namesMatch(detectedAccountName, expectedAccountName),
+      expectedAccountName
+        ? `Expected ${expectedAccountName}, but detected ${detectedAccountName || "nothing"}.`
+        : "No account name is configured under Settings > Payment."
+    ),
+    makeValidationCheck(
+      "receiptDateAfterInvoice",
+      "Receipt date is after invoice creation",
+      !receiptDate || !invoiceDate || sameDayOrAfter(receiptDate, invoiceDate),
+      "Receipt date is earlier than the invoice creation date.",
+      { severity: "critical" }
+    ),
+    makeValidationCheck(
+      "receiptDateNotFuture",
+      "Receipt date is not in the future",
+      !receiptDate || sameDayOrBefore(receiptDate, now),
+      "Receipt date is in the future.",
+      { severity: "critical" }
+    ),
+    makeValidationCheck(
+      "invoiceNotPaid",
+      "Invoice was not already paid",
+      !alreadyPaidBeforeUpload,
+      "This invoice was already marked as paid before this receipt was uploaded.",
+      { severity: "critical" }
+    ),
+    makeValidationCheck(
+      "duplicateTransaction",
+      "Transaction reference is unique",
+      !duplicateTransaction,
+      "This transaction reference has already been used for another payment.",
+      { severity: "critical" }
+    ),
+    makeValidationCheck(
+      "duplicateReceipt",
+      "Receipt file is unique",
+      !duplicateReceipt,
+      "The exact same receipt file has already been uploaded.",
+      { severity: "critical" }
+    ),
+    makeValidationCheck(
+      "tampering",
+      "No visible tampering detected",
+      !tamperingDetected,
+      tampering.reason || "OpenAI Vision flagged possible editing or manipulation.",
+      { severity: "critical" }
+    ),
+    makeValidationCheck(
+      "completeness",
+      "Receipt contains required details",
+      completenessMissing.length === 0,
+      completenessMissing.length
+        ? `Missing: ${completenessMissing.join(", ")}.`
+        : "",
+      { severity: "warning" }
+    ),
+  ];
+  const failedChecks = validationChecks.filter((check) => !check.ok);
+  const criticalFailures = failedChecks.filter(
+    (check) => check.severity === "critical"
+  ).length;
+  const warningFailures = failedChecks.length - criticalFailures;
+  const score = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        100 - criticalFailures * 18 - warningFailures * 10 - completenessMissing.length * 4
+      )
+    )
+  );
+
+  return {
+    score,
+    status: failedChecks.length ? "flagged" : "passed",
+    possibleTampering: tamperingDetected,
+    tamperingReason: tampering.reason || "",
+    missingDetails: completenessMissing,
+    failedReasons: failedChecks.map((check) => check.reason).filter(Boolean),
+    checks: validationChecks,
+    comparedAgainst: {
+      beneficiaryName: expectedBeneficiary,
+      accountName: expectedAccountName,
+      accountNumber: configuredPayment.accountNumber || "",
+      bankName: configuredPayment.bankName || "",
+    },
+  };
+}
+
 async function readReceiptWithOpenAiVision(buffer, mimeType, openAiVision = {}) {
   const apiKey = cleanVisionValue(openAiVision.apiKey);
   if (!openAiVision.enabled || !apiKey) return null;
@@ -512,7 +800,7 @@ async function readReceiptWithOpenAiVision(buffer, mimeType, openAiVision = {}) 
   const content = [
     {
       type: "input_text",
-      text: "Read this Nigerian bank-transfer receipt. Extract only visible details; do not guess. Preserve visible names, bank, transaction ID, date, time and receipt text. Return amount without currency symbols or separators, or 0 when no amount is visible.",
+      text: "Read this Nigerian bank-transfer receipt. Extract only visible details; do not guess. Preserve visible names, bank, transaction ID, date, time, account number, transaction status and receipt text. Return amount without currency symbols or separators, or 0 when no amount is visible. Also inspect whether the receipt appears edited or manipulated, including inconsistent fonts, altered amounts, blurred text, copied sections or other suspicious signs.",
     },
   ];
 
@@ -558,6 +846,19 @@ async function readReceiptWithOpenAiVision(buffer, mimeType, openAiVision = {}) 
               bankName: { type: "string" },
               senderName: { type: "string" },
               recipientName: { type: "string" },
+              beneficiaryName: { type: "string" },
+              beneficiaryAccountName: { type: "string" },
+              accountNumber: { type: "string" },
+              transactionStatus: { type: "string" },
+              tampering: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  possible: { type: "boolean" },
+                  reason: { type: "string" },
+                },
+                required: ["possible", "reason"],
+              },
             },
             required: [
               "receiptText",
@@ -568,6 +869,11 @@ async function readReceiptWithOpenAiVision(buffer, mimeType, openAiVision = {}) 
               "bankName",
               "senderName",
               "recipientName",
+              "beneficiaryName",
+              "beneficiaryAccountName",
+              "accountNumber",
+              "transactionStatus",
+              "tampering",
             ],
           },
         },
@@ -588,7 +894,14 @@ export async function analyzeReceiptFile(
   buffer,
   mimeType,
   invoice = {},
-  { openAiVision = {} } = {}
+  {
+    openAiVision = {},
+    configuredPayment = {},
+    duplicateTransaction = false,
+    duplicateReceipt = false,
+    invoiceStatusBeforeReceipt = "",
+    invoicePaymentStatusBeforeReceipt = "",
+  } = {}
 ) {
   let text = "";
   let ocrText = "";
@@ -626,6 +939,22 @@ export async function analyzeReceiptFile(
     cleanVisionValue(visionData?.senderName) || extractSenderName(combinedText);
   const recipientName =
     cleanVisionValue(visionData?.recipientName) || extractRecipientName(combinedText);
+  const beneficiaryName =
+    cleanVisionValue(visionData?.beneficiaryName) || recipientName;
+  const beneficiaryAccountName =
+    cleanVisionValue(visionData?.beneficiaryAccountName) || beneficiaryName;
+  const accountNumber =
+    cleanVisionValue(visionData?.accountNumber) || extractAccountNumber(combinedText);
+  const transactionStatus =
+    cleanVisionValue(visionData?.transactionStatus) ||
+    extractTransactionStatus(combinedText);
+  const tampering =
+    visionData?.tampering && typeof visionData.tampering === "object"
+      ? {
+          possible: Boolean(visionData.tampering.possible),
+          reason: cleanVisionValue(visionData.tampering.reason),
+        }
+      : { possible: false, reason: "" };
 
   const checks = [
     {
@@ -653,8 +982,7 @@ export async function analyzeReceiptFile(
   const confidence = Math.round(
     (checks.filter((check) => check.ok).length / checks.length) * 100
   );
-
-  return {
+  const extracted = {
     textSnippet: combinedText.slice(0, 1000),
     amount,
     bankName,
@@ -670,10 +998,31 @@ export async function analyzeReceiptFile(
         : transactionDate,
     senderName,
     recipientName,
+    beneficiaryName,
+    beneficiaryAccountName,
+    accountNumber,
+    transactionStatus,
+    tampering,
     ocrApplied: Boolean(visionData || ocrText),
     ocrProvider: visionData ? "openai_vision" : ocrText ? "tesseract" : "pdf_text",
     confidence,
     checks,
+  };
+  const verification = buildReceiptVerification({
+    extracted,
+    invoice,
+    configuredPayment,
+    duplicateTransaction,
+    duplicateReceipt,
+    invoiceStatusBeforeReceipt,
+    invoicePaymentStatusBeforeReceipt,
+  });
+
+  return {
+    ...extracted,
+    confidence: verification.score,
+    extractionConfidence: confidence,
+    verification,
   };
 }
 

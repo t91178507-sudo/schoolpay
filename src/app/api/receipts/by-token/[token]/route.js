@@ -5,6 +5,7 @@ import { connectDB } from "../../../../../lib/mongodb";
 import { decryptSettingsSecret } from "../../../../../lib/paymentGatewaySettings";
 import {
   analyzeReceiptFile,
+  buildReceiptVerification,
   encryptReceiptBuffer,
   logReceiptAudit,
   validateReceiptFile,
@@ -49,6 +50,81 @@ async function findDuplicateReceipt(
   }
 
   return db.collection("receiptUploads").findOne(query);
+}
+
+async function findDuplicateTransactionUse(
+  db,
+  { ownerId, transactionReference, excludeReceiptId, excludeInvoiceId }
+) {
+  const reference = String(transactionReference || "").trim();
+
+  if (!reference) return null;
+
+  const receiptQuery = {
+    ownerId,
+    transactionReference: reference,
+  };
+
+  if (excludeReceiptId) {
+    receiptQuery._id = { $ne: excludeReceiptId };
+  }
+
+  const duplicateReceipt = await db.collection("receiptUploads").findOne(receiptQuery);
+
+  if (duplicateReceipt) {
+    return {
+      source: "receipt",
+      id: String(duplicateReceipt._id),
+      invoiceNumber: duplicateReceipt.invoiceNumber || "",
+    };
+  }
+
+  const invoiceQuery = {
+    ownerId,
+    $or: [
+      { paymentReference: reference },
+      { "paymentTransactions.paymentReference": reference },
+      { "paymentTransactions.reference": reference },
+    ],
+  };
+
+  if (excludeInvoiceId) {
+    invoiceQuery._id = { $ne: excludeInvoiceId };
+  }
+
+  const duplicatePayment = await db.collection("invoices").findOne(invoiceQuery);
+
+  if (duplicatePayment) {
+    return {
+      source: "payment",
+      id: String(duplicatePayment._id),
+      invoiceNumber: duplicatePayment.invoiceNumber || "",
+    };
+  }
+
+  return null;
+}
+
+function resolveConfiguredPayment(owner = {}) {
+  const gateways = owner.paymentGateways || {};
+  const receiptUpload = gateways.receiptUpload || {};
+  const accountDetails = gateways.accountDetails || {};
+  const preferred =
+    owner.defaultPaymentGateway === "receiptUpload"
+      ? receiptUpload
+      : owner.defaultPaymentGateway === "accountDetails"
+        ? accountDetails
+        : receiptUpload.enabled
+          ? receiptUpload
+          : accountDetails;
+
+  return {
+    bankName: preferred.bankName || "",
+    accountName: preferred.accountName || "",
+    beneficiaryName: preferred.accountName || owner.businessName || "",
+    accountNumber: preferred.accountNumber || "",
+    businessName: owner.businessName || "",
+  };
 }
 
 async function tokenCanAccessInvoice(db, invoice, token) {
@@ -107,10 +183,15 @@ async function processReceiptAnalysis({
   const db = await connectDB();
 
   try {
+    const owner =
+      invoice.ownerId && ObjectId.isValid(invoice.ownerId)
+        ? await db.collection("users").findOne({ _id: new ObjectId(invoice.ownerId) })
+        : null;
+    const configuredPayment = resolveConfiguredPayment(owner || {});
     const platformSettings =
       (await db.collection("platformSettings").findOne({ _id: "platform" })) || {};
     const storedOpenAiVision = platformSettings.openAiVision || {};
-    const extracted = await analyzeReceiptFile(buffer, mimeType, invoice, {
+    const preliminaryExtracted = await analyzeReceiptFile(buffer, mimeType, invoice, {
       openAiVision: {
         enabled: storedOpenAiVision.enabled === true,
         model: storedOpenAiVision.model || "gpt-4o-mini",
@@ -119,72 +200,43 @@ async function processReceiptAnalysis({
           process.env.OPENAI_API_KEY ||
           "",
       },
+      configuredPayment,
+      invoiceStatusBeforeReceipt: submittedFields.invoiceStatusBeforeReceipt,
+      invoicePaymentStatusBeforeReceipt:
+        submittedFields.invoicePaymentStatusBeforeReceipt,
     });
     const transactionReference =
-      submittedFields.transactionReference || extracted.transactionReference || "";
+      submittedFields.transactionReference ||
+      preliminaryExtracted.transactionReference ||
+      "";
+    const duplicateTransaction = await findDuplicateTransactionUse(db, {
+      ownerId: invoice.ownerId,
+      transactionReference,
+      excludeReceiptId: receiptId,
+      excludeInvoiceId: invoice._id,
+    });
+    const extracted = {
+      ...preliminaryExtracted,
+      transactionReference,
+    };
+    extracted.verification = buildReceiptVerification({
+      extracted,
+      invoice,
+      configuredPayment,
+      duplicateTransaction: Boolean(duplicateTransaction),
+      duplicateReceipt: false,
+      invoiceStatusBeforeReceipt: submittedFields.invoiceStatusBeforeReceipt,
+      invoicePaymentStatusBeforeReceipt:
+        submittedFields.invoicePaymentStatusBeforeReceipt,
+    });
+    extracted.verification = {
+      ...extracted.verification,
+      duplicateTransaction: duplicateTransaction || null,
+    };
     const paymentDate =
       submittedFields.paymentDate || extracted.transactionDate || "";
     const senderName = submittedFields.senderName || extracted.senderName || "";
-    const duplicate = transactionReference
-      ? await findDuplicateReceipt(db, {
-          ownerId: invoice.ownerId,
-          transactionReference,
-          excludeReceiptId: receiptId,
-        })
-      : null;
     const now = new Date();
-
-    if (duplicate) {
-      const rejectionReason =
-        "This transaction ID has already been used for another receipt.";
-
-      await db.collection("receiptUploads").updateOne(
-        { _id: receiptId, analysisStatus: "processing" },
-        {
-          $set: {
-            amount: Number(extracted.amount || 0),
-            transactionReference,
-            paymentDate,
-            paymentTime: extracted.transactionTime || "",
-            senderName,
-            recipientName: extracted.recipientName || "",
-            extracted,
-            analysisStatus: "duplicate",
-            analysisCompletedAt: now,
-            analysisError: rejectionReason,
-            status: "rejected",
-            rejectionReason,
-            rejectedAt: now,
-            rejectedBy: "automated-duplicate-check",
-            updatedAt: now,
-          },
-        }
-      );
-
-      await db.collection("invoices").updateOne(
-        { _id: invoice._id, receiptUploadId: receiptId },
-        {
-          $set: {
-            status: submittedFields.invoiceStatusBeforeReceipt || "Unpaid",
-            paymentStatus:
-              submittedFields.invoicePaymentStatusBeforeReceipt || "unpaid",
-            receiptValidationStatus: "rejected",
-            receiptUploadId: "",
-            updatedAt: now,
-          },
-        }
-      );
-
-      await logReceiptAudit(db, {
-        ownerId: invoice.ownerId,
-        receiptId,
-        invoiceId: String(invoice._id),
-        userId: "system",
-        ipAddress: "",
-        action: "Receipt Duplicate Detected",
-      });
-      return;
-    }
 
     await db.collection("receiptUploads").updateOne(
       { _id: receiptId, analysisStatus: "processing" },
@@ -197,9 +249,10 @@ async function processReceiptAnalysis({
           senderName,
           recipientName: extracted.recipientName || "",
           extracted,
+          verification: extracted.verification,
           analysisStatus: "completed",
           analysisCompletedAt: now,
-          analysisError: "",
+          analysisError: extracted.verification?.failedReasons?.[0] || "",
           updatedAt: now,
         },
       }
@@ -317,6 +370,13 @@ export async function POST(req, context) {
       analysisCompletedAt: null,
       analysisError: "",
       status: "pending",
+      verification: {
+        score: 0,
+        status: "pending",
+        possibleTampering: false,
+        failedReasons: [],
+        checks: [],
+      },
       rejectionReason: "",
       rejectedAt: null,
       rejectedBy: "",
