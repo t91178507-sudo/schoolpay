@@ -63,8 +63,20 @@ function maskAccountSid(accountSid) {
 
 function buildSettingsPayload(settings = {}) {
   const managedTwilio = resolveManagedTwilioPlatformConfig(settings);
+  const openAiVision = settings.openAiVision || {};
 
   return {
+    openAiVision: {
+      enabled: openAiVision.enabled === true,
+      configured: Boolean(
+        decryptSettingsSecret(openAiVision.apiKey) || process.env.OPENAI_API_KEY
+      ),
+      apiKeyConfigured: Boolean(
+        decryptSettingsSecret(openAiVision.apiKey) || process.env.OPENAI_API_KEY
+      ),
+      model: normalizeText(openAiVision.model) || "gpt-4o-mini",
+      updatedAt: openAiVision.updatedAt || null,
+    },
     whatsappBridge: {
       bridgeBaseUrl: settings.whatsappBridge?.bridgeBaseUrl || "",
       bridgePort: settings.whatsappBridge?.bridgePort || "",
@@ -84,6 +96,49 @@ function buildSettingsPayload(settings = {}) {
       updatedAt: settings.twilioManaged?.updatedAt || managedTwilio.updatedAt || null,
     },
   };
+}
+
+async function saveOpenAiVision(db, body, currentSettings) {
+  const input = body.openAiVision || {};
+  const current = currentSettings.openAiVision || {};
+  const apiKey =
+    normalizeText(input.apiKey) ||
+    decryptSettingsSecret(current.apiKey) ||
+    normalizeText(process.env.OPENAI_API_KEY);
+
+  if (input.enabled === true && !apiKey) {
+    return Response.json(
+      { error: "Enter an OpenAI API key before enabling receipt analysis." },
+      { status: 400 }
+    );
+  }
+
+  const now = new Date();
+  const openAiVision = {
+    enabled: input.enabled === true,
+    apiKey: normalizeText(input.apiKey)
+      ? encryptSettingsSecret(normalizeText(input.apiKey))
+      : current.apiKey || "",
+    model: normalizeText(input.model) || "gpt-4o-mini",
+    updatedAt: now,
+  };
+
+  await db.collection("platformSettings").updateOne(
+    { _id: PLATFORM_SETTINGS_ID },
+    {
+      $set: { openAiVision, updatedAt: now },
+      $setOnInsert: { createdAt: now },
+    },
+    { upsert: true }
+  );
+
+  return Response.json({
+    success: true,
+    message: openAiVision.enabled
+      ? "OpenAI Vision is enabled for receipt analysis."
+      : "OpenAI Vision is saved but currently disabled.",
+    settings: buildSettingsPayload({ ...currentSettings, openAiVision }),
+  });
 }
 
 async function saveManagedTwilio(db, body, currentSettings) {
@@ -271,6 +326,10 @@ export async function PUT(req) {
     const section = normalizeText(body.section) || "whatsappBridge";
     const currentSettings =
       (await db.collection("platformSettings").findOne({ _id: PLATFORM_SETTINGS_ID })) || {};
+
+    if (section === "openAiVision") {
+      return await saveOpenAiVision(db, body, currentSettings);
+    }
 
     if (section === "twilioManaged") {
       return await saveManagedTwilio(db, body, currentSettings);

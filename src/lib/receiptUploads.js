@@ -490,25 +490,142 @@ async function readImageTextWithOcr(buffer) {
     return "";
   }
 }
-export async function analyzeReceiptFile(buffer, mimeType, invoice = {}) {
-  let text = "";
-  let ocrText = "";
-  const invoiceAmount = parseAmount(invoice.balanceDue || invoice.amount || 0);
+
+function getResponseText(response) {
+  if (typeof response?.output_text === "string") return response.output_text;
+
+  return (response?.output || [])
+    .flatMap((item) => item?.content || [])
+    .filter((item) => item?.type === "output_text")
+    .map((item) => item.text || "")
+    .join("\n");
+}
+
+function cleanVisionValue(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+async function readReceiptWithOpenAiVision(buffer, mimeType, openAiVision = {}) {
+  const apiKey = cleanVisionValue(openAiVision.apiKey);
+  if (!openAiVision.enabled || !apiKey) return null;
+
+  const content = [
+    {
+      type: "input_text",
+      text: "Read this Nigerian bank-transfer receipt. Extract only visible details; do not guess. Preserve visible names, bank, transaction ID, date, time and receipt text. Return amount without currency symbols or separators, or 0 when no amount is visible.",
+    },
+  ];
 
   if (mimeType === "application/pdf") {
-    text = await readPdfText(buffer);
-  } else if (mimeType?.startsWith("image/")) {
-    ocrText = await readImageTextWithOcr(buffer);
+    content.push({
+      type: "input_file",
+      filename: "receipt.pdf",
+      file_data: buffer.toString("base64"),
+    });
+  } else {
+    content.push({
+      type: "input_image",
+      image_url: `data:${mimeType || "image/jpeg"};base64,${buffer.toString("base64")}`,
+      detail: "high",
+    });
   }
 
-  const combinedText = normalizeReceiptText(`${text}\n${ocrText}`);
-  const amount = extractAmount(combinedText, invoiceAmount);
-  const transactionReference = extractReference(combinedText);
-  const transactionDateTime = extractDateTime(combinedText);
-  const transactionDate = transactionDateTime.date;
-  const bankName = extractBank(combinedText);
-  const senderName = extractSenderName(combinedText);
-  const recipientName = extractRecipientName(combinedText);
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: cleanVisionValue(openAiVision.model) || "gpt-4o-mini",
+      store: false,
+      max_output_tokens: 1800,
+      input: [{ role: "user", content }],
+      text: {
+        format: {
+          type: "json_schema",
+          name: "receipt_details",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              receiptText: { type: "string" },
+              amount: { type: "number" },
+              transactionReference: { type: "string" },
+              transactionDate: { type: "string" },
+              transactionTime: { type: "string" },
+              bankName: { type: "string" },
+              senderName: { type: "string" },
+              recipientName: { type: "string" },
+            },
+            required: [
+              "receiptText",
+              "amount",
+              "transactionReference",
+              "transactionDate",
+              "transactionTime",
+              "bankName",
+              "senderName",
+              "recipientName",
+            ],
+          },
+        },
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error?.error?.message || "OpenAI receipt analysis failed.");
+  }
+
+  const output = getResponseText(await response.json());
+  if (!output) throw new Error("OpenAI returned no receipt details.");
+  return JSON.parse(output);
+}
+export async function analyzeReceiptFile(
+  buffer,
+  mimeType,
+  invoice = {},
+  { openAiVision = {} } = {}
+) {
+  let text = "";
+  let ocrText = "";
+  let visionData = null;
+  const invoiceAmount = parseAmount(invoice.balanceDue || invoice.amount || 0);
+
+  try {
+    visionData = await readReceiptWithOpenAiVision(buffer, mimeType, openAiVision);
+  } catch (error) {
+    console.error("OPENAI RECEIPT VISION ERROR:", error.message || error);
+  }
+
+  if (!visionData) {
+    if (mimeType === "application/pdf") {
+      text = await readPdfText(buffer);
+    } else if (mimeType?.startsWith("image/")) {
+      ocrText = await readImageTextWithOcr(buffer);
+    }
+  }
+
+  const combinedText = normalizeReceiptText(
+    `${cleanVisionValue(visionData?.receiptText)}\n${text}\n${ocrText}`
+  );
+  const visionAmount = parseAmount(visionData?.amount || 0);
+  const amount = visionAmount || extractAmount(combinedText, invoiceAmount);
+  const transactionReference =
+    cleanVisionValue(visionData?.transactionReference) || extractReference(combinedText);
+  const fallbackDateTime = extractDateTime(combinedText);
+  const transactionDate =
+    cleanVisionValue(visionData?.transactionDate) || fallbackDateTime.date;
+  const transactionTime =
+    cleanVisionValue(visionData?.transactionTime) || fallbackDateTime.time;
+  const bankName = cleanVisionValue(visionData?.bankName) || extractBank(combinedText);
+  const senderName =
+    cleanVisionValue(visionData?.senderName) || extractSenderName(combinedText);
+  const recipientName =
+    cleanVisionValue(visionData?.recipientName) || extractRecipientName(combinedText);
 
   const checks = [
     {
@@ -543,17 +660,18 @@ export async function analyzeReceiptFile(buffer, mimeType, invoice = {}) {
     bankName,
     transactionReference,
     transactionDate,
-    transactionTime: transactionDateTime.time,
-    transactionTimezone: transactionDateTime.timezone,
+    transactionTime,
+    transactionTimezone: fallbackDateTime.timezone,
     transactionDateTime:
-      transactionDateTime.date && transactionDateTime.time
-        ? `${transactionDateTime.date} ${transactionDateTime.time}${
-            transactionDateTime.timezone ? ` ${transactionDateTime.timezone}` : ""
+      transactionDate && transactionTime
+        ? `${transactionDate} ${transactionTime}${
+            fallbackDateTime.timezone ? ` ${fallbackDateTime.timezone}` : ""
           }`
-        : transactionDateTime.date,
+        : transactionDate,
     senderName,
     recipientName,
-    ocrApplied: Boolean(ocrText),
+    ocrApplied: Boolean(visionData || ocrText),
+    ocrProvider: visionData ? "openai_vision" : ocrText ? "tesseract" : "pdf_text",
     confidence,
     checks,
   };

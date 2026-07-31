@@ -4,6 +4,14 @@ import { useEffect, useState } from "react";
 import { adminFetch } from "../../../lib/adminFetch";
 
 const EMPTY_SETTINGS = {
+  openAiVision: {
+    enabled: false,
+    configured: false,
+    apiKeyConfigured: false,
+    apiKey: "",
+    model: "gpt-4o-mini",
+    updatedAt: null,
+  },
   whatsappBridge: {
     bridgeBaseUrl: "",
     bridgePort: "",
@@ -33,10 +41,12 @@ export default function AdminSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingTwilio, setSavingTwilio] = useState(false);
+  const [savingOpenAi, setSavingOpenAi] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [showTwilioToken, setShowTwilioToken] = useState(false);
+  const [showOpenAiKey, setShowOpenAiKey] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -44,6 +54,10 @@ export default function AdminSettings() {
         const res = await adminFetch("/api/admin/settings");
         const data = res.ok ? await res.json() : EMPTY_SETTINGS;
         setSettings({
+          openAiVision: {
+            ...EMPTY_SETTINGS.openAiVision,
+            ...(data.openAiVision || {}),
+          },
           whatsappBridge: {
             ...EMPTY_SETTINGS.whatsappBridge,
             ...(data.whatsappBridge || {}),
@@ -73,6 +87,55 @@ export default function AdminSettings() {
     }));
     setMessage("");
     setError("");
+  };
+
+  const updateOpenAiField = (field, value) => {
+    setSettings((current) => ({
+      ...current,
+      openAiVision: {
+        ...current.openAiVision,
+        [field]: value,
+      },
+    }));
+    setMessage("");
+    setError("");
+  };
+
+  const handleSaveOpenAi = async (event) => {
+    event.preventDefault();
+    setSavingOpenAi(true);
+    setMessage("");
+    setError("");
+
+    try {
+      const res = await adminFetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          section: "openAiVision",
+          openAiVision: {
+            enabled: settings.openAiVision.enabled === true,
+            apiKey: settings.openAiVision.apiKey || "",
+            model: settings.openAiVision.model || "gpt-4o-mini",
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unable to save OpenAI Vision settings");
+
+      setSettings((current) => ({
+        ...current,
+        openAiVision: {
+          ...EMPTY_SETTINGS.openAiVision,
+          ...(data.settings?.openAiVision || {}),
+        },
+      }));
+      setMessage(data.message || "OpenAI Vision settings saved.");
+    } catch (saveError) {
+      setError(saveError.message || "Unable to save OpenAI Vision settings");
+    } finally {
+      setSavingOpenAi(false);
+    }
   };
 
   const updateTwilioField = (field, value) => {
@@ -206,12 +269,75 @@ export default function AdminSettings() {
         </p>
       ) : null}
 
+      <form onSubmit={handleSaveOpenAi} className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-950">OpenAI Vision receipt analysis</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+              Read uploaded receipt images and PDFs to extract the amount, bank, transaction ID, date, time, sender and recipient. The local reader remains available if OpenAI is unavailable.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={settings.openAiVision.enabled === true}
+            onClick={() => updateOpenAiField("enabled", !settings.openAiVision.enabled)}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+              settings.openAiVision.enabled ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {settings.openAiVision.enabled ? "Enabled" : "Disabled"}
+          </button>
+        </div>
+
+        <div className="mt-6 grid gap-5 md:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">OpenAI API key</label>
+            <div className="flex min-h-12 rounded-lg border border-slate-300 focus-within:border-slate-500">
+              <input
+                type={showOpenAiKey ? "text" : "password"}
+                required={settings.openAiVision.enabled && !settings.openAiVision.apiKeyConfigured}
+                value={settings.openAiVision.apiKey || ""}
+                onChange={(event) => updateOpenAiField("apiKey", event.target.value)}
+                placeholder={settings.openAiVision.apiKeyConfigured ? "Saved securely" : "sk-..."}
+                className="min-w-0 flex-1 rounded-l-lg px-4 text-sm outline-none"
+              />
+              <button type="button" onClick={() => setShowOpenAiKey((visible) => !visible)} className="px-4 text-sm font-medium text-slate-500 hover:text-slate-900">
+                {showOpenAiKey ? "Hide" : "Show"}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">The key is encrypted before it is stored. Leave it blank to keep the saved key.</p>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">Vision model</label>
+            <select
+              value={settings.openAiVision.model || "gpt-4o-mini"}
+              onChange={(event) => updateOpenAiField("model", event.target.value)}
+              className="min-h-12 w-full rounded-lg border border-slate-300 bg-white px-4 text-sm outline-none focus:border-slate-500"
+            >
+              <option value="gpt-4o-mini">GPT-4o mini - fast and economical</option>
+              <option value="gpt-4o">GPT-4o - higher accuracy</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 pt-5">
+          <p className="text-xs text-slate-500">
+            {settings.openAiVision.updatedAt ? `Last updated ${new Date(settings.openAiVision.updatedAt).toLocaleString()}` : "Add an API key and enable analysis when ready."}
+          </p>
+          <button type="submit" disabled={savingOpenAi} className="min-h-11 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400">
+            {savingOpenAi ? "Saving..." : "Save receipt analysis"}
+          </button>
+        </div>
+      </form>
+
       <form onSubmit={handleSaveTwilio} className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
           <div>
             <h2 className="text-lg font-semibold text-slate-950">Twilio managed WhatsApp</h2>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
-              Connect InvoiceHub's parent Twilio account. Verified businesses can then create an isolated subaccount and register their own WhatsApp sender.
+              Connect InvoiceHub&apos;s parent Twilio account. Verified businesses can then create an isolated subaccount and register their own WhatsApp sender.
             </p>
           </div>
           <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${settings.twilioManaged.configured ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>

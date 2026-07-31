@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { ObjectId } from "mongodb";
 import { after } from "next/server";
 import { connectDB } from "../../../../../lib/mongodb";
+import { decryptSettingsSecret } from "../../../../../lib/paymentGatewaySettings";
 import {
   analyzeReceiptFile,
   encryptReceiptBuffer,
@@ -106,7 +107,19 @@ async function processReceiptAnalysis({
   const db = await connectDB();
 
   try {
-    const extracted = await analyzeReceiptFile(buffer, mimeType, invoice);
+    const platformSettings =
+      (await db.collection("platformSettings").findOne({ _id: "platform" })) || {};
+    const storedOpenAiVision = platformSettings.openAiVision || {};
+    const extracted = await analyzeReceiptFile(buffer, mimeType, invoice, {
+      openAiVision: {
+        enabled: storedOpenAiVision.enabled === true,
+        model: storedOpenAiVision.model || "gpt-4o-mini",
+        apiKey:
+          decryptSettingsSecret(storedOpenAiVision.apiKey) ||
+          process.env.OPENAI_API_KEY ||
+          "",
+      },
+    });
     const transactionReference =
       submittedFields.transactionReference || extracted.transactionReference || "";
     const paymentDate =
