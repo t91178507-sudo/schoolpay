@@ -127,40 +127,20 @@ function buildInvoicePdfMediaUrl(invoice = {}, origin = "") {
 }
 
 function buildInvoiceWhatsAppMessage({
-  invoice,
-  owner,
-  origin,
   isReminder,
   baseMessage,
   outstandingAmount,
 }) {
-  const formattedInvoiceAmount = `N${Number(invoice.amount || 0).toLocaleString()}`;
-  const formattedOutstanding = `N${Number(outstandingAmount || 0).toLocaleString()}`;
-
   let waMessage = String(baseMessage || "");
-  const amountRegex = /amount:/i;
-  const balanceRegex = /balance:/i;
+  const balanceRegex = /outstanding balance:/i;
   const lines = waMessage.split(/\r?\n/);
-  const amountIndex = lines.findIndex((line) => amountRegex.test(line));
+  const balanceIndex = lines.findIndex((line) => balanceRegex.test(line));
 
-  if (amountIndex !== -1) {
-    const filtered = lines.filter((line) => !balanceRegex.test(line));
-    const newAmountIndex = filtered.findIndex((line) => amountRegex.test(line));
-    const insertPosition = newAmountIndex >= 0 ? newAmountIndex + 1 : filtered.length;
-
-    filtered.splice(insertPosition, 0, `Balance: ${formattedOutstanding}`);
-    waMessage = filtered.join("\n");
-  } else {
-    const hasBalanceInMessage = balanceRegex.test(waMessage);
-    const extras = [];
-
-    extras.push(`Amount: ${formattedInvoiceAmount}`);
-
-    if (!hasBalanceInMessage) {
-      extras.push(`Balance: ${formattedOutstanding}`);
-    }
-
-    waMessage = extras.length ? [waMessage, "", ...extras].join("\n") : waMessage;
+  if (isReminder && balanceIndex === -1) {
+    const formattedOutstanding = `N${Number(outstandingAmount || 0).toLocaleString()}`;
+    waMessage = [waMessage, "", `Outstanding balance: ${formattedOutstanding}`].join(
+      "\n"
+    );
   }
 
   return waMessage;
@@ -223,9 +203,6 @@ export async function deliverInvoiceMessage({
   });
 
   const waMessage = buildInvoiceWhatsAppMessage({
-    invoice,
-    owner,
-    origin,
     isReminder,
     baseMessage,
     outstandingAmount,
@@ -633,12 +610,16 @@ export async function deliverReceiptRejection({
   const rejectionReason = String(reason || "Receipt could not be validated").trim();
 
   const message = [
+    `*${businessName}*`,
+    "",
     `Hello ${customerName},`,
     "",
-    `Your uploaded payment receipt for Invoice ${invoiceNumber} could not be validated.`,
+    `We reviewed the payment receipt uploaded for Invoice ${invoiceNumber}, but it could not be validated.`,
     `Reason: ${rejectionReason}`,
     "",
-    `The invoice remains unpaid. Please contact ${businessName} or upload another receipt.`,
+    "The invoice remains unpaid for now. Please upload a clearer or corrected receipt, or contact us for help.",
+    "",
+    "Thank you.",
   ].join("\n");
 
   if (selectedProvider === "browser") {

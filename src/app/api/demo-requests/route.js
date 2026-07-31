@@ -12,18 +12,22 @@ function isValidEmail(value) {
 
 function buildDemoRequestMessage(request = {}) {
   return [
-    "*New InvoiceHub demo request*",
+    "*New InvoiceHub Demo Request*",
     "",
-    `Name: ${request.fullName}`,
-    `Email: ${request.email}`,
-    `Phone: ${request.phone}`,
-    `Business: ${request.businessName}`,
+    "A new prospect has requested a product demo.",
+    "",
+    `Contact name: ${request.fullName}`,
+    `Business name: ${request.businessName}`,
     `Business type: ${request.businessType}`,
     `Team size: ${request.teamSize}`,
+    `Phone: ${request.phone}`,
+    `Email: ${request.email}`,
     `Submitted: ${request.createdAt.toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}`,
     "",
-    "What they would like to see:",
+    "Demo notes:",
     request.message || "No additional message provided.",
+    "",
+    "Please follow up as soon as possible.",
   ].join("\n");
 }
 

@@ -74,7 +74,6 @@ function formatMessageDate(date = new Date()) {
   );
 }
 
-
 function formatLogoLine(businessLogo = "") {
   if (typeof businessLogo === "string" && /^https?:\/\//i.test(businessLogo)) {
     return `Logo: ${businessLogo}\n`;
@@ -97,23 +96,36 @@ export function buildInvoiceMessage({
   date = new Date(),
   isReminder = false,
 }) {
-  const reminderLine = isReminder ? "\nPayment Reminder\n" : "";
   const normalizedPendingBalance = Number(pendingBalance);
   const amountLines = isReminder
-    ? `Original Invoice Amount: ${formatCurrency(amount)}\nBalance Pending: ${formatCurrency(
+    ? `Original amount: ${formatCurrency(amount)}\nOutstanding balance: ${formatCurrency(
         Number.isFinite(normalizedPendingBalance) ? normalizedPendingBalance : amount
       )}`
-    : `Amount: ${formatCurrency(amount)}`;
+    : `Amount due: ${formatCurrency(amount)}`;
+  const greeting = `Hello ${customerName || "there"},`;
+  const title = isReminder
+    ? "This is a payment reminder for your invoice."
+    : "A new invoice has been prepared for you.";
+  const action = isReminder
+    ? "Please use the link below to review the invoice and complete payment."
+    : "Please use the link below to view the invoice and payment details.";
 
-  return `${formatLogoLine(businessLogo)}${businessName || "InvoiceHub"}${reminderLine}
+  return `${formatLogoLine(businessLogo)}*${businessName || "InvoiceHub"}*
 
-Invoice Number: ${invoiceNumber || "Pending"}
+${greeting}
+
+${title}
+
+Invoice number: ${invoiceNumber || "Pending"}
 ${customerLabel}: ${customerName}
-${amountLines}
 Description: ${description || "Invoice payment"}
-Date: ${formatMessageDate(date)}
-${paymentLinkLabel}:
-${paymentLink}`;
+${amountLines}
+Date issued: ${formatMessageDate(date)}
+
+${action}
+${paymentLinkLabel}: ${paymentLink}
+
+Thank you.`;
 }
 
 export function buildPaymentConfirmationMessage({
@@ -126,11 +138,13 @@ export function buildPaymentConfirmationMessage({
 }) {
   return `*${businessName || "InvoiceHub"}*
 
-Payment received successfully.
+Hello ${customerName || "there"},
 
-Invoice Number: ${invoiceNumber || "Pending"}
+Your payment has been received and recorded successfully.
+
+Invoice number: ${invoiceNumber || "Pending"}
 ${customerLabel}: ${customerName}
-Amount Paid: ${formatCurrency(amount)}
+Amount paid: ${formatCurrency(amount)}
 Description: ${description || "Invoice payment"}
 
 Thank you for your payment.`;

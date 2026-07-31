@@ -25,16 +25,54 @@ const ACTION_STATUS = {
 };
 
 function buildOwnerMessage(action, businessName, reason, requestedDocument, deadline) {
+  const name = businessName || "Your business";
+
   if (action === "approve") {
-    return `${businessName} has been verified by InvoiceHub. All platform features are now available.`;
+    return `*InvoiceHub Business Verification*
+
+Hello,
+
+${name} has been verified successfully.
+
+You can now send invoices, share payment links, use WhatsApp messaging, connect payment gateways, and receive public invoice payments.
+
+Thank you for completing verification.`;
   }
+
   if (action === "reject") {
-    return `${businessName} verification was rejected. Reason: ${reason}. You can update your documents and resubmit.`;
+    return `*InvoiceHub Business Verification*
+
+Hello,
+
+The verification request for ${name} was not approved.
+
+Reason: ${reason}
+
+Please update your verification information and submit it again for review.`;
   }
+
   if (action === "suspend") {
-    return `${businessName} has been suspended. Reason: ${reason}. Please contact InvoiceHub support.`;
+    return `*InvoiceHub Business Verification*
+
+Hello,
+
+${name} has been suspended.
+
+Reason: ${reason}
+
+Please contact InvoiceHub support if you need help resolving this.`;
   }
-  return `${businessName} needs more information for verification. Requested: ${requestedDocument}. Reason: ${reason}.${deadline ? ` Upload by ${deadline}.` : ""}`;
+
+  return `*InvoiceHub Business Verification*
+
+Hello,
+
+We need more information to continue reviewing ${name}.
+
+Requested item: ${requestedDocument}
+Reason: ${reason}${deadline ? `\nUpload deadline: ${deadline}` : ""}
+
+Please upload the requested information from your dashboard.`;
 }
 
 async function notifyOwner({ db, owner, business, action, reason, requestedDocument, deadline }) {
