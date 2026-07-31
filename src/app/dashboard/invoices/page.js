@@ -1,7 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { FiCheckCircle, FiMessageCircle, FiPlus, FiTrash2 } from "react-icons/fi";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FiCheckCircle,
+  FiClock,
+  FiCreditCard,
+  FiFilter,
+  FiMessageCircle,
+  FiPlus,
+  FiRefreshCw,
+  FiRepeat,
+  FiSearch,
+  FiTrash2,
+  FiX,
+} from "react-icons/fi";
 import {
   EmptyState,
   InputField,
@@ -12,7 +24,6 @@ import {
   StatGrid,
   StatusBadge,
   SurfaceCard,
-  Toolbar,
 } from "../../../components/DashboardUI";
 import { authFetch } from "../../../lib/authFetch";
 import { getCustomerLabels } from "../../../lib/businessLabels";
@@ -20,10 +31,17 @@ import { useBusinessSession } from "../../../lib/clientSession";
 import { useConfirm } from "../../../components/AppFeedback";
 import CreateInvoiceModal from "../../../components/CreateInvoiceModal";
 
+function formatCurrency(value) {
+  return `N${Number(value || 0).toLocaleString()}`;
+}
+
 function formatDateTime(value) {
   if (!value) return "-";
 
   const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "-";
+
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
@@ -34,6 +52,7 @@ function formatDate(value) {
   if (!value) return "-";
 
   const date = new Date(value);
+
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString();
 }
 
@@ -51,9 +70,7 @@ function getOutstandingAmount(invoice = {}) {
   const balanceDue = Number(invoice.balanceDue);
   const status = String(invoice.status || invoice.paymentStatus || "").toLowerCase();
 
-  if (status === "paid") {
-    return 0;
-  }
+  if (status === "paid") return 0;
 
   if (Number.isFinite(balanceDue) && balanceDue > 0) {
     return Math.min(balanceDue, amount || balanceDue);
@@ -93,22 +110,81 @@ function getNotificationTone(status) {
   if (normalized === "sent") return "green";
   if (normalized === "prepared") return "blue";
   if (normalized === "failed") return "red";
+
   return "slate";
 }
-function openExternalTab(url, notify) {
-  if (!url) return false;
 
-  const opened = window.open(url, "_blank", "noopener,noreferrer");
+function getInvoiceCustomerName(invoice = {}, fallback = "Customer") {
+  return (
+    invoice.customer ||
+    invoice.customerName ||
+    invoice.student ||
+    invoice.studentName ||
+    invoice.name ||
+    fallback
+  );
+}
 
-  if (!opened) {
-    notify?.(
-      "error",
-      "Your browser blocked the WhatsApp tab. Please allow pop-ups for InvoiceHub and try again."
-    );
-    return false;
+function getInvoiceCategory(invoice = {}) {
+  return invoice.category || invoice.class || "Uncategorized";
+}
+
+function getInvoiceProvider(invoice = {}) {
+  return invoice.paymentProvider || invoice.pendingPaymentProvider || "Not started";
+}
+
+function getInvoiceStatus(invoice = {}) {
+  return String(invoice.status || invoice.paymentStatus || "Unpaid");
+}
+
+function getDueStatus(invoice = {}) {
+  const outstanding = getOutstandingAmount(invoice);
+
+  if (outstanding <= 0) {
+    return {
+      label: "Settled",
+      tone: "green",
+    };
   }
 
-  return true;
+  const dueDate = invoice.dueDate || invoice.date || invoice.createdAt;
+
+  if (!dueDate) {
+    return {
+      label: "Open",
+      tone: "orange",
+    };
+  }
+
+  const due = new Date(dueDate);
+  const now = new Date();
+
+  if (Number.isNaN(due.getTime())) {
+    return {
+      label: "Open",
+      tone: "orange",
+    };
+  }
+
+  if (due < now) {
+    return {
+      label: "Overdue",
+      tone: "red",
+    };
+  }
+
+  return {
+    label: "Due",
+    tone: "orange",
+  };
+}
+
+function getCollectionRate(totalAmount, balancePending) {
+  if (!totalAmount) return 0;
+
+  const collected = Math.max(totalAmount - balancePending, 0);
+
+  return Math.round((collected / totalAmount) * 100);
 }
 
 function getBrowserWhatsAppUrlFromResponse(data = {}) {
@@ -131,14 +207,157 @@ function getWhatsAppProviderFromResponse(data = {}) {
   );
 }
 
+function openReservedTab(notify) {
+  const opened = window.open("", "_blank", "noopener,noreferrer");
+
+  if (!opened) {
+    notify?.(
+      "error",
+      "Your browser blocked the WhatsApp tab. Please allow pop-ups for InvoiceHub and try again."
+    );
+    return null;
+  }
+
+  opened.document.write(`
+    <html>
+      <head>
+        <title>Opening WhatsApp...</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            padding: 32px;
+            color: #0f172a;
+            background: #f8fafc;
+          }
+          .card {
+            max-width: 420px;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            background: white;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+          }
+          h3 {
+            margin: 0 0 8px;
+          }
+          p {
+            margin: 0;
+            color: #475569;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h3>Preparing WhatsApp message...</h3>
+          <p>Please wait while InvoiceHub prepares the invoice message.</p>
+        </div>
+      </body>
+    </html>
+  `);
+
+  opened.document.close();
+
+  return opened;
+}
+
+function openExternalTab(url, notify, existingWindow = null) {
+  if (!url) return false;
+
+  const opened =
+    existingWindow && !existingWindow.closed
+      ? existingWindow
+      : window.open("", "_blank", "noopener,noreferrer");
+
+  if (!opened) {
+    notify?.(
+      "error",
+      "Your browser blocked the WhatsApp tab. Please allow pop-ups for InvoiceHub and try again."
+    );
+    return false;
+  }
+
+  opened.location.href = url;
+
+  return true;
+}
+
+function searchMatches(values, query) {
+  const normalizedQuery = String(query || "").trim().toLowerCase();
+
+  if (!normalizedQuery) return true;
+
+  return values
+    .filter((value) => value !== undefined && value !== null)
+    .some((value) => String(value).toLowerCase().includes(normalizedQuery));
+}
+
+function NoticeBanner({ notice }) {
+  if (!notice?.text) return null;
+
+  const classes = {
+    success:
+      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300",
+    info:
+      "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300",
+    error:
+      "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300",
+  };
+
+  return (
+    <div
+      className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
+        classes[notice.tone] || classes.info
+      }`}
+    >
+      {notice.text}
+    </div>
+  );
+}
+
+function InsightCard({ icon: Icon, label, value, description, tone = "slate" }) {
+  const toneClass = {
+    slate:
+      "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
+    emerald:
+      "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+    orange:
+      "bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
+    blue:
+      "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+    red:
+      "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+  }[tone];
+
+  return (
+    <SurfaceCard className="flex items-start gap-3 p-4">
+      <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneClass}`}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <div>
+        <p className="text-sm font-semibold text-slate-900 dark:text-white">
+          {value}
+        </p>
+        <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+          {label}
+        </p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          {description}
+        </p>
+      </div>
+    </SurfaceCard>
+  );
+}
+
 export default function Invoices() {
   const confirm = useConfirm();
   const session = useBusinessSession();
   const customerLabels = getCustomerLabels(session.businessType);
+
   const [invoices, setInvoices] = useState([]);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
   const [recurringInvoices, setRecurringInvoices] = useState([]);
   const [activePage, setActivePage] = useState("invoices");
+
   const [invoiceFilterForm, setInvoiceFilterForm] = useState({
     search: "",
     category: "all",
@@ -148,6 +367,7 @@ export default function Invoices() {
     dateFrom: "",
     dateTo: "",
   });
+
   const [invoiceFilters, setInvoiceFilters] = useState({
     search: "",
     category: "all",
@@ -157,21 +377,25 @@ export default function Invoices() {
     dateFrom: "",
     dateTo: "",
   });
+
   const [recurringSearch, setRecurringSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState({ tone: "", text: "" });
   const [recurringLoading, setRecurringLoading] = useState(false);
   const [recurringLoaded, setRecurringLoaded] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
+
   const [manualPaymentModal, setManualPaymentModal] = useState({
     open: false,
     invoice: null,
     amount: "",
   });
+
   const [savingManualPayment, setSavingManualPayment] = useState(false);
   const [showRecurringForm, setShowRecurringForm] = useState(false);
   const [savingRecurring, setSavingRecurring] = useState(false);
   const [runningRecurring, setRunningRecurring] = useState(false);
+
   const [recurringForm, setRecurringForm] = useState({
     customerName: "",
     phone: "",
@@ -183,10 +407,22 @@ export default function Invoices() {
     endDate: "",
   });
 
+  const showNotice = useCallback((tone, text) => {
+    setNotice({ tone, text });
+  }, []);
+
   const loadInvoices = useCallback(async () => {
+    setLoading(true);
+
     try {
-      const invoiceRes = await authFetch("/api/invoices");
+      const cacheBust = Date.now();
+
+      const invoiceRes = await authFetch(`/api/invoices?t=${cacheBust}`, {
+        cache: "no-store",
+      });
+
       const data = invoiceRes.ok ? await invoiceRes.json() : [];
+
       setInvoices(Array.isArray(data) ? data : []);
     } catch {
       setInvoices([]);
@@ -199,8 +435,17 @@ export default function Invoices() {
     setRecurringLoading(true);
 
     try {
-      const recurringRes = await authFetch("/api/recurring-invoices");
+      const cacheBust = Date.now();
+
+      const recurringRes = await authFetch(
+        `/api/recurring-invoices?t=${cacheBust}`,
+        {
+          cache: "no-store",
+        }
+      );
+
       const recurringData = recurringRes.ok ? await recurringRes.json() : [];
+
       setRecurringInvoices(Array.isArray(recurringData) ? recurringData : []);
       setRecurringLoaded(true);
     } catch {
@@ -214,6 +459,7 @@ export default function Invoices() {
     const initialLoad = setTimeout(() => {
       loadInvoices();
     }, 0);
+
     return () => clearTimeout(initialLoad);
   }, [loadInvoices]);
 
@@ -225,15 +471,221 @@ export default function Invoices() {
     const recurringLoad = setTimeout(() => {
       loadRecurringInvoices();
     }, 0);
+
     return () => clearTimeout(recurringLoad);
   }, [activePage, recurringLoaded, recurringLoading, loadRecurringInvoices]);
 
-  const showNotice = useCallback((tone, text) => {
-    setNotice({ tone, text });
-  }, []);
+  const actionableInvoices = useMemo(
+    () => invoices.filter((invoice) => getOutstandingAmount(invoice) > 0),
+    [invoices]
+  );
+
+  const invoiceCategoryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          actionableInvoices.map((invoice) => getInvoiceCategory(invoice))
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [actionableInvoices]
+  );
+
+  const invoiceProviderOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(actionableInvoices.map((invoice) => getInvoiceProvider(invoice)))
+      ).sort((a, b) => a.localeCompare(b)),
+    [actionableInvoices]
+  );
+
+  const invoiceStatusOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(actionableInvoices.map((invoice) => getInvoiceStatus(invoice)))
+      ).sort((a, b) => a.localeCompare(b)),
+    [actionableInvoices]
+  );
+
+  const notificationStatusOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          actionableInvoices.map((invoice) =>
+            normalizeNotificationStatus(invoice.customerNotificationStatus)
+          )
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [actionableInvoices]
+  );
+
+  const filteredActionableInvoices = useMemo(() => {
+    return actionableInvoices.filter((invoice) => {
+      const invoiceCategory = getInvoiceCategory(invoice);
+      const paymentProvider = getInvoiceProvider(invoice);
+      const invoiceStatus = getInvoiceStatus(invoice);
+      const notificationStatus = normalizeNotificationStatus(
+        invoice.customerNotificationStatus
+      );
+
+      const invoiceDate = invoice.date ? new Date(invoice.date) : null;
+      const dateFrom = invoiceFilters.dateFrom
+        ? new Date(`${invoiceFilters.dateFrom}T00:00:00`)
+        : null;
+      const dateTo = invoiceFilters.dateTo
+        ? new Date(`${invoiceFilters.dateTo}T23:59:59`)
+        : null;
+
+      const matchesCategory =
+        invoiceFilters.category === "all" ||
+        invoiceCategory === invoiceFilters.category;
+
+      const matchesProvider =
+        invoiceFilters.provider === "all" ||
+        paymentProvider === invoiceFilters.provider;
+
+      const matchesStatus =
+        invoiceFilters.status === "all" ||
+        invoiceStatus === invoiceFilters.status;
+
+      const matchesNotification =
+        invoiceFilters.notification === "all" ||
+        notificationStatus === invoiceFilters.notification;
+
+      const matchesDateFrom = !dateFrom || !invoiceDate || invoiceDate >= dateFrom;
+      const matchesDateTo = !dateTo || !invoiceDate || invoiceDate <= dateTo;
+
+      const matchesSearch = searchMatches(
+        [
+          invoice.customer,
+          invoice.customerName,
+          invoice.student,
+          invoice.studentName,
+          invoice.invoiceNumber,
+          invoice.description,
+          invoice.category,
+          invoice.class,
+          invoice.phone,
+          invoice.email,
+          invoice.status,
+          invoice.paymentProvider,
+          invoice.pendingPaymentProvider,
+          normalizeNotificationStatus(invoice.customerNotificationStatus),
+          getOutstandingAmount(invoice),
+        ],
+        invoiceFilters.search
+      );
+
+      return (
+        matchesCategory &&
+        matchesProvider &&
+        matchesStatus &&
+        matchesNotification &&
+        matchesDateFrom &&
+        matchesDateTo &&
+        matchesSearch
+      );
+    });
+  }, [actionableInvoices, invoiceFilters]);
+
+  const filteredRecurringInvoices = useMemo(() => {
+    return recurringInvoices.filter((schedule) =>
+      searchMatches(
+        [
+          schedule.customerName,
+          schedule.customer,
+          schedule.description,
+          schedule.phone,
+          schedule.email,
+          schedule.frequency,
+          schedule.active === false ? "paused" : "active",
+          schedule.amount,
+          schedule.generatedCount,
+          normalizeNotificationStatus(schedule.lastNotification?.status),
+        ],
+        recurringSearch
+      )
+    );
+  }, [recurringInvoices, recurringSearch]);
+
+  const totalInvoiceAmount = useMemo(
+    () =>
+      actionableInvoices.reduce(
+        (sum, invoice) => sum + getOriginalInvoiceAmount(invoice),
+        0
+      ),
+    [actionableInvoices]
+  );
+
+  const balancePendingAmount = useMemo(
+    () =>
+      actionableInvoices.reduce(
+        (sum, invoice) => sum + getOutstandingAmount(invoice),
+        0
+      ),
+    [actionableInvoices]
+  );
+
+  const unpaidCount = actionableInvoices.length;
+
+  const collectionRate = getCollectionRate(
+    totalInvoiceAmount,
+    balancePendingAmount
+  );
+
+  const overdueCount = actionableInvoices.filter(
+    (invoice) => getDueStatus(invoice).label === "Overdue"
+  ).length;
+
+  const preparedNotificationCount = actionableInvoices.filter(
+    (invoice) =>
+      normalizeNotificationStatus(invoice.customerNotificationStatus) ===
+      "prepared"
+  ).length;
+
+  const activeRecurringCount = recurringInvoices.filter(
+    (schedule) => schedule.active !== false
+  ).length;
+
+  const recurringTotalAmount = recurringInvoices.reduce(
+    (sum, schedule) => sum + Number(schedule.amount || 0),
+    0
+  );
+
+  const dueRecurringCount = recurringInvoices.filter((schedule) => {
+    if (schedule.active === false || !schedule.nextRunAt) return false;
+
+    return new Date(schedule.nextRunAt) <= new Date();
+  }).length;
+
+  const updateInvoiceFilterForm = (field, value) => {
+    setInvoiceFilterForm((current) => ({
+      ...current,
+      value,
+    }));
+  };
+
+  const applyInvoiceFilters = () => {
+    setInvoiceFilters(invoiceFilterForm);
+  };
+
+  const resetInvoiceFilters = () => {
+    const reset = {
+      search: "",
+      category: "all",
+      provider: "all",
+      status: "all",
+      notification: "all",
+      dateFrom: "",
+      dateTo: "",
+    };
+
+    setInvoiceFilterForm(reset);
+    setInvoiceFilters(reset);
+  };
 
   const openManualPaymentModal = (invoice) => {
     const { limit } = getManualPaymentLimit(invoice);
+
     setManualPaymentModal({
       open: true,
       invoice,
@@ -243,7 +695,12 @@ export default function Invoices() {
 
   const closeManualPaymentModal = () => {
     if (savingManualPayment) return;
-    setManualPaymentModal({ open: false, invoice: null, amount: "" });
+
+    setManualPaymentModal({
+      open: false,
+      invoice: null,
+      amount: "",
+    });
   };
 
   const markPaid = async (invoice, paidAmount) => {
@@ -259,7 +716,7 @@ export default function Invoices() {
     if (normalizedPaidAmount > limit) {
       showNotice(
         "error",
-        `Paid amount cannot be more than the ${label} of N${limit.toLocaleString()}.`
+        `Paid amount cannot be more than the ${label} of ${formatCurrency(limit)}.`
       );
       return;
     }
@@ -279,12 +736,20 @@ export default function Invoices() {
         throw new Error(data.error || "Update failed");
       }
 
-      setManualPaymentModal({ open: false, invoice: null, amount: "" });
+      setManualPaymentModal({
+        open: false,
+        invoice: null,
+        amount: "",
+      });
+
       showNotice(
         "success",
         data.message ||
-          (normalizedPaidAmount >= limit ? "Invoice marked as paid." : "Manual payment recorded.")
+          (normalizedPaidAmount >= limit
+            ? "Invoice marked as paid."
+            : "Manual payment recorded.")
       );
+
       await loadInvoices();
     } catch (error) {
       showNotice("error", error.message || "Unable to record payment.");
@@ -300,6 +765,7 @@ export default function Invoices() {
       message: "Delete this invoice? This action cannot be undone.",
       confirmLabel: "Delete",
     });
+
     if (!confirmed) return;
 
     try {
@@ -312,134 +778,123 @@ export default function Invoices() {
         return;
       }
 
-      setInvoices((prev) => prev.filter((invoice) => String(invoice._id) !== String(id)));
+      setInvoices((previous) =>
+        previous.filter((invoice) => String(invoice._id) !== String(id))
+      );
+
+      showNotice("success", "Invoice deleted.");
     } catch {
       showNotice("error", "Error deleting invoice");
     }
   };
 
   const shareWhatsApp = async (invoice) => {
-  if (!invoice.phone) {
-    showNotice("error", "No phone number.");
-    return;
-  }
+    if (!invoice.phone) {
+      showNotice("error", "No phone number is available for this invoice.");
+      return;
+    }
 
-  if (
-    !invoice.token &&
-    !invoice.paymentUrl &&
-    !invoice.paymentLink &&
-    !invoice.checkoutUrl
-  ) {
-    showNotice("error", "This invoice does not have a payment link yet.");
-    return;
-  }
+    if (
+      !invoice.token &&
+      !invoice.paymentUrl &&
+      !invoice.paymentLink &&
+      !invoice.checkoutUrl
+    ) {
+      showNotice("error", "This invoice does not have a payment link yet.");
+      return;
+    }
 
-  try {
-    const res = await authFetch("/api/notifications/whatsapp/invoice", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        invoiceId: String(invoice._id),
-        origin: window.location.origin,
-      }),
-      cache: "no-store",
-    });
+    const reservedWhatsAppTab = openReservedTab(showNotice);
 
-    const data = await res.json().catch(() => ({}));
+    try {
+      const res = await authFetch("/api/notifications/whatsapp/invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoiceId: String(invoice._id),
+          origin: window.location.origin,
+        }),
+        cache: "no-store",
+      });
 
-    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        if (reservedWhatsAppTab && !reservedWhatsAppTab.closed) {
+          reservedWhatsAppTab.close();
+        }
+
+        showNotice("error", data.error || "Unable to prepare WhatsApp message.");
+        return;
+      }
+
+      const provider = getWhatsAppProviderFromResponse(data);
+      const fallbackUrl = getBrowserWhatsAppUrlFromResponse(data);
+
+      if ((provider === "browser" || fallbackUrl) && fallbackUrl) {
+        const opened = openExternalTab(
+          fallbackUrl,
+          showNotice,
+          reservedWhatsAppTab
+        );
+
+        if (opened) {
+          showNotice(
+            "success",
+            "WhatsApp opened with the prepared invoice message."
+          );
+        }
+
+        await loadInvoices();
+        return;
+      }
+
+      if (reservedWhatsAppTab && !reservedWhatsAppTab.closed) {
+        reservedWhatsAppTab.close();
+      }
+
+      if (
+        data?.delivery?.sent === true &&
+        data?.delivery?.provider === "whatsappWeb"
+      ) {
+        showNotice("success", "Invoice sent through the connected WhatsApp session.");
+        await loadInvoices();
+        return;
+      }
+
+      if (
+        data?.delivery?.provider === "twilio" &&
+        ["queued", "sent", "accepted"].includes(
+          String(data?.delivery?.status || "")
+        )
+      ) {
+        showNotice("success", "Invoice message queued through Twilio WhatsApp.");
+        await loadInvoices();
+        return;
+      }
+
+      if (data?.delivery?.queued) {
+        showNotice("info", "Invoice message queued for WhatsApp delivery.");
+        await loadInvoices();
+        return;
+      }
+
       showNotice(
         "error",
-        data.error || "Unable to prepare WhatsApp message."
+        "WhatsApp message could not be sent or opened. Check your WhatsApp settings and try again."
       );
-      return;
-    }
-
-    const provider = getWhatsAppProviderFromResponse(data);
-    const fallbackUrl = getBrowserWhatsAppUrlFromResponse(data);
-
-    /*
-      Browser WhatsApp selected:
-      Open wa.me manually and do NOT show bridge error.
-    */
-    if (provider === "browser" && fallbackUrl) {
-      const opened = openExternalTab(fallbackUrl, showNotice);
-
-      if (opened) {
-        showNotice(
-          "success",
-          "Browser WhatsApp opened with the prepared invoice message."
-        );
+    } catch (error) {
+      if (reservedWhatsAppTab && !reservedWhatsAppTab.closed) {
+        reservedWhatsAppTab.close();
       }
 
-      await loadInvoices();
-      return;
+      showNotice(
+        "error",
+        error.message || "Unable to reach the WhatsApp service. Please try again."
+      );
     }
+  };
 
-    /*
-      Some backend responses may use fallback status without provider.
-    */
-    if (fallbackUrl) {
-      const opened = openExternalTab(fallbackUrl, showNotice);
-
-      if (opened) {
-        showNotice(
-          "success",
-          "WhatsApp opened with the prepared invoice message."
-        );
-      }
-
-      await loadInvoices();
-      return;
-    }
-
-    /*
-      WhatsApp Web bridge selected and message sent.
-    */
-    if (
-      data?.delivery?.sent === true &&
-      data?.delivery?.provider === "whatsappWeb"
-    ) {
-      showNotice("success", "Sent through the connected WhatsApp session.");
-      await loadInvoices();
-      return;
-    }
-
-    /*
-      Twilio selected and message queued/sent.
-    */
-    if (
-      data?.delivery?.provider === "twilio" &&
-      ["queued", "sent", "accepted"].includes(String(data?.delivery?.status || ""))
-    ) {
-      showNotice("success", "Invoice message queued through Twilio WhatsApp.");
-      await loadInvoices();
-      return;
-    }
-
-    /*
-      Generic queued response.
-    */
-    if (data?.delivery?.queued) {
-      showNotice("info", "Message queued for WhatsApp delivery.");
-      await loadInvoices();
-      return;
-    }
-
-    /*
-      Final fallback only if there is truly no browser URL and no sent provider.
-    */
-    showNotice(
-      "error",
-      "WhatsApp message could not be sent or opened. Check your WhatsApp settings and try again."
-    );
-  } catch (error) {
-    showNotice(
-      "error",
-      error.message || "Unable to reach the WhatsApp service. Please try again."
-    );
-  }
-};
   const sendBulkReminders = async () => {
     if (actionableInvoices.length === 0) {
       showNotice("info", "There are no unpaid invoices to remind.");
@@ -457,6 +912,7 @@ export default function Invoices() {
           force: true,
         }),
       });
+
       const data = await res.json();
 
       if (!res.ok) {
@@ -466,14 +922,21 @@ export default function Invoices() {
       if (Array.isArray(data.fallbackDeliveries)) {
         data.fallbackDeliveries.forEach((delivery) => {
           if (delivery.fallbackUrl) {
-            openExternalTab(delivery.fallbackUrl);
+            openExternalTab(delivery.fallbackUrl, showNotice);
           }
         });
       }
 
-      showNotice("success", `Reminders processed: ${data.processedCount}\nSent through WhatsApp provider: ${data.sentCount}\nOpened in WhatsApp manually: ${data.fallbackCount}\nSkipped: ${data.skippedCount}\nCooldown skipped: ${data.cooldownSkippedCount || 0}\nDaily cap skipped: ${data.cappedSkippedCount || 0}`);
+      showNotice(
+        "success",
+        `Reminders processed: ${data.processedCount || 0}. Sent: ${
+          data.sentCount || 0
+        }. Opened manually: ${data.fallbackCount || 0}. Skipped: ${
+          data.skippedCount || 0
+        }.`
+      );
 
-      loadInvoices();
+      await loadInvoices();
     } catch (error) {
       showNotice("error", error.message || "Unable to send reminders");
     } finally {
@@ -484,19 +947,8 @@ export default function Invoices() {
   const updateRecurringForm = (field, value) => {
     setRecurringForm((current) => ({
       ...current,
-      [field]: value,
+      value,
     }));
-  };
-
-  const updateInvoiceFilterForm = (field, value) => {
-    setInvoiceFilterForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
-  };
-
-  const applyInvoiceFilters = () => {
-    setInvoiceFilters(invoiceFilterForm);
   };
 
   const createRecurringInvoice = async (event) => {
@@ -517,6 +969,7 @@ export default function Invoices() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(recurringForm),
       });
+
       const data = await res.json();
 
       if (!res.ok) {
@@ -533,7 +986,10 @@ export default function Invoices() {
         startDate: new Date().toISOString().slice(0, 10),
         endDate: "",
       });
+
       setShowRecurringForm(false);
+      showNotice("success", "Recurring invoice schedule created.");
+
       await Promise.all([loadInvoices(), loadRecurringInvoices()]);
     } catch (error) {
       showNotice("error", error.message || "Unable to create recurring invoice");
@@ -549,13 +1005,20 @@ export default function Invoices() {
       const res = await authFetch("/api/recurring-invoices/run", {
         method: "POST",
       });
+
       const data = await res.json();
 
       if (!res.ok) {
         throw new Error(data.error || "Unable to run recurring invoices");
       }
 
-      showNotice("success", `Recurring invoices processed: ${data.processedCount}\nGenerated: ${data.generatedCount}\nSkipped: ${data.skippedCount}`);
+      showNotice(
+        "success",
+        `Recurring invoices processed: ${data.processedCount || 0}. Generated: ${
+          data.generatedCount || 0
+        }. Skipped: ${data.skippedCount || 0}.`
+      );
+
       await Promise.all([loadInvoices(), loadRecurringInvoices()]);
     } catch (error) {
       showNotice("error", error.message || "Unable to run recurring invoices");
@@ -580,7 +1043,7 @@ export default function Invoices() {
         throw new Error(data.error || "Unable to update recurring invoice");
       }
 
-      loadRecurringInvoices();
+      await loadRecurringInvoices();
     } catch (error) {
       showNotice("error", error.message || "Unable to update recurring invoice");
     }
@@ -592,6 +1055,7 @@ export default function Invoices() {
       message: "Delete this recurring invoice schedule? This action cannot be undone.",
       confirmLabel: "Delete",
     });
+
     if (!confirmed) return;
 
     try {
@@ -604,134 +1068,17 @@ export default function Invoices() {
         throw new Error(data.error || "Unable to delete recurring invoice");
       }
 
-      loadRecurringInvoices();
+      showNotice("success", "Recurring schedule deleted.");
+      await loadRecurringInvoices();
     } catch (error) {
       showNotice("error", error.message || "Unable to delete recurring invoice");
     }
   };
 
-  const searchMatches = (values, query) => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return true;
-
-    return values
-      .filter((value) => value !== undefined && value !== null)
-      .some((value) => String(value).toLowerCase().includes(normalizedQuery));
-  };
-
-  const actionableInvoices = invoices.filter((invoice) => getOutstandingAmount(invoice) > 0);
-  const invoiceCategoryOptions = Array.from(
-    new Set(
-      actionableInvoices.map((invoice) => invoice.category || invoice.class || "Uncategorized")
-    )
-  ).sort((a, b) => a.localeCompare(b));
-  const invoiceProviderOptions = Array.from(
-    new Set(
-      actionableInvoices
-        .map((invoice) => invoice.paymentProvider || invoice.pendingPaymentProvider || "Not started")
-        .filter(Boolean)
-    )
-  ).sort((a, b) => a.localeCompare(b));
-  const invoiceStatusOptions = Array.from(
-    new Set(actionableInvoices.map((invoice) => invoice.status || "Unpaid").filter(Boolean))
-  ).sort((a, b) => a.localeCompare(b));
-  const notificationStatusOptions = Array.from(
-    new Set(
-      actionableInvoices
-        .map((invoice) => normalizeNotificationStatus(invoice.customerNotificationStatus))
-        .filter(Boolean)
-    )
-  ).sort((a, b) => a.localeCompare(b));
-  const filteredActionableInvoices = actionableInvoices.filter((invoice) => {
-    const invoiceCategory = invoice.category || invoice.class || "Uncategorized";
-    const paymentProvider =
-      invoice.paymentProvider || invoice.pendingPaymentProvider || "Not started";
-    const invoiceStatus = invoice.status || "Unpaid";
-    const notificationStatus = normalizeNotificationStatus(invoice.customerNotificationStatus);
-    const invoiceDate = invoice.date ? new Date(invoice.date) : null;
-    const dateFrom = invoiceFilters.dateFrom ? new Date(`${invoiceFilters.dateFrom}T00:00:00`) : null;
-    const dateTo = invoiceFilters.dateTo ? new Date(`${invoiceFilters.dateTo}T23:59:59`) : null;
-    const matchesCategory =
-      invoiceFilters.category === "all" || invoiceCategory === invoiceFilters.category;
-    const matchesProvider =
-      invoiceFilters.provider === "all" || paymentProvider === invoiceFilters.provider;
-    const matchesStatus =
-      invoiceFilters.status === "all" || invoiceStatus === invoiceFilters.status;
-    const matchesNotification =
-      invoiceFilters.notification === "all" ||
-      notificationStatus === invoiceFilters.notification;
-    const matchesDateFrom = !dateFrom || !invoiceDate || invoiceDate >= dateFrom;
-    const matchesDateTo = !dateTo || !invoiceDate || invoiceDate <= dateTo;
-
-    return (
-      matchesCategory &&
-      matchesProvider &&
-      matchesStatus &&
-      matchesNotification &&
-      matchesDateFrom &&
-      matchesDateTo &&
-      searchMatches(
-      [
-        invoice.customer,
-        invoice.customerName,
-        invoice.student,
-        invoice.invoiceNumber,
-        invoice.description,
-        invoice.category,
-        invoice.class,
-        invoice.phone,
-        invoice.status,
-        invoice.paymentProvider,
-        invoice.pendingPaymentProvider,
-        normalizeNotificationStatus(invoice.customerNotificationStatus),
-        getOutstandingAmount(invoice),
-      ],
-      invoiceFilters.search
-    )
-    );
-  });
-  const filteredRecurringInvoices = recurringInvoices.filter((schedule) =>
-    searchMatches(
-      [
-        schedule.customerName,
-        schedule.customer,
-        schedule.description,
-        schedule.phone,
-        schedule.email,
-        schedule.frequency,
-        schedule.active === false ? "paused" : "active",
-        schedule.amount,
-        schedule.generatedCount,
-        normalizeNotificationStatus(schedule.lastNotification?.status),
-      ],
-      recurringSearch
-    )
-  );
-  const totalInvoiceAmount = actionableInvoices.reduce(
-    (sum, invoice) => sum + getOriginalInvoiceAmount(invoice),
-    0
-  );
-  const balancePendingAmount = actionableInvoices.reduce(
-    (sum, invoice) => sum + getOutstandingAmount(invoice),
-    0
-  );
-  const unpaidCount = actionableInvoices.length;
-  const activeRecurringCount = recurringInvoices.filter(
-    (schedule) => schedule.active !== false
-  ).length;
-  const recurringTotalAmount = recurringInvoices.reduce(
-    (sum, schedule) => sum + Number(schedule.amount || 0),
-    0
-  );
-  const dueRecurringCount = recurringInvoices.filter((schedule) => {
-    if (schedule.active === false || !schedule.nextRunAt) return false;
-    return new Date(schedule.nextRunAt) <= new Date();
-  }).length;
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-r-transparent"></div>
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-r-transparent" />
       </div>
     );
   }
@@ -740,886 +1087,1115 @@ export default function Invoices() {
     <PageShell>
       <PageHeader
         title="Invoices"
-        description={`Manage invoices, follow-up status, and ${customerLabels.singular} communication from one compact view.`}
+        description={`Create invoices, monitor balances, and manage ${customerLabels.singular} follow-up in one workspace.`}
         actions={
           activePage === "invoices" ? (
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => setShowCreateInvoice(true)}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
               >
                 <FiPlus className="h-4 w-4" />
                 Create invoice
               </button>
+
               <button
                 type="button"
                 onClick={sendBulkReminders}
                 disabled={sendingReminders || actionableInvoices.length === 0}
-                className="rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#20BA5C] disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#20BA5C] disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                {sendingReminders ? "Sending reminders..." : "Remind all unpaid"}
+                <FiMessageCircle className="h-4 w-4" />
+                {sendingReminders ? "Sending..." : "Remind unpaid"}
               </button>
             </div>
-          ) : null
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowRecurringForm(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+              >
+                <FiPlus className="h-4 w-4" />
+                New schedule
+              </button>
+
+              <button
+                type="button"
+                onClick={runDueRecurringInvoices}
+                disabled={runningRecurring}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <FiRefreshCw className={`h-4 w-4 ${runningRecurring ? "animate-spin" : ""}`} />
+                {runningRecurring ? "Running..." : "Run due"}
+              </button>
+            </div>
+          )
         }
       />
 
-      {notice.text ? (
-        <div
-          className={`rounded-2xl border px-4 py-3 text-sm ${
-            notice.tone === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
-              : notice.tone === "info"
-                ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300"
-                : "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
-          }`}
-        >
-          {notice.text}
-        </div>
-      ) : null}
+      <NoticeBanner notice={notice} />
 
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
           onClick={() => setActivePage("invoices")}
-          className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
             activePage === "invoices"
-              ? "bg-slate-900 text-white"
+              ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950"
               : "border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           }`}
         >
+          <FiCreditCard className="h-4 w-4" />
           Invoices
         </button>
+
         <button
           type="button"
           onClick={() => setActivePage("recurring")}
-          className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
             activePage === "recurring"
-              ? "bg-slate-900 text-white"
+              ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950"
               : "border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           }`}
         >
+          <FiRepeat className="h-4 w-4" />
           Recurring invoices
         </button>
-      </div>
-
-      <div className="max-w-8xl">
-        {activePage === "invoices" ? (
-          <Toolbar>
-            <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
-              <SelectField
-                value={invoiceFilterForm.category}
-                onChange={(event) => updateInvoiceFilterForm("category", event.target.value)}
-                className="min-w-0"
-              >
-                <option value="all">All categories</option>
-                {invoiceCategoryOptions.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </SelectField>
-              <SelectField
-                value={invoiceFilterForm.provider}
-                onChange={(event) => updateInvoiceFilterForm("provider", event.target.value)}
-                className="min-w-0"
-              >
-                <option value="all">All gateways</option>
-                {invoiceProviderOptions.map((provider) => (
-                  <option key={provider} value={provider}>
-                    {provider}
-                  </option>
-                ))}
-              </SelectField>
-              <InputField
-                type="date"
-                value={invoiceFilterForm.dateFrom}
-                onChange={(event) => updateInvoiceFilterForm("dateFrom", event.target.value)}
-                className="min-w-0 w-full"
-              />
-              <InputField
-                type="date"
-                value={invoiceFilterForm.dateTo}
-                onChange={(event) => updateInvoiceFilterForm("dateTo", event.target.value)}
-                className="min-w-0 w-full"
-              />
-              <SelectField
-                value={invoiceFilterForm.status}
-                onChange={(event) => updateInvoiceFilterForm("status", event.target.value)}
-                className="min-w-0"
-              >
-                <option value="all">All statuses</option>
-                {invoiceStatusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </SelectField>
-              <SelectField
-                value={invoiceFilterForm.notification}
-                onChange={(event) => updateInvoiceFilterForm("notification", event.target.value)}
-                className="min-w-0"
-              >
-                <option value="all">All notifications</option>
-                {notificationStatusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </SelectField>
-              <div className="grid min-w-0 gap-3 2xl:grid-cols-1">
-                <InputField
-                  type="search"
-                  value={invoiceFilterForm.search}
-                  onChange={(event) => updateInvoiceFilterForm("search", event.target.value)}
-                  placeholder="Search invoice, customer, phone"
-                  className="w-full min-w-0"
-                />
-                <button
-                  type="button"
-                  onClick={applyInvoiceFilters}
-                  className="rounded-xl bg-[#4B93C8] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#3D82B7]"
-                >
-                  Filter
-                </button>
-              </div>
-            </div>
-          </Toolbar>
-        ) : (
-          <>
-            <label htmlFor="recurring-search" className="sr-only">
-              Search recurring invoices
-            </label>
-            <input
-              id="recurring-search"
-              type="search"
-              value={recurringSearch}
-              onChange={(event) => setRecurringSearch(event.target.value)}
-              placeholder="Search recurring invoices"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-800"
-            />
-          </>
-        )}
       </div>
 
       <StatGrid>
         {activePage === "invoices" ? (
           <>
-            <StatCard label="Total invoices" value={actionableInvoices.length} tone="slate" />
-            <StatCard label="Total amount" value={`N${totalInvoiceAmount.toLocaleString()}`} tone="blue" />
-            <StatCard label="Balance pending" value={`N${balancePendingAmount.toLocaleString()}`} tone="orange" />
-            <StatCard label="Unpaid" value={unpaidCount} tone="orange" />
+            <StatCard label="Open invoices" value={actionableInvoices.length} tone="slate" />
+            <StatCard label="Total amount" value={formatCurrency(totalInvoiceAmount)} tone="blue" />
+            <StatCard label="Balance pending" value={formatCurrency(balancePendingAmount)} tone="orange" />
+            <StatCard
+              label="Collection rate"
+              value={`${collectionRate}%`}
+              tone={collectionRate >= 80 ? "emerald" : "orange"}
+            />
           </>
         ) : (
           <>
             <StatCard label="Total schedules" value={recurringInvoices.length} tone="slate" />
-            <StatCard label="Scheduled amount" value={`N${recurringTotalAmount.toLocaleString()}`} tone="blue" />
+            <StatCard label="Scheduled amount" value={formatCurrency(recurringTotalAmount)} tone="blue" />
             <StatCard label="Active" value={activeRecurringCount} tone="emerald" />
             <StatCard label="Due now" value={dueRecurringCount} tone="orange" />
           </>
         )}
       </StatGrid>
 
-      {activePage === "recurring" && (
+      {activePage === "invoices" ? (
         <>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                Recurring invoices
-              </h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Create schedules that automatically generate unpaid invoices on the next due date.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => setShowRecurringForm(true)}
-                className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
-              >
-                Create recurring invoice
-              </button>
-              <button
-                type="button"
-                onClick={runDueRecurringInvoices}
-                disabled={runningRecurring}
-                className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-              >
-                {runningRecurring ? "Running..." : "Run due now"}
-              </button>
-            </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <InsightCard
+              icon={FiClock}
+              label="Overdue"
+              value={`${overdueCount} invoice${overdueCount === 1 ? "" : "s"}`}
+              description="Invoices past their due date."
+              tone={overdueCount ? "red" : "slate"}
+            />
+
+            <InsightCard
+              icon={FiMessageCircle}
+              label="Prepared messages"
+              value={`${preparedNotificationCount} ready`}
+              description="Messages prepared for follow-up."
+              tone="blue"
+            />
+
+            <InsightCard
+              icon={FiCreditCard}
+              label="Unpaid"
+              value={`${unpaidCount} open`}
+              description="Awaiting full settlement."
+              tone="orange"
+            />
           </div>
-          <SurfaceCard className="overflow-hidden">
-            {recurringLoading ? (
-              <div className="flex min-h-[14rem] items-center justify-center">
-                <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-r-transparent"></div>
-              </div>
-            ) : filteredRecurringInvoices.length === 0 ? (
-              <EmptyState
-                title={recurringInvoices.length === 0 ? "No recurring invoices found" : "No matching recurring invoices"}
-                description={
-                  recurringInvoices.length === 0
-                    ? "Create a recurring invoice schedule to generate invoices automatically."
-                    : "Try another name, phone number, description, or status."
-                }
-              />
-            ) : (
-              <>
-                <div className="divide-y divide-slate-200 lg:hidden">
-                  {filteredRecurringInvoices.map((schedule) => (
-                    <div key={schedule._id} className="space-y-3 p-3.5 sm:p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-1">
-                          <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                            {schedule.customerName || schedule.customer || customerLabels.singularTitle}
-                          </p>
-                          <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Next: {formatDateTime(schedule.nextRunAt)}
-                          </p>
-                        </div>
-                        <StatusBadge tone={schedule.active === false ? "slate" : "green"}>
-                          {schedule.active === false ? "Paused" : "Active"}
-                        </StatusBadge>
-                      </div>
 
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                            Details
-                          </p>
-                          <p className="text-sm text-slate-700 dark:text-slate-300">
-                            {schedule.description || "-"}
-                          </p>
-                          <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Phone: {schedule.phone || "-"}
-                          </p>
-                          <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Frequency: {schedule.frequency || "monthly"}
-                          </p>
-                          <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Window: {formatDate(schedule.startDate || schedule.nextRunAt)} -{" "}
-                            {schedule.endDate ? formatDate(schedule.endDate) : "No end date"}
-                          </p>
-                        </div>
+          <InvoiceFilterPanel
+            invoiceFilterForm={invoiceFilterForm}
+            updateInvoiceFilterForm={updateInvoiceFilterForm}
+            applyInvoiceFilters={applyInvoiceFilters}
+            resetInvoiceFilters={resetInvoiceFilters}
+            invoiceCategoryOptions={invoiceCategoryOptions}
+            invoiceProviderOptions={invoiceProviderOptions}
+            invoiceStatusOptions={invoiceStatusOptions}
+            notificationStatusOptions={notificationStatusOptions}
+          />
 
-                        <div className="space-y-2">
-                          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                            Schedule
-                          </p>
-                          <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                            N{Number(schedule.amount || 0).toLocaleString()}
-                          </p>
-                          <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Generated: {schedule.generatedCount || 0}
-                          </p>
-                          <StatusBadge tone={getNotificationTone(schedule.lastNotification?.status)}>
-                            {normalizeNotificationStatus(schedule.lastNotification?.status)}
-                          </StatusBadge>
-                        </div>
-                      </div>
+          <InvoiceList
+            invoices={filteredActionableInvoices}
+            allInvoicesCount={actionableInvoices.length}
+            customerLabels={customerLabels}
+            onRecordPayment={openManualPaymentModal}
+            onShareWhatsApp={shareWhatsApp}
+            onDeleteInvoice={deleteInvoice}
+          />
+        </>
+      ) : (
+        <>
+          <RecurringHeader
+            recurringSearch={recurringSearch}
+            setRecurringSearch={setRecurringSearch}
+            setShowRecurringForm={setShowRecurringForm}
+            runDueRecurringInvoices={runDueRecurringInvoices}
+            runningRecurring={runningRecurring}
+          />
 
-                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => toggleRecurringInvoice(schedule)}
-                          className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                        >
-                          {schedule.active === false ? "Resume" : "Pause"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteRecurringInvoice(schedule)}
-                          className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-700"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="hidden overflow-x-auto lg:block">
-                  <table className="w-full table-fixed">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
-                        <th className="w-[24%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                          Schedule
-                        </th>
-                        <th className="w-[28%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                          Details
-                        </th>
-                        <th className="w-[16%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                          Amount
-                        </th>
-                        <th className="w-[16%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                          Notification
-                        </th>
-                        <th className="w-[16%] px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-slate-500">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {filteredRecurringInvoices.map((schedule) => (
-                        <tr key={schedule._id} className="hover:bg-slate-50 dark:hover:bg-slate-950/60">
-                          <td className="px-4 py-3 align-top">
-                            <div className="space-y-1">
-                              <p className="font-semibold text-slate-900 dark:text-slate-100">
-                                {schedule.customerName || schedule.customer || customerLabels.singularTitle}
-                              </p>
-                              <p className="text-sm text-slate-500 dark:text-slate-400">
-                                {schedule.frequency || "monthly"}
-                              </p>
-                              <p className="text-sm text-slate-500 dark:text-slate-400">
-                                Next: {formatDateTime(schedule.nextRunAt)}
-                              </p>
-                              <p className="text-sm text-slate-500 dark:text-slate-400">
-                                {formatDate(schedule.startDate || schedule.nextRunAt)} -{" "}
-                                {schedule.endDate ? formatDate(schedule.endDate) : "No end date"}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <div className="space-y-2">
-                              <p className="text-sm text-slate-700 dark:text-slate-300">
-                                {schedule.description || "-"}
-                              </p>
-                              <p className="text-sm text-slate-500 dark:text-slate-400">
-                                Phone: {schedule.phone || "-"}
-                              </p>
-                              <p className="text-sm text-slate-500 dark:text-slate-400">
-                                Generated: {schedule.generatedCount || 0}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <div className="space-y-2">
-                              <p className="font-semibold text-slate-900 dark:text-slate-100">
-                                N{Number(schedule.amount || 0).toLocaleString()}
-                              </p>
-                              <StatusBadge tone={schedule.active === false ? "slate" : "green"}>
-                                {schedule.active === false ? "Paused" : "Active"}
-                              </StatusBadge>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <StatusBadge tone={getNotificationTone(schedule.lastNotification?.status)}>
-                              {normalizeNotificationStatus(schedule.lastNotification?.status)}
-                            </StatusBadge>
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <div className="ml-auto flex max-w-[12rem] flex-wrap items-center justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => toggleRecurringInvoice(schedule)}
-                                className="whitespace-nowrap rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                              >
-                                {schedule.active === false ? "Resume" : "Pause"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => deleteRecurringInvoice(schedule)}
-                                className="whitespace-nowrap rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-          </SurfaceCard>
+          <RecurringList
+            recurringLoading={recurringLoading}
+            recurringInvoices={recurringInvoices}
+            filteredRecurringInvoices={filteredRecurringInvoices}
+            customerLabels={customerLabels}
+            toggleRecurringInvoice={toggleRecurringInvoice}
+            deleteRecurringInvoice={deleteRecurringInvoice}
+          />
         </>
       )}
 
-      {activePage === "recurring_legacy" && (
-      <SurfaceCard className="space-y-6">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-              Recurring invoices
-            </h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Create schedules that automatically generate unpaid invoices on the next due date.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => setShowRecurringForm(true)}
-              className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
-            >
-              Create recurring invoice
-            </button>
-            <button
-              type="button"
-              onClick={runDueRecurringInvoices}
-              disabled={runningRecurring}
-              className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              {runningRecurring ? "Running..." : "Run due now"}
-            </button>
-          </div>
-        </div>
+      {showRecurringForm ? (
+        <RecurringInvoiceModal
+          recurringForm={recurringForm}
+          customerLabels={customerLabels}
+          savingRecurring={savingRecurring}
+          updateRecurringForm={updateRecurringForm}
+          onClose={() => setShowRecurringForm(false)}
+          onSubmit={createRecurringInvoice}
+        />
+      ) : null}
 
-        {recurringInvoices.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-            No recurring invoice schedules yet.
-          </div>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {recurringInvoices.map((schedule) => (
-              <div
-                key={schedule._id}
-                className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">
-                      {schedule.customerName || schedule.customer}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                      {schedule.description} &middot; N{Number(schedule.amount || 0).toLocaleString()}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                      {schedule.frequency || "monthly"} &middot; next {formatDateTime(schedule.nextRunAt)}
-                    </p>
-                  </div>
-                  <StatusBadge tone={schedule.active === false ? "slate" : "green"}>
-                    {schedule.active === false ? "Paused" : "Active"}
-                  </StatusBadge>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleRecurringInvoice(schedule)}
-                    className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
-                    {schedule.active === false ? "Resume" : "Pause"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteRecurringInvoice(schedule)}
-                    className="rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </SurfaceCard>
-      )}
-
-      {activePage === "invoices" && (
-      <SurfaceCard className="overflow-hidden">
-        {filteredActionableInvoices.length === 0 ? (
-          <EmptyState
-            title={actionableInvoices.length === 0 ? "No open invoices found" : "No matching invoices"}
-            description={
-              actionableInvoices.length === 0
-                ? "Only unpaid or partially paid invoices are shown here."
-                : "Try another name, phone number, invoice number, description, or status."
-            }
-          />
-        ) : (
-          <>
-            <div className="divide-y divide-slate-200 lg:hidden">
-              {filteredActionableInvoices.map((invoice) => {
-                const customerName =
-                  invoice.customer || invoice.customerName || invoice.student || customerLabels.singularTitle;
-                const invoiceCategory = invoice.category || invoice.class || "Uncategorized";
-
-                return (
-                  <div key={invoice._id} className="space-y-3 p-3.5 sm:p-4">
-                    <div className="space-y-1">
-                      <p className="text-base font-semibold text-slate-900 dark:text-slate-100">{customerName}</p>
-                      <p className="font-mono text-xs text-slate-500 dark:text-slate-400">
-                        {invoice.invoiceNumber || "-"}
-                      </p>
-                      <StatusBadge tone="slate">{invoiceCategory}</StatusBadge>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">{formatDateTime(invoice.date)}</p>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                          Details
-                        </p>
-                        <p className="text-sm text-slate-700 dark:text-slate-300">
-                          {invoice.description || invoice.category || invoice.class || "-"}
-                        </p>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Phone: {invoice.phone || "-"}</p>
-                        <p className="break-all font-mono text-xs text-slate-400 dark:text-slate-500">
-                          {invoice.token ? `${invoice.token.substring(0, 14)}...` : "-"}
-                        </p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                          Amounts
-                        </p>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Original amount</p>
-                            <p className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
-                              N{getOriginalInvoiceAmount(invoice).toLocaleString()}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Balance pending</p>
-                            <p className="mt-1 text-base font-semibold text-amber-700 dark:text-amber-300">
-                              N{getOutstandingAmount(invoice).toLocaleString()}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <StatusBadge tone={invoice.status === "Paid" ? "green" : "orange"}>
-                            {invoice.status || "Unpaid"}
-                          </StatusBadge>
-                        </div>
-                        <StatusBadge tone={getNotificationTone(invoice.customerNotificationStatus)}>
-                          {normalizeNotificationStatus(invoice.customerNotificationStatus)}
-                        </StatusBadge>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                      {invoice.status !== "Paid" ? (
-                        <button
-                          onClick={() => openManualPaymentModal(invoice)}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-green-700"
-                        >
-                          <FiCheckCircle className="h-4 w-4" />
-                          Record payment
-                        </button>
-                      ) : null}
-                      <button
-                        onClick={() => shareWhatsApp(invoice)}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#20BA5C]"
-                      >
-                        <FiMessageCircle className="h-4 w-4" />
-                        Share on WhatsApp
-                      </button>
-                      <button
-                        onClick={() => deleteInvoice(invoice._id)}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-700"
-                      >
-                        <FiTrash2 className="h-4 w-4" />
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="hidden min-w-0 lg:block">
-              <table className="w-full table-fixed">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950/50">
-                    <th className="px-2 py-3.5 text-left text-[10px] xl:px-3 xl:text-xs font-semibold uppercase tracking-wide text-slate-500">Invoice</th>
-                    <th className="px-2 py-3.5 text-left text-[10px] xl:px-3 xl:text-xs font-semibold uppercase tracking-wide text-slate-500">Customer</th>
-                    <th className="px-2 py-3.5 text-left text-[10px] xl:px-3 xl:text-xs font-semibold uppercase tracking-wide text-slate-500">Invoice details</th>
-                    <th className="px-2 py-3.5 text-left text-[10px] xl:px-3 xl:text-xs font-semibold uppercase tracking-wide text-slate-500">Amounts</th>
-                    <th className="px-2 py-3.5 text-left text-[10px] xl:px-3 xl:text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
-                    <th className="px-2 py-3.5 text-left text-[10px] xl:px-3 xl:text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {filteredActionableInvoices.map((invoice) => {
-                    const customerName =
-                      invoice.customer || invoice.customerName || invoice.student || customerLabels.singularTitle;
-                    const invoiceCategory = invoice.category || invoice.class || "Uncategorized";
-                    const notificationStatus = normalizeNotificationStatus(invoice.customerNotificationStatus);
-                    const notificationTone = getNotificationTone(invoice.customerNotificationStatus);
-
-                    return (
-                      <tr key={invoice._id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-950/50">
-                        <td className="min-w-0 px-2 py-4 align-middle xl:px-3">
-                          <p className="truncate font-mono text-xs font-medium text-slate-700 dark:text-slate-300" title={invoice.invoiceNumber || "-"}>
-                            {invoice.invoiceNumber || "-"}
-                          </p>
-                          <p className="mt-1.5 truncate text-xs text-slate-500 dark:text-slate-400" title={formatDateTime(invoice.date)}>{formatDateTime(invoice.date)}</p>
-                        </td>
-                        <td className="min-w-0 px-2 py-4 align-middle xl:px-3">
-                          <p className="truncate text-sm font-semibold text-slate-950 dark:text-white" title={customerName}>{customerName}</p>
-                          <p className="mt-1.5 truncate text-xs text-slate-500 dark:text-slate-400">{invoice.phone || "No phone number"}</p>
-                        </td>
-                        <td className="min-w-0 px-2 py-4 align-middle xl:px-3">
-                          <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200" title={invoice.description || invoice.category || invoice.class || "-"}>
-                            {invoice.description || invoice.category || invoice.class || "-"}
-                          </p>
-                          <div className="mt-1.5 min-w-0 overflow-hidden"><StatusBadge tone="slate">{invoiceCategory}</StatusBadge></div>
-                        </td>
-
-                        <td className="min-w-0 px-2 py-4 align-middle xl:px-3">
-                          <p className="truncate text-xs font-semibold text-slate-950 dark:text-white xl:text-sm">N{getOriginalInvoiceAmount(invoice).toLocaleString()}</p>
-                          <p className="mt-1.5 truncate text-[11px] font-medium text-amber-700 dark:text-amber-300 xl:text-xs">Balance N{getOutstandingAmount(invoice).toLocaleString()}</p>
-                        </td>
-                        <td className="min-w-0 px-2 py-4 align-middle xl:px-3">
-                          <div className="min-w-0 overflow-hidden flex flex-col items-start gap-1.5">
-                            <StatusBadge tone={invoice.status === "Paid" ? "green" : "orange"}>{invoice.status || "Unpaid"}</StatusBadge>
-                            <span className={`max-w-full truncate text-[11px] font-medium xl:text-xs ${
-                              notificationTone === "green"
-                                ? "text-emerald-700 dark:text-emerald-300"
-                                : notificationTone === "red"
-                                  ? "text-red-700 dark:text-red-300"
-                                  : notificationTone === "blue"
-                                    ? "text-blue-700 dark:text-blue-300"
-                                    : "text-slate-500 dark:text-slate-400"
-                            }`}>
-                              Message {notificationStatus}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="min-w-0 px-2 py-4 align-middle xl:px-3">
-                          <div className="flex min-w-0 flex-wrap items-center justify-start gap-1">
-                            {invoice.status !== "Paid" && (
-                              <button onClick={() => openManualPaymentModal(invoice)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white transition hover:bg-emerald-700" title="Record payment" aria-label="Record payment">
-                                <FiCheckCircle className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                            <button onClick={() => shareWhatsApp(invoice)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#25D366] text-white transition hover:bg-[#20BA5C]" title="Share on WhatsApp" aria-label="Share on WhatsApp">
-                              <FiMessageCircle className="h-3.5 w-3.5" />
-                            </button>
-                            <button onClick={() => deleteInvoice(invoice._id)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white transition hover:bg-red-700" title="Delete invoice" aria-label="Delete invoice">
-                              <FiTrash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </SurfaceCard>
-      )}
-
-      {showRecurringForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] bg-white shadow-2xl dark:bg-slate-900">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5 dark:border-slate-800">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                  Recurring invoices
-                </p>
-                <h2 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-                  Create recurring invoice
-                </h2>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  Define the customer, billing amount, and active date window for automatic invoice generation.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowRecurringForm(false)}
-                className="rounded-full border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-              >
-                Close
-              </button>
-            </div>
-
-            <form onSubmit={createRecurringInvoice} className="space-y-6 p-6">
-              <div className="grid gap-4 lg:grid-cols-[1.35fr_0.9fr]">
-                <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-800 dark:bg-slate-950/40">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    Customer and invoice details
-                  </p>
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <label className="space-y-2 sm:col-span-2">
-                      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                        {customerLabels.singularTitle} name
-                      </span>
-                      <input
-                        type="text"
-                        value={recurringForm.customerName}
-                        onChange={(event) => updateRecurringForm("customerName", event.target.value)}
-                        placeholder={`Enter ${customerLabels.singularTitle.toLowerCase()} name`}
-                        required
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      />
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                        Phone number
-                      </span>
-                      <input
-                        type="tel"
-                        value={recurringForm.phone}
-                        onChange={(event) => updateRecurringForm("phone", event.target.value)}
-                        placeholder="Enter phone number"
-                        required
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      />
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                        Email
-                      </span>
-                      <input
-                        type="email"
-                        value={recurringForm.email}
-                        onChange={(event) => updateRecurringForm("email", event.target.value)}
-                        placeholder="Email address"
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      />
-                    </label>
-                    <label className="space-y-2 sm:col-span-2">
-                      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                        Description
-                      </span>
-                      <input
-                        type="text"
-                        value={recurringForm.description}
-                        onChange={(event) => updateRecurringForm("description", event.target.value)}
-                        placeholder="What will this recurring invoice cover?"
-                        required
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-slate-200 bg-slate-900 p-5 text-white dark:border-slate-800">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                    Schedule preview
-                  </p>
-                  <p className="mt-4 text-4xl font-semibold">
-                    N{Number(recurringForm.amount || 0).toLocaleString()}
-                  </p>
-                  <div className="mt-5 space-y-3 text-sm text-slate-300">
-                    <div className="flex items-center justify-between gap-4">
-                      <span>Frequency</span>
-                      <span className="font-medium capitalize text-white">
-                        {recurringForm.frequency}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span>Starts</span>
-                      <span className="font-medium text-white">
-                        {formatDate(recurringForm.startDate)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span>Ends</span>
-                      <span className="font-medium text-white">
-                        {recurringForm.endDate ? formatDate(recurringForm.endDate) : "No end date"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
-                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  Billing schedule
-                </p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                      Amount
-                    </span>
-                    <input
-                      type="number"
-                      min="1"
-                      value={recurringForm.amount}
-                      onChange={(event) => updateRecurringForm("amount", event.target.value)}
-                      placeholder="0.00"
-                      required
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                      Frequency
-                    </span>
-                    <select
-                      value={recurringForm.frequency}
-                      onChange={(event) => updateRecurringForm("frequency", event.target.value)}
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    >
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                      Start date
-                    </span>
-                    <input
-                      type="date"
-                      value={recurringForm.startDate}
-                      onChange={(event) => updateRecurringForm("startDate", event.target.value)}
-                      required
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    />
-                  </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                      End date
-                    </span>
-                    <input
-                      type="date"
-                      min={recurringForm.startDate || undefined}
-                      value={recurringForm.endDate}
-                      onChange={(event) => updateRecurringForm("endDate", event.target.value)}
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    />
-                  </label>
-                </div>
-                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                  The first invoice will be generated on the start date. Leave the end date empty to keep the schedule running.
-                </p>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowRecurringForm(false)}
-                  className="flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingRecurring}
-                  className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                >
-                  {savingRecurring ? "Creating..." : "Create schedule"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
       <CreateInvoiceModal
         isOpen={showCreateInvoice}
         onClose={() => setShowCreateInvoice(false)}
         onInvoiceAdded={loadInvoices}
       />
-      {manualPaymentModal.open && manualPaymentModal.invoice ? (        <ManualPaymentModal
+
+      {manualPaymentModal.open && manualPaymentModal.invoice ? (
+        <ManualPaymentModal
           invoice={manualPaymentModal.invoice}
           amount={manualPaymentModal.amount}
           saving={savingManualPayment}
           onAmountChange={(value) =>
-            setManualPaymentModal((current) => ({ ...current, amount: value }))
+            setManualPaymentModal((current) => ({
+              ...current,
+              amount: value,
+            }))
           }
           onClose={closeManualPaymentModal}
-          onConfirm={() => markPaid(manualPaymentModal.invoice, manualPaymentModal.amount)}
+          onConfirm={() =>
+            markPaid(manualPaymentModal.invoice, manualPaymentModal.amount)
+          }
         />
       ) : null}
     </PageShell>
+  );
+}
+
+function InvoiceFilterPanel({
+  invoiceFilterForm,
+  updateInvoiceFilterForm,
+  applyInvoiceFilters,
+  resetInvoiceFilters,
+  invoiceCategoryOptions,
+  invoiceProviderOptions,
+  invoiceStatusOptions,
+  notificationStatusOptions,
+}) {
+  return (
+    <SurfaceCard className="overflow-hidden">
+      <div className="border-b border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-800 dark:bg-slate-950/60">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950 dark:text-white">
+              Invoice workspace
+            </h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Filter, review, share, and record payments for open invoices.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={applyInvoiceFilters}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+            >
+              <FiFilter className="h-4 w-4" />
+              Apply filters
+            </button>
+
+            <button
+              type="button"
+              onClick={resetInvoiceFilters}
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <FiX className="h-4 w-4" />
+              Clear
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+        <div className="relative 2xl:col-span-2">
+          <FiSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <InputField
+            type="search"
+            value={invoiceFilterForm.search}
+            onChange={(event) =>
+              updateInvoiceFilterForm("search", event.target.value)
+            }
+            placeholder="Search invoice, customer, phone"
+            className="w-full pl-10"
+          />
+        </div>
+
+        <SelectField
+          value={invoiceFilterForm.category}
+          onChange={(event) =>
+            updateInvoiceFilterForm("category", event.target.value)
+          }
+        >
+          <option value="all">All categories</option>
+          {invoiceCategoryOptions.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </SelectField>
+
+        <SelectField
+          value={invoiceFilterForm.provider}
+          onChange={(event) =>
+            updateInvoiceFilterForm("provider", event.target.value)
+          }
+        >
+          <option value="all">All gateways</option>
+          {invoiceProviderOptions.map((provider) => (
+            <option key={provider} value={provider}>
+              {provider}
+            </option>
+          ))}
+        </SelectField>
+
+        <SelectField
+          value={invoiceFilterForm.status}
+          onChange={(event) =>
+            updateInvoiceFilterForm("status", event.target.value)
+          }
+        >
+          <option value="all">All statuses</option>
+          {invoiceStatusOptions.map((status) => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
+        </SelectField>
+
+        <SelectField
+          value={invoiceFilterForm.notification}
+          onChange={(event) =>
+            updateInvoiceFilterForm("notification", event.target.value)
+          }
+        >
+          <option value="all">All notifications</option>
+          {notificationStatusOptions.map((status) => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
+        </SelectField>
+
+        <InputField
+          type="date"
+          value={invoiceFilterForm.dateFrom}
+          onChange={(event) =>
+            updateInvoiceFilterForm("dateFrom", event.target.value)
+          }
+        />
+
+        <InputField
+          type="date"
+          value={invoiceFilterForm.dateTo}
+          onChange={(event) =>
+            updateInvoiceFilterForm("dateTo", event.target.value)
+          }
+        />
+      </div>
+    </SurfaceCard>
+  );
+}
+
+function InvoiceList({
+  invoices,
+  allInvoicesCount,
+  customerLabels,
+  onRecordPayment,
+  onShareWhatsApp,
+  onDeleteInvoice,
+}) {
+  if (!invoices.length) {
+    return (
+      <SurfaceCard className="p-6">
+        <EmptyState
+          title={allInvoicesCount === 0 ? "No open invoices found" : "No matching invoices"}
+          description={
+            allInvoicesCount === 0
+              ? "Only unpaid or partially paid invoices are shown here."
+              : "Try another name, phone number, invoice number, description, or status."
+          }
+        />
+      </SurfaceCard>
+    );
+  }
+
+  return (
+    <SurfaceCard className="overflow-hidden">
+      <div className="divide-y divide-slate-200 lg:hidden dark:divide-slate-800">
+        {invoices.map((invoice) => (
+          <InvoiceCard
+            key={invoice._id}
+            invoice={invoice}
+            customerLabels={customerLabels}
+            onRecordPayment={onRecordPayment}
+            onShareWhatsApp={onShareWhatsApp}
+            onDeleteInvoice={onDeleteInvoice}
+          />
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="w-full table-fixed">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950/50">
+              <th className="w-[16%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Invoice
+              </th>
+              <th className="w-[20%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Customer
+              </th>
+              <th className="w-[24%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Details
+              </th>
+              <th className="w-[15%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Amount
+              </th>
+              <th className="w-[13%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Status
+              </th>
+              <th className="w-[12%] px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Actions
+              </th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {invoices.map((invoice) => {
+              const customerName = getInvoiceCustomerName(
+                invoice,
+                customerLabels.singularTitle
+              );
+              const invoiceCategory = getInvoiceCategory(invoice);
+              const notificationStatus = normalizeNotificationStatus(
+                invoice.customerNotificationStatus
+              );
+              const notificationTone = getNotificationTone(
+                invoice.customerNotificationStatus
+              );
+              const dueStatus = getDueStatus(invoice);
+
+              return (
+                <tr
+                  key={invoice._id}
+                  className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-950/50"
+                >
+                  <td className="px-4 py-4 align-top">
+                    <p
+                      className="truncate font-mono text-xs font-semibold text-slate-800 dark:text-slate-200"
+                      title={invoice.invoiceNumber || "-"}
+                    >
+                      {invoice.invoiceNumber || "-"}
+                    </p>
+                    <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                      {formatDateTime(invoice.date)}
+                    </p>
+                  </td>
+
+                  <td className="px-4 py-4 align-top">
+                    <p
+                      className="truncate text-sm font-semibold text-slate-950 dark:text-white"
+                      title={customerName}
+                    >
+                      {customerName}
+                    </p>
+                    <p className="mt-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                      {invoice.phone || "No phone number"}
+                    </p>
+                    {invoice.email ? (
+                      <p className="mt-1 truncate text-xs text-slate-400">
+                        {invoice.email}
+                      </p>
+                    ) : null}
+                  </td>
+
+                  <td className="px-4 py-4 align-top">
+                    <p
+                      className="truncate text-sm font-medium text-slate-800 dark:text-slate-200"
+                      title={invoice.description || invoice.category || invoice.class || "-"}
+                    >
+                      {invoice.description || invoice.category || invoice.class || "-"}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <StatusBadge tone="slate">{invoiceCategory}</StatusBadge>
+                      <StatusBadge tone={dueStatus.tone}>{dueStatus.label}</StatusBadge>
+                    </div>
+                  </td>
+
+                  <td className="px-4 py-4 align-top">
+                    <p className="text-sm font-semibold text-slate-950 dark:text-white">
+                      {formatCurrency(getOriginalInvoiceAmount(invoice))}
+                    </p>
+                    <p className="mt-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+                      Balance {formatCurrency(getOutstandingAmount(invoice))}
+                    </p>
+                  </td>
+
+                  <td className="px-4 py-4 align-top">
+                    <div className="flex flex-col items-start gap-1.5">
+                      <StatusBadge tone={invoice.status === "Paid" ? "green" : "orange"}>
+                        {invoice.status || "Unpaid"}
+                      </StatusBadge>
+                      <StatusBadge tone={notificationTone}>
+                        Message {notificationStatus}
+                      </StatusBadge>
+                    </div>
+                  </td>
+
+                  <td className="px-4 py-4 align-top">
+                    <div className="flex justify-end gap-1.5">
+                      {invoice.status !== "Paid" ? (
+                        <button
+                          type="button"
+                          onClick={() => onRecordPayment(invoice)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 text-white transition hover:bg-emerald-700"
+                          title="Record payment"
+                          aria-label="Record payment"
+                        >
+                          <FiCheckCircle className="h-4 w-4" />
+                        </button>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={() => onShareWhatsApp(invoice)}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#25D366] text-white transition hover:bg-[#20BA5C]"
+                        title="Share on WhatsApp"
+                        aria-label="Share on WhatsApp"
+                      >
+                        <FiMessageCircle className="h-4 w-4" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => onDeleteInvoice(invoice._id)}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-red-600 text-white transition hover:bg-red-700"
+                        title="Delete invoice"
+                        aria-label="Delete invoice"
+                      >
+                        <FiTrash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </SurfaceCard>
+  );
+}
+
+function InvoiceCard({
+  invoice,
+  customerLabels,
+  onRecordPayment,
+  onShareWhatsApp,
+  onDeleteInvoice,
+}) {
+  const customerName = getInvoiceCustomerName(
+    invoice,
+    customerLabels.singularTitle
+  );
+  const invoiceCategory = getInvoiceCategory(invoice);
+  const notificationStatus = normalizeNotificationStatus(
+    invoice.customerNotificationStatus
+  );
+  const dueStatus = getDueStatus(invoice);
+
+  return (
+    <div className="space-y-4 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="truncate text-base font-semibold text-slate-900 dark:text-slate-100">
+            {customerName}
+          </p>
+          <p className="mt-1 font-mono text-xs text-slate-500 dark:text-slate-400">
+            {invoice.invoiceNumber || "-"}
+          </p>
+        </div>
+
+        <StatusBadge tone={dueStatus.tone}>{dueStatus.label}</StatusBadge>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-950/60">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            Invoice details
+          </p>
+          <p className="mt-2 text-sm font-medium text-slate-800 dark:text-slate-200">
+            {invoice.description || invoice.category || invoice.class || "-"}
+          </p>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Phone: {invoice.phone || "-"}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <StatusBadge tone="slate">{invoiceCategory}</StatusBadge>
+            <StatusBadge tone={invoice.status === "Paid" ? "green" : "orange"}>
+              {invoice.status || "Unpaid"}
+            </StatusBadge>
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-950/60">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            Amounts
+          </p>
+          <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
+            {formatCurrency(getOriginalInvoiceAmount(invoice))}
+          </p>
+          <p className="mt-1 text-sm font-medium text-amber-700 dark:text-amber-300">
+            Balance {formatCurrency(getOutstandingAmount(invoice))}
+          </p>
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            Message {notificationStatus}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        {invoice.status !== "Paid" ? (
+          <button
+            type="button"
+            onClick={() => onRecordPayment(invoice)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+          >
+            <FiCheckCircle className="h-4 w-4" />
+            Record payment
+          </button>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={() => onShareWhatsApp(invoice)}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#20BA5C]"
+        >
+          <FiMessageCircle className="h-4 w-4" />
+          Share on WhatsApp
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onDeleteInvoice(invoice._id)}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700"
+        >
+          <FiTrash2 className="h-4 w-4" />
+          Delete
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RecurringHeader({
+  recurringSearch,
+  setRecurringSearch,
+  setShowRecurringForm,
+  runDueRecurringInvoices,
+  runningRecurring,
+}) {
+  return (
+    <SurfaceCard className="p-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            Recurring invoices
+          </h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Create schedules that automatically generate invoices on due dates.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => setShowRecurringForm(true)}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
+          >
+            <FiPlus className="h-4 w-4" />
+            Create schedule
+          </button>
+
+          <button
+            type="button"
+            onClick={runDueRecurringInvoices}
+            disabled={runningRecurring}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            <FiRefreshCw className={`h-4 w-4 ${runningRecurring ? "animate-spin" : ""}`} />
+            {runningRecurring ? "Running..." : "Run due now"}
+          </button>
+        </div>
+      </div>
+
+      <div className="relative mt-4">
+        <FiSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <input
+          type="search"
+          value={recurringSearch}
+          onChange={(event) => setRecurringSearch(event.target.value)}
+          placeholder="Search recurring schedules"
+          className="w-full rounded-xl border border-slate-300 px-4 py-3 pl-10 text-sm outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-slate-800"
+        />
+      </div>
+    </SurfaceCard>
+  );
+}
+
+function RecurringList({
+  recurringLoading,
+  recurringInvoices,
+  filteredRecurringInvoices,
+  customerLabels,
+  toggleRecurringInvoice,
+  deleteRecurringInvoice,
+}) {
+  if (recurringLoading) {
+    return (
+      <SurfaceCard className="flex min-h-[14rem] items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-r-transparent" />
+      </SurfaceCard>
+    );
+  }
+
+  if (!filteredRecurringInvoices.length) {
+    return (
+      <SurfaceCard className="p-6">
+        <EmptyState
+          title={
+            recurringInvoices.length === 0
+              ? "No recurring invoices found"
+              : "No matching recurring invoices"
+          }
+          description={
+            recurringInvoices.length === 0
+              ? "Create a recurring schedule to generate invoices automatically."
+              : "Try another name, phone number, description, or status."
+          }
+        />
+      </SurfaceCard>
+    );
+  }
+
+  return (
+    <SurfaceCard className="overflow-hidden">
+      <div className="divide-y divide-slate-200 lg:hidden dark:divide-slate-800">
+        {filteredRecurringInvoices.map((schedule) => (
+          <div key={schedule._id} className="space-y-3 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">
+                  {schedule.customerName ||
+                    schedule.customer ||
+                    customerLabels.singularTitle}
+                </p>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  Next: {formatDateTime(schedule.nextRunAt)}
+                </p>
+              </div>
+
+              <StatusBadge tone={schedule.active === false ? "slate" : "green"}>
+                {schedule.active === false ? "Paused" : "Active"}
+              </StatusBadge>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-950/60">
+              <p className="text-sm text-slate-700 dark:text-slate-300">
+                {schedule.description || "-"}
+              </p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Phone: {schedule.phone || "-"}
+              </p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Frequency: {schedule.frequency || "monthly"}
+              </p>
+              <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {formatCurrency(schedule.amount)}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => toggleRecurringInvoice(schedule)}
+                className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                {schedule.active === false ? "Resume" : "Pause"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => deleteRecurringInvoice(schedule)}
+                className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="w-full table-fixed">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
+              <th className="w-[24%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Schedule
+              </th>
+              <th className="w-[30%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Details
+              </th>
+              <th className="w-[16%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Amount
+              </th>
+              <th className="w-[14%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Status
+              </th>
+              <th className="w-[16%] px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Actions
+              </th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {filteredRecurringInvoices.map((schedule) => (
+              <tr key={schedule._id} className="hover:bg-slate-50 dark:hover:bg-slate-950/60">
+                <td className="px-4 py-4 align-top">
+                  <p className="font-semibold text-slate-900 dark:text-slate-100">
+                    {schedule.customerName ||
+                      schedule.customer ||
+                      customerLabels.singularTitle}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    {schedule.frequency || "monthly"}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Next: {formatDateTime(schedule.nextRunAt)}
+                  </p>
+                </td>
+
+                <td className="px-4 py-4 align-top">
+                  <p className="text-sm text-slate-700 dark:text-slate-300">
+                    {schedule.description || "-"}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Phone: {schedule.phone || "-"}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Generated: {schedule.generatedCount || 0}
+                  </p>
+                </td>
+
+                <td className="px-4 py-4 align-top">
+                  <p className="font-semibold text-slate-900 dark:text-slate-100">
+                    {formatCurrency(schedule.amount)}
+                  </p>
+                </td>
+
+                <td className="px-4 py-4 align-top">
+                  <StatusBadge tone={schedule.active === false ? "slate" : "green"}>
+                    {schedule.active === false ? "Paused" : "Active"}
+                  </StatusBadge>
+                </td>
+
+                <td className="px-4 py-4 align-top">
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleRecurringInvoice(schedule)}
+                      className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      {schedule.active === false ? "Resume" : "Pause"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => deleteRecurringInvoice(schedule)}
+                      className="rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </SurfaceCard>
+  );
+}
+
+function RecurringInvoiceModal({
+  recurringForm,
+  customerLabels,
+  savingRecurring,
+  updateRecurringForm,
+  onClose,
+  onSubmit,
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] bg-white shadow-2xl dark:bg-slate-900">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5 dark:border-slate-800">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+              Recurring invoices
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
+              Create recurring invoice
+            </h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Define the customer, billing amount, and date window.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            Close
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="space-y-6 p-6">
+          <div className="grid gap-4 lg:grid-cols-[1.35fr_0.9fr]">
+            <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-800 dark:bg-slate-950/40">
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Customer and invoice details
+              </p>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <label className="space-y-2 sm:col-span-2">
+                  <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                    {customerLabels.singularTitle} name
+                  </span>
+                  <input
+                    type="text"
+                    value={recurringForm.customerName}
+                    onChange={(event) =>
+                      updateRecurringForm("customerName", event.target.value)
+                    }
+                    placeholder={`Enter ${customerLabels.singularTitle.toLowerCase()} name`}
+                    required
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                    Phone number
+                  </span>
+                  <input
+                    type="tel"
+                    value={recurringForm.phone}
+                    onChange={(event) =>
+                      updateRecurringForm("phone", event.target.value)
+                    }
+                    placeholder="Enter phone number"
+                    required
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                    Email
+                  </span>
+                  <input
+                    type="email"
+                    value={recurringForm.email}
+                    onChange={(event) =>
+                      updateRecurringForm("email", event.target.value)
+                    }
+                    placeholder="Email address"
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                </label>
+
+                <label className="space-y-2 sm:col-span-2">
+                  <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                    Description
+                  </span>
+                  <input
+                    type="text"
+                    value={recurringForm.description}
+                    onChange={(event) =>
+                      updateRecurringForm("description", event.target.value)
+                    }
+                    placeholder="What will this recurring invoice cover?"
+                    required
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-slate-900 p-5 text-white dark:border-slate-800">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                Schedule preview
+              </p>
+              <p className="mt-4 text-4xl font-semibold">
+                {formatCurrency(recurringForm.amount)}
+              </p>
+
+              <div className="mt-5 space-y-3 text-sm text-slate-300">
+                <div className="flex items-center justify-between gap-4">
+                  <span>Frequency</span>
+                  <span className="font-medium capitalize text-white">
+                    {recurringForm.frequency}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                  <span>Starts</span>
+                  <span className="font-medium text-white">
+                    {formatDate(recurringForm.startDate)}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                  <span>Ends</span>
+                  <span className="font-medium text-white">
+                    {recurringForm.endDate
+                      ? formatDate(recurringForm.endDate)
+                      : "No end date"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              Billing schedule
+            </p>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                  Amount
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  value={recurringForm.amount}
+                  onChange={(event) =>
+                    updateRecurringForm("amount", event.target.value)
+                  }
+                  placeholder="0.00"
+                  required
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                  Frequency
+                </span>
+                <select
+                  value={recurringForm.frequency}
+                  onChange={(event) =>
+                    updateRecurringForm("frequency", event.target.value)
+                  }
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                >
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                  Start date
+                </span>
+                <input
+                  type="date"
+                  value={recurringForm.startDate}
+                  onChange={(event) =>
+                    updateRecurringForm("startDate", event.target.value)
+                  }
+                  required
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                  End date
+                </span>
+                <input
+                  type="date"
+                  min={recurringForm.startDate || undefined}
+                  value={recurringForm.endDate}
+                  onChange={(event) =>
+                    updateRecurringForm("endDate", event.target.value)
+                  }
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+              </label>
+            </div>
+
+            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+              The first invoice will be generated on the start date. Leave the end date empty to keep the schedule running.
+            </p>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={savingRecurring}
+              className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              {savingRecurring ? "Creating..." : "Create schedule"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -1645,11 +2221,12 @@ function ManualPaymentModal({
               Record paid amount
             </h2>
           </div>
+
           <button
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             Close
           </button>
@@ -1661,7 +2238,7 @@ function ManualPaymentModal({
               {label === "invoice amount" ? "Invoice amount" : "Outstanding balance"}
             </p>
             <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-              N{limit.toLocaleString()}
+              {formatCurrency(limit)}
             </p>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
               {invoice.invoiceNumber || "Invoice"}
@@ -1681,7 +2258,7 @@ function ManualPaymentModal({
               className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
             />
             <span className="mt-2 block text-xs text-slate-400">
-              Enter any amount up to N{limit.toLocaleString()}.
+              Enter any amount up to {formatCurrency(limit)}.
             </span>
           </label>
         </div>
@@ -1691,15 +2268,16 @@ function ManualPaymentModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="flex-1 rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="flex-1 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             Cancel
           </button>
+
           <button
             type="button"
             onClick={onConfirm}
             disabled={saving}
-            className="flex-1 rounded-xl bg-green-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-300"
+            className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
           >
             {saving ? "Saving..." : "Save payment"}
           </button>
@@ -1708,9 +2286,3 @@ function ManualPaymentModal({
     </div>
   );
 }
-
-
-
-
-
-
