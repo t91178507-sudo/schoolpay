@@ -101,7 +101,9 @@ export function buildInvoiceMessage({
     ? `Original amount: ${formatCurrency(amount)}\nOutstanding balance: ${formatCurrency(
         Number.isFinite(normalizedPendingBalance) ? normalizedPendingBalance : amount
       )}`
-    : `Amount due: ${formatCurrency(amount)}`;
+    : `Amount due: ${formatCurrency(amount)}\nBalance pending: ${formatCurrency(
+        Number.isFinite(normalizedPendingBalance) ? normalizedPendingBalance : amount
+      )}`;
   const greeting = `Hello ${customerName || "there"},`;
   const title = isReminder
     ? "This is a payment reminder for your invoice."
