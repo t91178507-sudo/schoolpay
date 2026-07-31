@@ -207,66 +207,25 @@ function getWhatsAppProviderFromResponse(data = {}) {
   );
 }
 
-function openReservedTab(notify) {
-  const opened = window.open("", "_blank", "noopener,noreferrer");
-
-  if (!opened) {
-    notify?.(
-      "error",
-      "Your browser blocked the WhatsApp tab. Please allow pop-ups for InvoiceHub and try again."
-    );
-    return null;
-  }
-
-  opened.document.write(`
-    <html>
-      <head>
-        <title>Opening WhatsApp...</title>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            padding: 32px;
-            color: #0f172a;
-            background: #f8fafc;
-          }
-          .card {
-            max-width: 420px;
-            border: 1px solid #e2e8f0;
-            border-radius: 16px;
-            background: white;
-            padding: 24px;
-            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-          }
-          h3 {
-            margin: 0 0 8px;
-          }
-          p {
-            margin: 0;
-            color: #475569;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <h3>Preparing WhatsApp message...</h3>
-          <p>Please wait while InvoiceHub prepares the invoice message.</p>
-        </div>
-      </body>
-    </html>
-  `);
-
-  opened.document.close();
-
-  return opened;
-}
-
-function openExternalTab(url, notify, existingWindow = null) {
+function openWhatsAppSameTab(url, notify) {
   if (!url) return false;
 
-  const opened =
-    existingWindow && !existingWindow.closed
-      ? existingWindow
-      : window.open("", "_blank", "noopener,noreferrer");
+  try {
+    window.location.href = url;
+    return true;
+  } catch {
+    notify?.(
+      "error",
+      "Unable to open WhatsApp. Please copy the payment link and send it manually."
+    );
+    return false;
+  }
+}
+
+function openExternalTab(url, notify) {
+  if (!url) return false;
+
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
 
   if (!opened) {
     notify?.(
@@ -275,8 +234,6 @@ function openExternalTab(url, notify, existingWindow = null) {
     );
     return false;
   }
-
-  opened.location.href = url;
 
   return true;
 }
@@ -789,111 +746,100 @@ export default function Invoices() {
   };
 
   const shareWhatsApp = async (invoice) => {
-    if (!invoice.phone) {
-      showNotice("error", "No phone number is available for this invoice.");
+  if (!invoice.phone) {
+    showNotice("error", "No phone number is available for this invoice.");
+    return;
+  }
+
+  if (
+    !invoice.token &&
+    !invoice.paymentUrl &&
+    !invoice.paymentLink &&
+    !invoice.checkoutUrl
+  ) {
+    showNotice("error", "This invoice does not have a payment link yet.");
+    return;
+  }
+
+  try {
+    const res = await authFetch("/api/notifications/whatsapp/invoice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        invoiceId: String(invoice._id),
+        origin: window.location.origin,
+      }),
+      cache: "no-store",
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      showNotice("error", data.error || "Unable to prepare WhatsApp message.");
       return;
     }
 
+    const provider = getWhatsAppProviderFromResponse(data);
+    const fallbackUrl = getBrowserWhatsAppUrlFromResponse(data);
+
+    /*
+      Browser WhatsApp/manual share:
+      Use same-tab redirect instead of opening a new window.
+    */
+    if ((provider === "browser" || fallbackUrl) && fallbackUrl) {
+      showNotice("success", "Opening WhatsApp with the prepared invoice message.");
+
+      window.setTimeout(() => {
+        openWhatsAppSameTab(fallbackUrl, showNotice);
+      }, 250);
+
+      await loadInvoices();
+      return;
+    }
+
+    /*
+      WhatsApp Web bridge selected and message sent server-side.
+    */
     if (
-      !invoice.token &&
-      !invoice.paymentUrl &&
-      !invoice.paymentLink &&
-      !invoice.checkoutUrl
+      data?.delivery?.sent === true &&
+      data?.delivery?.provider === "whatsappWeb"
     ) {
-      showNotice("error", "This invoice does not have a payment link yet.");
+      showNotice("success", "Invoice sent through the connected WhatsApp session.");
+      await loadInvoices();
       return;
     }
 
-    const reservedWhatsAppTab = openReservedTab(showNotice);
-
-    try {
-      const res = await authFetch("/api/notifications/whatsapp/invoice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          invoiceId: String(invoice._id),
-          origin: window.location.origin,
-        }),
-        cache: "no-store",
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        if (reservedWhatsAppTab && !reservedWhatsAppTab.closed) {
-          reservedWhatsAppTab.close();
-        }
-
-        showNotice("error", data.error || "Unable to prepare WhatsApp message.");
-        return;
-      }
-
-      const provider = getWhatsAppProviderFromResponse(data);
-      const fallbackUrl = getBrowserWhatsAppUrlFromResponse(data);
-
-      if ((provider === "browser" || fallbackUrl) && fallbackUrl) {
-        const opened = openExternalTab(
-          fallbackUrl,
-          showNotice,
-          reservedWhatsAppTab
-        );
-
-        if (opened) {
-          showNotice(
-            "success",
-            "WhatsApp opened with the prepared invoice message."
-          );
-        }
-
-        await loadInvoices();
-        return;
-      }
-
-      if (reservedWhatsAppTab && !reservedWhatsAppTab.closed) {
-        reservedWhatsAppTab.close();
-      }
-
-      if (
-        data?.delivery?.sent === true &&
-        data?.delivery?.provider === "whatsappWeb"
-      ) {
-        showNotice("success", "Invoice sent through the connected WhatsApp session.");
-        await loadInvoices();
-        return;
-      }
-
-      if (
-        data?.delivery?.provider === "twilio" &&
-        ["queued", "sent", "accepted"].includes(
-          String(data?.delivery?.status || "")
-        )
-      ) {
-        showNotice("success", "Invoice message queued through Twilio WhatsApp.");
-        await loadInvoices();
-        return;
-      }
-
-      if (data?.delivery?.queued) {
-        showNotice("info", "Invoice message queued for WhatsApp delivery.");
-        await loadInvoices();
-        return;
-      }
-
-      showNotice(
-        "error",
-        "WhatsApp message could not be sent or opened. Check your WhatsApp settings and try again."
-      );
-    } catch (error) {
-      if (reservedWhatsAppTab && !reservedWhatsAppTab.closed) {
-        reservedWhatsAppTab.close();
-      }
-
-      showNotice(
-        "error",
-        error.message || "Unable to reach the WhatsApp service. Please try again."
-      );
+    /*
+      Twilio selected and message queued/sent server-side.
+    */
+    if (
+      data?.delivery?.provider === "twilio" &&
+      ["queued", "sent", "accepted"].includes(
+        String(data?.delivery?.status || "")
+      )
+    ) {
+      showNotice("success", "Invoice message queued through Twilio WhatsApp.");
+      await loadInvoices();
+      return;
     }
-  };
+
+    if (data?.delivery?.queued) {
+      showNotice("info", "Invoice message queued for WhatsApp delivery.");
+      await loadInvoices();
+      return;
+    }
+
+    showNotice(
+      "error",
+      "WhatsApp message could not be sent or opened. Check your WhatsApp settings and try again."
+    );
+  } catch (error) {
+    showNotice(
+      "error",
+      error.message || "Unable to reach the WhatsApp service. Please try again."
+    );
+  }
+};
 
   const sendBulkReminders = async () => {
     if (actionableInvoices.length === 0) {
