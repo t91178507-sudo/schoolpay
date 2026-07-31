@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FiCheck, FiChevronDown, FiEye, FiEyeOff } from "react-icons/fi";
 
-const COUNTRIES = ["Nigeria", "Ghana", "Kenya", "South Africa", "United Kingdom", "United States"];
+const COUNTRIES = ["Nigeria"];
 
 export default function Register() {
   const [formData, setFormData] = useState({
