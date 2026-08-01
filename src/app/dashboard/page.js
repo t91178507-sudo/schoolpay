@@ -24,6 +24,7 @@ import {
 import { authFetch } from "../../lib/authFetch";
 import { getCustomerLabels } from "../../lib/businessLabels";
 import { useBusinessSession, useHydrated } from "../../lib/clientSession";
+import { flattenPaymentsForInvoices } from "../../lib/paymentTransactions";
 
 async function readJsonSafely(response, fallback) {
   if (!response?.ok) {
@@ -98,7 +99,7 @@ function getWhatsAppStatusView(status = {}) {
   };
 }
 
-function getCurrentYearMonthlyCollections(invoices = []) {
+function getCurrentYearMonthlyCollections(payments = []) {
   const currentYear = new Date().getFullYear();
   const monthLabels = [
     "Jan",
@@ -117,15 +118,15 @@ function getCurrentYearMonthlyCollections(invoices = []) {
 
   const totals = new Array(12).fill(0);
 
-  invoices.forEach((invoice) => {
-    const rawDate = invoice.paidAt || invoice.paymentConfirmedAt || invoice.updatedAt || invoice.date;
+  payments.forEach((payment) => {
+    const rawDate = payment.happenedAt;
     const date = rawDate ? new Date(rawDate) : null;
 
     if (!date || Number.isNaN(date.getTime()) || date.getFullYear() !== currentYear) {
       return;
     }
 
-    const amount = Number(invoice.paidAmount || invoice.amountPaid || 0);
+    const amount = Number(payment.amount || 0);
     totals[date.getMonth()] += amount;
   });
 
@@ -135,13 +136,13 @@ function getCurrentYearMonthlyCollections(invoices = []) {
   }));
 }
 
-function getLastFiveYearsCollections(invoices = []) {
+function getLastFiveYearsCollections(payments = []) {
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, index) => currentYear - 4 + index);
   const totals = Object.fromEntries(years.map((year) => [year, 0]));
 
-  invoices.forEach((invoice) => {
-    const rawDate = invoice.paidAt || invoice.paymentConfirmedAt || invoice.updatedAt || invoice.date;
+  payments.forEach((payment) => {
+    const rawDate = payment.happenedAt;
     const date = rawDate ? new Date(rawDate) : null;
 
     if (!date || Number.isNaN(date.getTime())) {
@@ -153,7 +154,7 @@ function getLastFiveYearsCollections(invoices = []) {
       return;
     }
 
-    const amount = Number(invoice.paidAmount || invoice.amountPaid || 0);
+    const amount = Number(payment.amount || 0);
     totals[year] += amount;
   });
 
@@ -215,8 +216,9 @@ export default function Dashboard() {
           0
         );
 
-        const totalRevenue = invoices.reduce(
-          (sum, inv) => sum + Number(inv.paidAmount || inv.amountPaid || 0),
+        const paymentRows = flattenPaymentsForInvoices(invoices);
+        const totalRevenue = paymentRows.reduce(
+          (sum, payment) => sum + Number(payment.amount || 0),
           0
         );
 
@@ -317,11 +319,11 @@ export default function Dashboard() {
     }) || "";
 
   const monthlyCollections = useMemo(
-    () => getCurrentYearMonthlyCollections(invoices),
+    () => getCurrentYearMonthlyCollections(flattenPaymentsForInvoices(invoices)),
     [invoices]
   );
   const yearlyCollections = useMemo(
-    () => getLastFiveYearsCollections(invoices),
+    () => getLastFiveYearsCollections(flattenPaymentsForInvoices(invoices)),
     [invoices]
   );
   const whatsAppStatusView = getWhatsAppStatusView(whatsAppStatus);

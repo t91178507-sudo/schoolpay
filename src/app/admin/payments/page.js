@@ -67,6 +67,10 @@ function getNotificationTone(status) {
 }
 
 function buildTransactionId(payment, index) {
+  if (payment.transactionId) {
+    return String(payment.transactionId);
+  }
+
   const date = formatDateInput(payment.happenedAt).replaceAll("-", "") || "00000000";
   const reference = String(payment.paymentReference || payment.invoiceNumber || payment._id || "AUTO")
     .replace(/[^A-Za-z0-9]/g, "")

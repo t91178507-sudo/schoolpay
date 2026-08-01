@@ -1,5 +1,6 @@
 import { connectDB } from "../../../../lib/mongodb";
 import { requireAdmin } from "../../../../lib/adminAuth";
+import { flattenPaymentsForInvoices } from "../../../../lib/paymentTransactions";
 
 function parseMoney(value) {
   const amount = Number(value);
@@ -26,13 +27,20 @@ export async function GET(req) {
       usersById[user._id.toString()] = user;
     });
 
-    const enriched = paidInvoices.map((invoice) => {
+    const paymentRows = flattenPaymentsForInvoices(paidInvoices);
+
+    const enriched = paymentRows.map((payment) => {
+      const invoice = payment.invoice || {};
       const owner = invoice.ownerId ? usersById[invoice.ownerId] : null;
-      const status = invoice.status || "Paid";
-      const paidAmount = parseMoney(invoice.paidAmount || invoice.amount);
+      const status = payment.status || invoice.status || "Paid";
+      const normalizedStatus = String(status || "").toLowerCase();
+      const paidAmount = parseMoney(payment.amount);
 
       return {
         ...invoice,
+        _id: payment.id,
+        invoiceId: invoice._id,
+        transactionId: payment.transactionId,
         ownerBusinessName: owner?.businessName || invoice.businessName || "-",
         ownerEmail: owner?.email || "",
         customerDisplayName:
@@ -41,26 +49,33 @@ export async function GET(req) {
           invoice.description || invoice.category || invoice.class || "Invoice payment",
         paidAmount,
         paymentProvider:
+          payment.paymentProvider ||
+          payment.provider ||
           invoice.paymentProvider ||
           invoice.pendingPaymentProvider ||
-          (invoice.quickPayProfileId ? "Monnify" : "Manual"),
-        paymentReference:
-          invoice.paymentReference ||
-          invoice.pendingPaymentReference ||
-          invoice.invoiceNumber ||
-          "-",
-        paymentStatus: invoice.paymentStatus || (status === "Paid" ? "paid" : "partial"),
+          "Manual",
+        paymentReference: payment.paymentReference || payment.reference || "-",
+        paymentStatus:
+          payment.paymentStatus ||
+          (normalizedStatus === "paid"
+            ? "paid"
+            : normalizedStatus.includes("partial")
+              ? "partial"
+              : invoice.paymentStatus || "paid"),
         customerNotificationStatus:
+          payment.notificationStatus === "pending-whatsapp" ||
           invoice.customerNotificationStatus === "pending-whatsapp"
             ? "prepared"
-            : invoice.customerNotificationStatus || "draft",
-        happenedAt:
-          invoice.paidAt ||
-          invoice.paymentConfirmedAt ||
-          invoice.pendingPaymentCreatedAt ||
-          invoice.date ||
-          invoice.createdAt,
+            : payment.notificationStatus ||
+              invoice.customerNotificationStatus ||
+              "draft",
+        happenedAt: payment.happenedAt,
       };
+    }).sort((a, b) => {
+      const aTime = a.happenedAt ? new Date(a.happenedAt).getTime() : 0;
+      const bTime = b.happenedAt ? new Date(b.happenedAt).getTime() : 0;
+
+      return bTime - aTime;
     });
 
     const totalCollected = enriched.reduce(
