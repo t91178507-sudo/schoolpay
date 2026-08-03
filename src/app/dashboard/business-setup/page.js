@@ -8,11 +8,12 @@ import { emitSessionChange, useBusinessSession } from "../../../lib/clientSessio
 
 const BUSINESS_TYPES = [
   "Sole Proprietorship",
-  "Registered Company",
   "Partnership",
-  "Nonprofit",
-  "School",
+  "Registered Company",
+  "School / Educational Institution",
   "Professional Practice",
+  "Nonprofit / NGO",
+  "Religious Organization",
   "Other",
 ];
 

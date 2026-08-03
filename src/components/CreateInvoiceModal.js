@@ -1,7 +1,15 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { FiCalendar, FiPlus, FiTrash2 } from "react-icons/fi";
+import {
+  FiCalendar,
+  FiFileText,
+  FiPhone,
+  FiPlus,
+  FiTrash2,
+  FiUser,
+  FiX,
+} from "react-icons/fi";
 import { authFetch } from "../lib/authFetch";
 import { generateInvoiceToken } from "../lib/invoiceUtils";
 import { useToast } from "./AppFeedback";
@@ -188,68 +196,111 @@ export default function CreateInvoiceModal({ isOpen, onClose, onInvoiceAdded }) 
   if (!isOpen) return null;
 
   const inputClass =
-    "w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white";
+    "w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white";
+  const labelClass =
+    "text-sm font-medium text-slate-700 dark:text-slate-300";
+  const iconFieldClass =
+    "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
-        <div className="border-b border-gray-200 px-6 py-5 dark:border-slate-800 sm:px-8">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Create New Invoice</h2>
-          <p className="mt-1 text-gray-500 dark:text-slate-400">Generate an invoice for a customer</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 backdrop-blur-sm sm:p-5">
+      <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-950 sm:px-6">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-300">
+              Invoice setup
+            </p>
+            <h2 className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
+              Create invoice
+            </h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Add customer details, line items, and a due date.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="hidden rounded-lg border border-slate-200 bg-white px-4 py-2 text-right dark:border-slate-800 dark:bg-slate-900 sm:block">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Total
+              </p>
+              <p className="mt-0.5 text-lg font-semibold text-slate-950 dark:text-white">
+                N{totalAmount.toLocaleString()}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close create invoice"
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"
+            >
+              <FiX className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 p-6 sm:p-8">
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <label className="space-y-2">
-              <span className="block text-sm font-medium text-gray-700 dark:text-slate-300">Customer Name</span>
-              <input
-                type="text"
-                name="customer"
-                value={formData.customer}
-                onChange={handleChange}
-                required
-                className={inputClass}
-                placeholder="John Doe"
-              />
-            </label>
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5 sm:px-6">
+            <section className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="space-y-2">
+                  <span className={labelClass}>Customer name</span>
+                  <span className="relative block">
+                    <FiUser className={iconFieldClass} />
+                    <input
+                      type="text"
+                      name="customer"
+                      value={formData.customer}
+                      onChange={handleChange}
+                      required
+                      className={`${inputClass} pl-10`}
+                      placeholder="John Doe"
+                    />
+                  </span>
+                </label>
 
-            <label className="space-y-2">
-              <span className="block text-sm font-medium text-gray-700 dark:text-slate-300">Phone Number</span>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                required
-                className={inputClass}
-                placeholder="08012345678"
-              />
-            </label>
-          </div>
-
-          <label className="block space-y-2">
-            <span className="block text-sm font-medium text-gray-700 dark:text-slate-300">Description</span>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              required
-              rows={2}
-              className={`${inputClass} resize-y`}
-              placeholder="What this invoice is for"
-            />
-          </label>
-
-          <section className="space-y-3" aria-labelledby="invoice-items-heading">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h3 id="invoice-items-heading" className="text-sm font-semibold text-gray-900 dark:text-white">Items</h3>
-                <p className="text-xs text-gray-500 dark:text-slate-400">Add the products or services included in this invoice.</p>
+                <label className="space-y-2">
+                  <span className={labelClass}>Phone number</span>
+                  <span className="relative block">
+                    <FiPhone className={iconFieldClass} />
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      required
+                      className={`${inputClass} pl-10`}
+                      placeholder="08012345678"
+                    />
+                  </span>
+                </label>
               </div>
+
+              <label className="block space-y-2">
+                <span className={labelClass}>Invoice description</span>
+                <span className="relative block">
+                  <FiFileText className="pointer-events-none absolute left-3 top-3.5 text-slate-400" />
+                  <textarea
+                    name="description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    required
+                    rows={3}
+                    className={`${inputClass} resize-y pl-10`}
+                    placeholder="What this invoice is for"
+                  />
+                </span>
+              </label>
+            </section>
+
+            <section className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/40" aria-labelledby="invoice-items-heading">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 id="invoice-items-heading" className="text-sm font-semibold text-slate-950 dark:text-white">Line items</h3>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Add each charge that should appear on the invoice PDF.</p>
+                </div>
               <button
                 type="button"
                 onClick={addItem}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <FiPlus className="h-4 w-4" />
                 Add item
@@ -260,8 +311,8 @@ export default function CreateInvoiceModal({ isOpen, onClose, onInvoiceAdded }) 
               {items.map((item, index) => {
                 const lineTotal = Number(item.quantity || 0) * Number(item.unitPrice || 0);
                 return (
-                  <div key={item.id} className="grid grid-cols-12 gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-                    <label className="col-span-12 space-y-1.5 sm:col-span-6">
+                  <div key={item.id} className="grid grid-cols-12 gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <label className="col-span-12 space-y-1.5 md:col-span-6">
                       <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Item {index + 1}</span>
                       <input
                         type="text"
@@ -272,7 +323,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onInvoiceAdded }) 
                         required
                       />
                     </label>
-                    <label className="col-span-4 space-y-1.5 sm:col-span-2">
+                    <label className="col-span-4 space-y-1.5 md:col-span-2">
                       <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Quantity</span>
                       <input
                         type="number"
@@ -284,7 +335,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, onInvoiceAdded }) 
                         required
                       />
                     </label>
-                    <label className="col-span-8 space-y-1.5 sm:col-span-4">
+                    <label className="col-span-8 space-y-1.5 md:col-span-4">
                       <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Unit price (NGN)</span>
                       <div className="flex items-center gap-2">
                         <input
@@ -309,59 +360,69 @@ export default function CreateInvoiceModal({ isOpen, onClose, onInvoiceAdded }) 
                         </button>
                       </div>
                     </label>
-                    <p className="col-span-12 text-right text-xs text-slate-500 dark:text-slate-400">
-                      Line total: <span className="font-semibold text-slate-800 dark:text-slate-200">N{Number.isFinite(lineTotal) ? lineTotal.toLocaleString() : "0"}</span>
-                    </p>
+                    <div className="col-span-12 flex items-center justify-between border-t border-slate-100 pt-2 text-xs dark:border-slate-800">
+                      <span className="text-slate-500 dark:text-slate-400">Line total</span>
+                      <span className="font-semibold text-slate-900 dark:text-slate-100">N{Number.isFinite(lineTotal) ? lineTotal.toLocaleString() : "0"}</span>
+                    </div>
                   </div>
                 );
               })}
             </div>
 
-            <div className="flex items-center justify-between border-t border-slate-200 pt-3 dark:border-slate-700">
+            <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
               <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Invoice total</span>
               <span className="text-xl font-semibold text-slate-950 dark:text-white">N{totalAmount.toLocaleString()}</span>
             </div>
-          </section>
+            </section>
 
-          <label className="block space-y-2">
-            <span className="block text-sm font-medium text-gray-700 dark:text-slate-300">Due Date</span>
-            <div className="relative">
-              <input
-                ref={dueDateRef}
-                type="date"
-                name="dueDate"
-                value={formData.dueDate}
-                min={getToday()}
-                onChange={handleChange}
-                required
-                className={`${inputClass} pr-12 [&::-webkit-calendar-picker-indicator]:opacity-0`}
-              />
-              <button
-                type="button"
-                onClick={() => dueDateRef.current?.showPicker?.()}
-                className="absolute inset-y-0 right-0 inline-flex w-12 items-center justify-center text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
-                title="Open calendar"
-                aria-label="Open due date calendar"
-              >
-                <FiCalendar className="h-5 w-5" />
-              </button>
+            <label className="block space-y-2">
+              <span className={labelClass}>Due date</span>
+              <div className="relative">
+                <input
+                  ref={dueDateRef}
+                  type="date"
+                  name="dueDate"
+                  value={formData.dueDate}
+                  min={getToday()}
+                  onChange={handleChange}
+                  required
+                  className={`${inputClass} pr-12 [&::-webkit-calendar-picker-indicator]:opacity-0`}
+                />
+                <button
+                  type="button"
+                  onClick={() => dueDateRef.current?.showPicker?.()}
+                  className="absolute inset-y-0 right-0 inline-flex w-12 items-center justify-center text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                  title="Open calendar"
+                  aria-label="Open due date calendar"
+                >
+                  <FiCalendar className="h-5 w-5" />
+                </button>
+              </div>
+            </label>
+          </div>
+
+          <div className="grid gap-3 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:px-6">
+            <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-950 sm:max-w-xs">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Invoice total
+              </p>
+              <p className="mt-0.5 text-lg font-semibold text-slate-950 dark:text-white">
+                N{totalAmount.toLocaleString()}
+              </p>
             </div>
-          </label>
-
-          <div className="flex gap-4 pt-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="min-h-11 rounded-lg border border-slate-300 px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+              className="min-h-11 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
             >
-              {loading ? "Creating Invoice..." : "Create Invoice"}
+              {loading ? "Creating invoice..." : "Create invoice"}
             </button>
           </div>
         </form>
