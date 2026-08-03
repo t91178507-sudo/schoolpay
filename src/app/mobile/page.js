@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { FiArrowRight, FiCreditCard, FiFileText, FiQrCode, FiUsers } from "react-icons/fi";
 import { authFetch } from "../../lib/authFetch";
 
 function formatCurrency(value) {
@@ -40,39 +41,47 @@ export default function MobileHomePage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <p className="text-sm text-slate-400">Business Name</p>
-        <h2 className="mt-1 text-2xl font-semibold">{summary.businessName}</h2>
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 shadow-lg shadow-slate-950/20">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-300">
+          Mobile workspace
+        </p>
+        <h2 className="mt-2 text-xl font-semibold text-white sm:text-2xl">{summary.businessName}</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Payments, invoices, and receipt checks in one place.
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <SummaryCard label="Today's Sales" value={formatCurrency(summary.todayCollections)} />
-        <SummaryCard label="Payments Received" value={summary.todayTransactions} />
-        <SummaryCard label="Pending Receipts" value={summary.pendingReceiptValidation} />
-        <SummaryCard label="Outstanding Balance" value={formatCurrency(summary.outstandingBalance)} />
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <SummaryCard label="Today" value={formatCurrency(summary.todayCollections)} />
+        <SummaryCard label="Payments" value={summary.todayTransactions} />
+        <SummaryCard label="Receipts" value={summary.pendingReceiptValidation} />
+        <SummaryCard label="Outstanding" value={formatCurrency(summary.outstandingBalance)} />
       </div>
 
-      <section className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
-        <p className="text-sm font-medium text-slate-300">Quick Actions</p>
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <QuickButton href="/mobile/invoices" label="Create Invoice" />
-          <QuickButton href="/mobile/qr" label="Generate QR" />
-          <QuickButton href="/mobile/payments" label="Record Payment" />
-          <QuickButton href="/mobile/customers" label="View Customers" />
+      <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-white">Quick actions</p>
+          <span className="text-xs text-slate-500">Staff tools</span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <QuickButton href="/mobile/invoices" label="Invoice" icon={FiFileText} />
+          <QuickButton href="/mobile/qr" label="QR" icon={FiQrCode} />
+          <QuickButton href="/mobile/payments" label="Payments" icon={FiCreditCard} />
+          <QuickButton href="/mobile/customers" label="Customers" icon={FiUsers} />
         </div>
       </section>
 
-      <section className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+      <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-slate-300">Recent Activities</p>
+          <p className="text-sm font-semibold text-white">Recent activity</p>
           <span className="text-xs text-slate-500">Live</span>
         </div>
-        <div className="mt-4 space-y-3">
+        <div className="mt-3 space-y-2">
           {(summary.recentActivities || []).length ? (
             summary.recentActivities.map((activity) => (
-              <div key={activity._id} className="rounded-2xl bg-slate-950 px-4 py-3">
-                <p className="text-sm text-white">{activity.title}</p>
+              <div key={activity._id} className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-3">
+                <p className="text-sm font-medium text-white">{activity.title}</p>
                 <p className="mt-1 text-xs text-slate-500">
                   {activity.createdAt ? new Date(activity.createdAt).toLocaleString() : "-"}
                 </p>
@@ -89,20 +98,24 @@ export default function MobileHomePage() {
 
 function SummaryCard({ label, value }) {
   return (
-    <div className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-3 text-2xl font-semibold text-white">{value}</p>
+    <div className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900 p-3 sm:p-4">
+      <p className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
+      <p className="mt-2 truncate text-xl font-semibold text-white sm:text-2xl">{value}</p>
     </div>
   );
 }
 
-function QuickButton({ href, label }) {
+function QuickButton({ href, label, icon: Icon }) {
   return (
     <Link
       href={href}
-      className="rounded-2xl bg-blue-600 px-4 py-4 text-center text-sm font-semibold text-white"
+      className="group flex min-h-20 flex-col justify-between rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm font-semibold text-white transition hover:border-blue-500 hover:bg-slate-900"
     >
-      {label}
+      <Icon className="h-5 w-5 text-blue-300" aria-hidden="true" />
+      <span className="flex items-center justify-between gap-2">
+        {label}
+        <FiArrowRight className="h-4 w-4 text-slate-500 transition group-hover:translate-x-0.5 group-hover:text-blue-300" />
+      </span>
     </Link>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { FiEye, FiSearch } from "react-icons/fi";
 import { useConfirm } from "../../../components/AppFeedback";
 import { authFetch } from "../../../lib/authFetch";
 
@@ -147,26 +148,31 @@ export default function MobilePaymentsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-3">
+        <div className="grid grid-cols-4 gap-1">
         {["all", "paid", "pending", "rejected"].map((status) => (
           <button
             key={status}
             onClick={() => setStatusFilter(status)}
-            className={`rounded-2xl px-3 py-2 text-sm font-medium ${
-              statusFilter === status ? "bg-blue-600 text-white" : "bg-slate-900 text-slate-400"
+              className={`min-h-10 rounded-lg px-2 text-xs font-semibold capitalize transition ${
+              statusFilter === status ? "bg-blue-600 text-white" : "text-slate-400 hover:bg-slate-950"
             }`}
           >
             {status}
           </button>
         ))}
+        </div>
       </div>
 
-      <input
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        placeholder="Search customer, invoice, amount"
-        className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none"
-      />
+      <label className="relative block">
+        <FiSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search customer, invoice, amount"
+          className="min-h-11 w-full rounded-lg border border-slate-800 bg-slate-900 pl-10 pr-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-blue-500"
+        />
+      </label>
 
       {message ? (
         <p className={`text-sm ${messageTone === "warning" ? "text-amber-300" : "text-emerald-300"}`}>
@@ -177,21 +183,25 @@ export default function MobilePaymentsPage() {
 
       <div className="space-y-3">
         {receipts.length ? (
-          <div className="rounded-3xl border border-amber-800 bg-amber-950/40 p-4">
-            <p className="text-sm font-semibold text-amber-200">Receipt Validation</p>
-            <div className="mt-4 space-y-3">
+          <div className="rounded-2xl border border-amber-800/70 bg-amber-950/30 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-amber-100">Receipt validation</p>
+              <span className="rounded-full bg-amber-400/10 px-2.5 py-1 text-xs font-semibold text-amber-200">{receipts.length}</span>
+            </div>
+            <div className="mt-3 space-y-2">
               {receipts.map((receipt) => (
-                <div key={receipt._id} className="rounded-2xl bg-slate-950 px-4 py-3">
-                  <p className="font-medium text-white">{receipt.customerName || "Customer"}</p>
-                  <p className="mt-1 text-xs text-slate-500">
+                <div key={receipt._id} className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-3">
+                  <p className="truncate font-medium text-white">{receipt.customerName || "Customer"}</p>
+                  <p className="mt-1 truncate text-xs text-slate-500">
                     {receipt.invoiceNumber || "Pending invoice"} - {formatCurrency(receipt.amount)}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       onClick={() => openReceipt(receipt)}
                       disabled={Boolean(busy)}
-                      className="rounded-xl border border-slate-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-700 px-3 text-xs font-semibold text-white disabled:opacity-50"
                     >
+                      <FiEye className="h-3.5 w-3.5" />
                       {busy === `${receipt._id}-view` ? "Opening..." : "View receipt"}
                     </button>
                     {reviewedReceiptIds.includes(receipt._id) ? (
@@ -199,14 +209,14 @@ export default function MobilePaymentsPage() {
                         <button
                           onClick={() => reviewReceipt(receipt, "approve")}
                           disabled={Boolean(busy)}
-                          className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                          className="min-h-9 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
                         >
                           Approve
                         </button>
                         <button
                           onClick={() => setRejecting(receipt)}
                           disabled={Boolean(busy)}
-                          className="rounded-xl border border-red-400 px-3 py-2 text-xs font-semibold text-red-200 disabled:opacity-50"
+                          className="min-h-9 rounded-lg border border-red-400 px-3 text-xs font-semibold text-red-200 disabled:opacity-50"
                         >
                           Reject
                         </button>
@@ -222,17 +232,17 @@ export default function MobilePaymentsPage() {
           </div>
         ) : null}
         {filtered.map((payment) => (
-          <div key={payment._id} className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+          <div key={payment._id} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-semibold text-white">{payment.customer || "Customer"}</p>
-                <p className="text-xs text-slate-500">{payment.invoiceNumber || "-"}</p>
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-white">{payment.customer || "Customer"}</p>
+                <p className="mt-0.5 truncate text-xs text-slate-500">{payment.invoiceNumber || "-"}</p>
               </div>
-              <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+              <span className="shrink-0 rounded-full bg-slate-800 px-3 py-1 text-xs font-medium text-slate-300">
                 {payment.status || "Unknown"}
               </span>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
               <Info label="Amount" value={formatCurrency(payment.amount)} />
               <Info label="Paid" value={formatCurrency(payment.paidAmount)} />
               <Info label="Balance" value={formatCurrency(payment.balanceDue)} />
@@ -305,8 +315,8 @@ function MobileRejectModal({ receipt, busy, onCancel, onReject }) {
   const rejectionReason = reason === "Other" ? customReason.trim() : reason;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-slate-950/70 p-4">
-      <div className="w-full rounded-3xl bg-slate-900 p-5 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-end bg-slate-950/70 p-3 sm:items-center sm:justify-center">
+      <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-2xl">
         <h2 className="text-lg font-semibold text-white">Reject receipt</h2>
         <p className="mt-1 text-sm text-slate-400">
           The customer will receive this reason on WhatsApp.
@@ -354,9 +364,9 @@ function MobileRejectModal({ receipt, busy, onCancel, onReject }) {
 
 function Info({ label, value }) {
   return (
-    <div>
+    <div className="rounded-lg bg-slate-950 px-3 py-2">
       <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-sm text-white">{value}</p>
+      <p className="mt-1 truncate text-sm font-semibold text-white">{value}</p>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FiFileText, FiPlus } from "react-icons/fi";
 import { authFetch } from "../../../lib/authFetch";
 
 function formatCurrency(value) {
@@ -93,13 +94,21 @@ export default function MobileInvoicesPage() {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
-        <h2 className="text-lg font-semibold text-white">Create Invoice</h2>
-        <div className="mt-4 space-y-3">
+      <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600/15 text-blue-300">
+            <FiPlus className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-white">Create invoice</h2>
+            <p className="mt-1 text-sm text-slate-400">Prepare a customer invoice from your phone.</p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <select
             value={form.customerId}
             onChange={(event) => setForm((current) => ({ ...current, customerId: event.target.value }))}
-            className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
+            className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-white outline-none focus:border-blue-500"
           >
             <option value="">Select customer</option>
             {customers.map((customer) => (
@@ -112,41 +121,46 @@ export default function MobileInvoicesPage() {
             value={form.description}
             onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
             placeholder="Description"
-            className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
+            className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-blue-500 sm:col-span-2"
           />
           <input
             type="number"
             value={form.amount}
             onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))}
             placeholder="Amount"
-            className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
+            className="min-h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-blue-500"
           />
           <button
             onClick={createInvoice}
             disabled={saving}
-            className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white"
+            className="min-h-11 w-full rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50"
           >
-            {saving ? "Creating..." : "Create Invoice"}
+            {saving ? "Creating..." : "Create invoice"}
           </button>
         </div>
       </section>
 
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {invoices.map((invoice) => (
-          <div key={invoice._id} className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+          <div key={invoice._id} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-semibold text-white">{invoice.customer || invoice.customerName}</p>
-                <p className="text-xs text-slate-500">{invoice.invoiceNumber}</p>
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-slate-300">
+                  <FiFileText className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-white">{invoice.customer || invoice.customerName}</p>
+                  <p className="mt-0.5 truncate text-xs text-slate-500">{invoice.invoiceNumber}</p>
+                </div>
               </div>
-              <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+              <span className="shrink-0 rounded-full bg-slate-800 px-3 py-1 text-xs font-medium text-slate-300">
                 {invoice.status}
               </span>
             </div>
-            <p className="mt-3 text-sm text-slate-400">{invoice.description || "-"}</p>
-            <div className="mt-4 flex items-center justify-between text-sm">
+            <p className="mt-3 line-clamp-2 text-sm text-slate-400">{invoice.description || "-"}</p>
+            <div className="mt-4 flex items-center justify-between rounded-lg bg-slate-950 px-3 py-2 text-sm">
               <span className="text-slate-500">Amount</span>
               <span className="font-semibold text-white">{formatCurrency(invoice.amount)}</span>
             </div>
