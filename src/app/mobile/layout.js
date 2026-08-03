@@ -4,11 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import {
+  FiCode,
   FiCreditCard,
   FiFileText,
   FiGrid,
   FiLogOut,
-  FiQrCode,
   FiUser,
   FiUsers,
 } from "react-icons/fi";
@@ -18,7 +18,7 @@ const navItems = [
   { href: "/mobile", label: "Home", icon: FiGrid },
   { href: "/mobile/payments", label: "Payments", icon: FiCreditCard },
   { href: "/mobile/invoices", label: "Invoices", icon: FiFileText },
-  { href: "/mobile/qr", label: "QR", icon: FiQrCode },
+  { href: "/mobile/qr", label: "QR", icon: FiCode },
   { href: "/mobile/customers", label: "Customers", icon: FiUsers },
   { href: "/mobile/profile", label: "Profile", icon: FiUser },
 ];

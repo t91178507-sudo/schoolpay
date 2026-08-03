@@ -126,21 +126,32 @@ function buildInvoicePdfMediaUrl(invoice = {}, origin = "") {
   )}/pdf`;
 }
 
+function formatCurrencyValue(value) {
+  return `N${Number(value || 0).toLocaleString()}`;
+}
+
 function buildInvoiceWhatsAppMessage({
   isReminder,
   baseMessage,
   outstandingAmount,
+  invoiceAmount,
 }) {
   let waMessage = String(baseMessage || "");
-  const balanceRegex = /outstanding balance:/i;
+  const amountRegex = /amount:/i;
+  const balanceRegex = /balance:/i;
   const lines = waMessage.split(/\r?\n/);
-  const balanceIndex = lines.findIndex((line) => balanceRegex.test(line));
+  const amountIndex = lines.findIndex((line) => amountRegex.test(line));
 
-  if (isReminder && balanceIndex === -1) {
-    const formattedOutstanding = `N${Number(outstandingAmount || 0).toLocaleString()}`;
-    waMessage = [waMessage, "", `Outstanding balance: ${formattedOutstanding}`].join(
-      "\n"
-    );
+  if (amountIndex !== -1) {
+    const filtered = lines.filter((line) => !balanceRegex.test(line));
+    const newAmountIndex = filtered.findIndex((line) => amountRegex.test(line));
+    const insertPos = newAmountIndex >= 0 ? newAmountIndex + 1 : filtered.length;
+    filtered.splice(insertPos, 0, `Balance: ${formatCurrencyValue(outstandingAmount)}`);
+    waMessage = filtered.join("\n");
+  } else if (isReminder) {
+    const formattedAmount = formatCurrencyValue(invoiceAmount);
+    const formattedOutstanding = formatCurrencyValue(outstandingAmount);
+    waMessage = [waMessage, "", `Amount: ${formattedAmount}`, `Balance: ${formattedOutstanding}`].join("\n");
   }
 
   return waMessage;
@@ -206,6 +217,7 @@ export async function deliverInvoiceMessage({
     isReminder,
     baseMessage,
     outstandingAmount,
+    invoiceAmount: invoice.amount,
   });
 
   if (selectedProvider === "browser") {
@@ -418,6 +430,7 @@ export async function deliverPaymentConfirmation({
     amount: amount ?? invoice.paidAmount ?? invoice.amount ?? 0,
     description:
       invoice.description || invoice.category || invoice.class || "Invoice payment",
+    balance: Math.max(0, Number(getOutstandingAmount(invoice) || 0)),
   });
 
   if (selectedProvider === "browser") {

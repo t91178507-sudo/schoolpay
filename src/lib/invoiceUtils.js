@@ -63,7 +63,16 @@ export function calculateInvoiceTotal(items = []) {
 }
 
 function formatCurrency(amount) {
-  return `N${Number(amount || 0).toLocaleString()}`;
+  const numericAmount =
+    typeof amount === "string"
+      ? Number(String(amount).replace(/[^0-9.-]+/g, ""))
+      : Number(amount || 0);
+
+  if (!Number.isFinite(numericAmount)) {
+    return "N0";
+  }
+
+  return `N${numericAmount.toLocaleString()}`;
 }
 
 function formatMessageDate(date = new Date()) {
@@ -141,17 +150,33 @@ export function buildPaymentConfirmationMessage({
   customerLabel = "Customer Name",
   amount,
   description,
+  balance,
 }) {
+  const amountLine = `Amount paid: ${formatCurrency(amount)}`;
+  const balanceLine =
+    typeof balance !== "undefined" && balance !== null && Number(balance) > 0
+      ? `Balance: ${formatCurrency(balance)}`
+      : "";
+
+  const detailLines = [
+    `Invoice number: ${invoiceNumber || "Pending"}`,
+    `${customerLabel}: ${customerName}`,
+    amountLine,
+  ];
+
+  if (balanceLine) {
+    detailLines.push(balanceLine);
+  }
+
+  detailLines.push(`Description: ${description || "Invoice payment"}`);
+
   return `*${businessName || "InvoiceHub"}*
 
 Hello ${customerName || "there"},
 
 Your payment has been received and recorded successfully.
 
-Invoice number: ${invoiceNumber || "Pending"}
-${customerLabel}: ${customerName}
-Amount paid: ${formatCurrency(amount)}
-Description: ${description || "Invoice payment"}
+${detailLines.join("\n")}
 
 Thank you for your payment.`;
 }

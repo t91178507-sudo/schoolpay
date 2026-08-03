@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { FiArrowRight, FiCreditCard, FiFileText, FiQrCode, FiUsers } from "react-icons/fi";
+import { FiArrowRight, FiCode, FiCreditCard, FiFileText, FiUsers } from "react-icons/fi";
 import { authFetch } from "../../lib/authFetch";
 
 function formatCurrency(value) {
@@ -66,7 +66,7 @@ export default function MobileHomePage() {
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <QuickButton href="/mobile/invoices" label="Invoice" icon={FiFileText} />
-          <QuickButton href="/mobile/qr" label="QR" icon={FiQrCode} />
+          <QuickButton href="/mobile/qr" label="QR" icon={FiCode} />
           <QuickButton href="/mobile/payments" label="Payments" icon={FiCreditCard} />
           <QuickButton href="/mobile/customers" label="Customers" icon={FiUsers} />
         </div>
