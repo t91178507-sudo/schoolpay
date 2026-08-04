@@ -902,12 +902,7 @@ app.post("/api/session/logout", requireApiKey, async (req, res) => {
     sessionState.logoutRequested = true;
     clearRestartTimer(sessionState);
 
-    if (sessionState.client) {
-      await sessionState.client.logout();
-      await sessionState.client.destroy().catch(() => {});
-    }
-
-    await clearStoredSession(sessionState.sessionName);
+  await sessionState.client.destroy().catch(() => {});
     clearSessionRuntime(sessionState, "logged_out");
 
     ensureSession(sessionState.sessionName).catch(() => {});

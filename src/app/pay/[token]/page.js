@@ -55,7 +55,8 @@ export default function PaymentPage() {
   const [error, setError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [activeInvoice, setActiveInvoice] = useState(null);
-  const [payAmount, setPayAmount] = useState(0);
+  const [payAmount, setPayAmount] = useState("");
+
   const [copiedPayazaField, setCopiedPayazaField] = useState("");
   const [copiedReceiptField, setCopiedReceiptField] = useState("");
   const [launchingPayment, setLaunchingPayment] = useState(false);
@@ -76,14 +77,14 @@ export default function PaymentPage() {
   const payazaVerifyInFlight = useRef(false);
   const autoCheckingPayaza = Boolean(activeInvoice && payazaAccount?.paymentReference);
 
-  const openInvoice = (invoice) => {
-    setActiveInvoice(invoice);
-    setPayAmount(getOutstandingAmount(invoice));
-    setPayazaAccount(null);
-    setReceiptFormOpen(false);
-    setReceiptUploadProgress(0);
-    setReceiptSubmitted(false);
-  };
+const openInvoice = (invoice) => {
+  setActiveInvoice(invoice);
+  setPayAmount("");
+  setPayazaAccount(null);
+  setReceiptFormOpen(false);
+  setReceiptUploadProgress(0);
+  setReceiptSubmitted(false);
+};
 
   useEffect(() => {
     if (window.MonnifySDK) {
@@ -690,14 +691,15 @@ export default function PaymentPage() {
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-medium">
                 N
               </span>
-              <input
-                type="number"
-                min="1"
-                max={outstandingAmount}
-                value={payAmount}
-                onChange={handlePayAmountChange}
-                className="w-full pl-9 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-[15px] font-medium text-slate-900 dark:text-slate-100 tabular-nums focus:outline-none focus:border-slate-400"
-              />
+             <input
+  type="number"
+  min="1"
+  max={outstandingAmount}
+  value={payAmount}
+  onChange={handlePayAmountChange}
+  placeholder={`Enter amount (max N${outstandingAmount.toLocaleString()})`}
+  className="w-full pl-9 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-[15px] font-medium text-slate-900 dark:text-slate-100 tabular-nums focus:outline-none focus:border-slate-400"
+/>
             </div>
             <p className="mt-2 text-[12px] text-slate-400">
               You can enter any amount up to N{outstandingAmount.toLocaleString()}.
