@@ -47,6 +47,23 @@ function getOutstandingAmount(invoice) {
   return totalAmount;
 }
 
+function formatCurrency(value) {
+  return `N${Number(value || 0).toLocaleString()}`;
+}
+
+function formatInvoiceDate(value) {
+  if (!value) return "Date unavailable";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "Date unavailable";
+
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
+}
+
 export default function PaymentPage() {
   const toast = useToast();
   const { token } = useParams();
@@ -503,58 +520,92 @@ const openInvoice = (invoice) => {
   }
 
   if (!activeInvoice) {
+    const totalDue = unpaidInvoices.reduce(
+      (sum, inv) => sum + Number(getOutstandingAmount(inv) || 0),
+      0
+    );
+
     return (
-      <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 py-16 px-4">
-        <div className="max-w-md mx-auto">
-          <div className="mb-6 px-1">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="truncate text-[13px] font-semibold tracking-wide text-slate-900 uppercase dark:text-slate-100">
-                {customer.businessName || "Invoice Payment"}
-              </span>
+      <div className="min-h-screen bg-slate-50 px-4 py-8 dark:bg-slate-950 sm:py-14">
+        <div className="mx-auto w-full max-w-xl">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">
+                {customer.businessName || "InvoiceHub"}
+              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Secure invoice payment
+              </p>
+            </div>
+            <div className="shrink-0">
               {customer.businessVerified ? (
-                <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold normal-case text-emerald-800">Verified Business</span>
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold text-emerald-800">
+                  Verified
+                </span>
               ) : null}
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
-            <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800">
-              <p className="text-[12px] font-medium text-slate-500 uppercase tracking-wide">
-                Select an invoice to pay
+          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="border-b border-slate-100 bg-slate-950 px-5 py-5 text-white dark:border-slate-800">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                Select invoice
               </p>
-              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100 mt-1">
+              <h1 className="mt-2 truncate text-2xl font-semibold">
                 {customer.name}
-              </p>
+              </h1>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="rounded-2xl bg-white/10 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-300">
+                    Open invoices
+                  </p>
+                  <p className="mt-1 text-lg font-semibold">{unpaidInvoices.length}</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-300">
+                    Total due
+                  </p>
+                  <p className="mt-1 truncate text-lg font-semibold">
+                    {formatCurrency(totalDue)}
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="space-y-3 p-4">
               {unpaidInvoices.map((inv) => {
+                const amountDue = getOutstandingAmount(inv);
+                const description =
+                  inv.description || inv.category || inv.class || "Invoice payment";
+
                 return (
                   <button
                     key={inv._id}
                     onClick={() => openInvoice(inv)}
-                    className="w-full text-left px-8 py-5 flex items-center justify-between transition-colors hover:bg-slate-50 dark:hover:bg-slate-950/50"
+                    className="group w-full rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50/40 dark:border-slate-800 dark:bg-slate-950/50 dark:hover:border-emerald-900 dark:hover:bg-emerald-950/20"
                   >
-                    <div>
-                      <p className="font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
-                        N{Number(getOutstandingAmount(inv)).toLocaleString()}
-                      </p>
-                      <p className="text-[12px] text-slate-400 dark:text-slate-500 mt-1">
-                        {inv.date
-                          ? new Date(inv.date).toLocaleDateString() +
-                            " " +
-                            new Date(inv.date).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          : "-"}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">
+                          {inv.invoiceNumber || description}
+                        </p>
+                        <p className="mt-1 line-clamp-1 text-sm text-slate-500 dark:text-slate-400">
+                          {description}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-lg font-semibold tabular-nums text-slate-950 dark:text-white">
+                        {formatCurrency(amountDue)}
                       </p>
                     </div>
-                    <span
-                      className="text-[11px] font-medium px-2.5 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200"
-                    >
-                      Pay now
-                    </span>
+
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                      <p className="text-xs text-slate-400 dark:text-slate-500">
+                        {formatInvoiceDate(inv.date || inv.createdAt)}
+                      </p>
+                      <span className="inline-flex items-center rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition group-hover:bg-emerald-700">
+                        Pay now
+                      </span>
+                    </div>
                   </button>
                 );
               })}

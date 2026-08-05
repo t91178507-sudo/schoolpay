@@ -13,11 +13,11 @@ import { buildInvoiceAttachment } from "./invoicePdf";
 import { buildPaymentReceiptAttachment } from "./paymentReceiptPdf";
 import { markInvoiceNotificationPrepared } from "./paymentLifecycle";
 import { getOutstandingAmount } from "./reminderSafety";
+import { sendOrQueueWhatsAppWebMessage } from "./whatsappMessageQueue";
 import {
+  fetchWhatsAppWebStatus,
   isWhatsAppWebConfigured,
   resolveActiveWhatsAppWebConfig,
-  sendWhatsAppWebDocument,
-  sendWhatsAppWebMessage,
 } from "./whatsappWebBridge";
 import {
   getTwilioTemplate,
@@ -49,23 +49,6 @@ function buildFallbackUrl(phone, message) {
   }
 
   return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`;
-}
-
-function shouldFallbackToBrowser(error) {
-  const normalizedMessage = String(error?.message || "").toLowerCase();
-  const normalizedCode = String(error?.code || error?.cause?.code || "").trim();
-
-  return (
-    normalizedCode === "ECONNREFUSED" ||
-    normalizedCode === "ECONNRESET" ||
-    normalizedCode === "ETIMEDOUT" ||
-    normalizedCode === "ENOTFOUND" ||
-    normalizedMessage.includes("fetch failed") ||
-    normalizedMessage.includes("connect econnrefused") ||
-    normalizedMessage.includes("connection refused") ||
-    normalizedMessage.includes("timed out") ||
-    normalizedMessage.includes("whatsapp")
-  );
 }
 
 function getCustomerMessageLabel(owner = {}) {
@@ -340,53 +323,32 @@ export async function deliverInvoiceMessage({
       );
     }
 
-    try {
-      const attachment = buildInvoiceAttachment({ invoice, owner, origin });
-      let attachmentSent = false;
+    const bridgeStatus = await fetchWhatsAppWebStatus(whatsAppWebConfig).catch(
+      (error) => ({
+        status: "offline",
+        lastError: error.message || "WhatsApp bridge is offline",
+      })
+    );
+    const attachment = buildInvoiceAttachment({ invoice, owner, origin });
+    const result = await sendOrQueueWhatsAppWebMessage({
+      db,
+      owner,
+      config: whatsAppWebConfig,
+      bridgeStatus,
+      type: isReminder ? "invoice_reminder" : "invoice",
+      relatedId: invoice._id,
+      phone,
+      text: waMessage,
+      attachment,
+    });
 
-      try {
-        await sendWhatsAppWebDocument(whatsAppWebConfig, {
-          phone,
-          caption: waMessage,
-          attachment,
-        });
-        attachmentSent = true;
-      } catch (attachmentError) {
-        console.error(
-          isReminder
-            ? "WHATSAPP REMINDER PDF SEND ERROR:"
-            : "WHATSAPP INVOICE PDF SEND ERROR:",
-          attachmentError
-        );
+    await markInvoiceNotificationPrepared(
+      db,
+      invoice._id,
+      result.status === "sent" ? "sent" : "pending-whatsapp"
+    );
 
-        await sendWhatsAppWebMessage(whatsAppWebConfig, {
-          phone,
-          text: waMessage,
-        });
-      }
-
-      await markInvoiceNotificationPrepared(db, invoice._id, "sent");
-
-      return {
-        sent: true,
-        status: "sent",
-        provider: "whatsappWeb",
-        attachmentSent,
-      };
-    } catch (error) {
-      if (!shouldFallbackToBrowser(error)) {
-        throw error;
-      }
-
-      await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
-
-      return buildBrowserResult({
-        phone,
-        message: waMessage,
-        provider: "browser",
-        status: "fallback",
-      });
-    }
+    return result;
   }
 
   const browserConfig = resolveBrowserWhatsAppConfig(owner || {});
@@ -529,56 +491,36 @@ export async function deliverPaymentConfirmation({
       );
     }
 
-    try {
-      const attachment = buildPaymentReceiptAttachment({
-        invoice,
-        owner,
-        amount: amount ?? invoice.paidAmount ?? invoice.amount ?? 0,
-      });
+    const bridgeStatus = await fetchWhatsAppWebStatus(whatsAppWebConfig).catch(
+      (error) => ({
+        status: "offline",
+        lastError: error.message || "WhatsApp bridge is offline",
+      })
+    );
+    const attachment = buildPaymentReceiptAttachment({
+      invoice,
+      owner,
+      amount: amount ?? invoice.paidAmount ?? invoice.amount ?? 0,
+    });
+    const result = await sendOrQueueWhatsAppWebMessage({
+      db,
+      owner,
+      config: whatsAppWebConfig,
+      bridgeStatus,
+      type: "payment_confirmation",
+      relatedId: invoice._id,
+      phone,
+      text: message,
+      attachment,
+    });
 
-      let attachmentSent = false;
+    await markInvoiceNotificationPrepared(
+      db,
+      invoice._id,
+      result.status === "sent" ? "sent" : "pending-whatsapp"
+    );
 
-      try {
-        await sendWhatsAppWebDocument(whatsAppWebConfig, {
-          phone,
-          caption: message,
-          attachment,
-        });
-        attachmentSent = true;
-      } catch (attachmentError) {
-        console.error("PAYMENT RECEIPT PDF SEND ERROR:", attachmentError);
-
-        await sendWhatsAppWebMessage(whatsAppWebConfig, {
-          phone,
-          text: message,
-        });
-      }
-
-      await markInvoiceNotificationPrepared(db, invoice._id, "sent");
-
-      return {
-        sent: true,
-        status: "sent",
-        provider: "whatsappWeb",
-        attachmentSent,
-      };
-    } catch (error) {
-      if (!shouldFallbackToBrowser(error)) {
-        throw error;
-      }
-
-      await markInvoiceNotificationPrepared(db, invoice._id, "prepared");
-
-      return {
-        ...buildBrowserResult({
-          phone,
-          message,
-          provider: "browser",
-          status: "fallback",
-        }),
-        attachmentSent: false,
-      };
-    }
+    return result;
   }
 
   const browserConfig = resolveBrowserWhatsAppConfig(owner || {});
@@ -701,17 +643,23 @@ export async function deliverReceiptRejection({
       );
     }
 
-    const delivery = await sendWhatsAppWebMessage(whatsAppWebConfig, {
+    const bridgeStatus = await fetchWhatsAppWebStatus(whatsAppWebConfig).catch(
+      (error) => ({
+        status: "offline",
+        lastError: error.message || "WhatsApp bridge is offline",
+      })
+    );
+
+    return sendOrQueueWhatsAppWebMessage({
+      db,
+      owner,
+      config: whatsAppWebConfig,
+      bridgeStatus,
+      type: "receipt_rejection",
+      relatedId: invoice?._id,
       phone: recipientPhone,
       text: message,
     });
-
-    return {
-      sent: true,
-      status: "sent",
-      provider: "whatsappWeb",
-      messageId: delivery?.messageId || delivery?.id || delivery?.key?.id || "",
-    };
   }
 
   return {

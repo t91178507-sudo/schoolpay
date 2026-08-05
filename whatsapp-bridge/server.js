@@ -28,6 +28,15 @@ const WINDOWS_BROWSER_CANDIDATES = [
   "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
 ];
 const BROWSER_PATH = resolveBrowserPath();
+const SESSION_BOOTSTRAP_STATUSES = new Set([
+  "idle",
+  "logged_out",
+  "deleted",
+  "disconnected",
+  "auth_failure",
+  "retrying",
+]);
+const READY_KEEPALIVE_MS = 60 * 1000;
 
 const app = express();
 app.use(cors());
@@ -168,6 +177,7 @@ function buildSessionState(sessionName) {
     lastUpdatedAt: new Date().toISOString(),
     restartTimer: null,
     readyTimeoutTimer: null,
+    keepAliveTimer: null,
     messageLogs: [],
     logoutRequested: false,
   };
@@ -249,6 +259,7 @@ async function clearStoredSession(sessionName) {
 function clearSessionRuntime(sessionState, nextStatus = "deleted") {
   clearRestartTimer(sessionState);
   clearReadyTimeout(sessionState);
+  clearKeepAliveTimer(sessionState);
   sessionState.client = null;
   sessionState.initializingPromise = null;
   sessionState.qrDataUrl = "";
@@ -272,6 +283,34 @@ function clearReadyTimeout(sessionState) {
     clearTimeout(sessionState.readyTimeoutTimer);
     sessionState.readyTimeoutTimer = null;
   }
+}
+
+function clearKeepAliveTimer(sessionState) {
+  if (sessionState.keepAliveTimer) {
+    clearInterval(sessionState.keepAliveTimer);
+    sessionState.keepAliveTimer = null;
+  }
+}
+
+function startReadyKeepAlive(sessionState) {
+  clearKeepAliveTimer(sessionState);
+
+  sessionState.keepAliveTimer = setInterval(async () => {
+    if (!sessionState.client || sessionState.status !== "ready") {
+      clearKeepAliveTimer(sessionState);
+      return;
+    }
+
+    try {
+      await sessionState.client.getState();
+      touchSession(sessionState);
+    } catch (error) {
+      scheduleRestart(
+        sessionState,
+        error.message || "WhatsApp keepalive check failed"
+      );
+    }
+  }, READY_KEEPALIVE_MS);
 }
 
 async function resetPairingLaunchState(sessionState) {
@@ -331,14 +370,8 @@ function serializeSessionState(sessionState) {
 function getSessionSnapshot(sessionName, { bootstrap = false } = {}) {
   const sessionState = getSessionState(sessionName);
 
-  if (
-    bootstrap &&
-    !sessionState.client &&
-    !sessionState.initializingPromise &&
-    !sessionState.restartTimer &&
-    sessionState.status !== "ready"
-  ) {
-    ensureSession(sessionState.sessionName).catch(() => {});
+  if (bootstrap) {
+    wakeSession(sessionState.sessionName);
   }
 
   return sessionState;
@@ -414,6 +447,7 @@ async function buildClient(sessionState) {
     sessionState.lastError = "";
     sessionState.connectedNumber = nextClient.info?.wid?.user || "";
     touchSession(sessionState, "ready");
+    startReadyKeepAlive(sessionState);
   });
 
   nextClient.on("auth_failure", (message) => {
@@ -459,6 +493,7 @@ function scheduleRestart(sessionState, reason) {
   }
 
   clearReadyTimeout(sessionState);
+  clearKeepAliveTimer(sessionState);
   sessionState.lastError = reason || sessionState.lastError;
   touchSession(sessionState, "retrying");
 
@@ -487,6 +522,7 @@ function scheduleRestart(sessionState, reason) {
 async function restartSessionImmediately(sessionState, reason) {
   clearRestartTimer(sessionState);
   clearReadyTimeout(sessionState);
+  clearKeepAliveTimer(sessionState);
   sessionState.lastError = reason || sessionState.lastError || "Restarting WhatsApp session";
   touchSession(sessionState, "retrying");
 
@@ -508,6 +544,7 @@ async function ensureSession(sessionName) {
   }
 
   if (!sessionState.initializingPromise) {
+    sessionState.logoutRequested = false;
     touchSession(sessionState, "starting");
     sessionState.initializingPromise = buildClient(sessionState)
       .catch((error) => {
@@ -528,7 +565,22 @@ async function ensureSession(sessionName) {
   return sessionState;
 }
 
-async function waitForSessionReady(sessionState, timeoutMs = 15000) {
+function wakeSession(sessionName) {
+  const sessionState = getSessionState(sessionName);
+
+  if (
+    !sessionState.client &&
+    !sessionState.initializingPromise &&
+    !sessionState.restartTimer &&
+    SESSION_BOOTSTRAP_STATUSES.has(sessionState.status)
+  ) {
+    ensureSession(sessionState.sessionName).catch(() => {});
+  }
+
+  return sessionState;
+}
+
+async function waitForSessionReady(sessionState, timeoutMs = 30000) {
   await ensureSession(sessionState.sessionName);
 
   if (sessionState.client && sessionState.status === "ready") {

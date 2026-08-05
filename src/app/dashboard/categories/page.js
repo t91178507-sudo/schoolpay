@@ -15,7 +15,6 @@ import {
   FiMail,
   FiPhone,
   FiHash,
-  FiMoreHorizontal,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import AddCustomerModal from "../../../components/AddCustomerModal";
@@ -851,50 +850,55 @@ export default function CategoriesPage() {
                   return (
                     <div
                       key={category}
-                      className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                      className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
                     >
-                      <div className={`h-1.5 w-full bg-gradient-to-r ${iconColor}`} />
-                      <div className="p-5">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${iconColor} text-sm font-bold text-white shadow-sm`}
-                            >
-                              {category.slice(0, 2).toUpperCase()}
-                            </div>
-                            <div>
-                              <h3 className="text-base font-semibold text-slate-900 dark:text-white">
-                                {category}
-                              </h3>
-                              <p className="text-sm text-slate-500 dark:text-slate-400">
-                                {count} {count === 1 ? customerLabels.singular : customerLabels.plural}
-                              </p>
-                            </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div
+                            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${iconColor} text-sm font-bold text-white shadow-sm`}
+                          >
+                            {category.slice(0, 2).toUpperCase()}
                           </div>
-                          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                            <button
-                              onClick={() => renameCategory(category)}
-                              className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-                              title="Rename"
-                            >
-                              <FiEdit2 className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              onClick={() => deleteCategory(category)}
-                              className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
-                              title="Delete"
-                            >
-                              <FiTrash2 className="h-3.5 w-3.5" />
-                            </button>
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                              Category
+                            </p>
+                            <h3 className="mt-1 truncate text-lg font-semibold text-slate-950 dark:text-white">
+                              {category}
+                            </h3>
                           </div>
                         </div>
 
-                        <div className="mt-5 flex items-center gap-3">
+                        <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                          {count} {count === 1 ? customerLabels.singular : customerLabels.plural}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+                        <button
+                          onClick={() => setSelectedCategory(category)}
+                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                        >
+                          View group
+                          <FiArrowRight className="h-4 w-4" />
+                        </button>
+
+                        <div className="flex shrink-0 items-center gap-1">
                           <button
-                            onClick={() => setSelectedCategory(category)}
-                            className="flex-1 rounded-xl bg-slate-900 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                            onClick={() => renameCategory(category)}
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                            title="Rename"
+                            aria-label={`Rename ${category}`}
                           >
-                            View group
+                            <FiEdit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteCategory(category)}
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 text-red-500 transition hover:bg-red-50 hover:text-red-700 dark:border-red-950/60 dark:text-red-400 dark:hover:bg-red-950/30"
+                            title="Delete"
+                            aria-label={`Delete ${category}`}
+                          >
+                            <FiTrash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </div>

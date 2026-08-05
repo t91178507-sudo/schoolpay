@@ -271,35 +271,96 @@ function NoticeBanner({ notice }) {
   );
 }
 
-function InsightCard({ icon: Icon, label, value, description, tone = "slate" }) {
-  const toneClass = {
-    slate:
-      "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
-    emerald:
-      "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-    orange:
-      "bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
-    blue:
-      "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
-    red:
-      "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300",
-  }[tone];
+function CompactInvoiceSummary({
+  totalInvoiceAmount,
+  balancePendingAmount,
+  collectionRate,
+  actionableCount,
+  overdueCount,
+  preparedNotificationCount,
+  unpaidCount,
+}) {
+  const metrics = [
+    {
+      label: "Open",
+      value: actionableCount,
+      tone: "text-slate-950 dark:text-white",
+    },
+    {
+      label: "Total",
+      value: formatCurrency(totalInvoiceAmount),
+      tone: "text-blue-600",
+    },
+    {
+      label: "Pending",
+      value: formatCurrency(balancePendingAmount),
+      tone: "text-orange-600",
+    },
+    {
+      label: "Collected",
+      value: `${collectionRate}%`,
+      tone: collectionRate >= 80 ? "text-emerald-600" : "text-orange-600",
+    },
+  ];
+
+  const insights = [
+    {
+      icon: FiClock,
+      label: "Overdue",
+      value: overdueCount,
+      tone: overdueCount ? "text-red-600" : "text-slate-500",
+    },
+    {
+      icon: FiMessageCircle,
+      label: "Ready",
+      value: preparedNotificationCount,
+      tone: "text-blue-600",
+    },
+    {
+      icon: FiCreditCard,
+      label: "Unpaid",
+      value: unpaidCount,
+      tone: "text-orange-600",
+    },
+  ];
 
   return (
-    <SurfaceCard className="flex items-start gap-3 p-4">
-      <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneClass}`}>
-        <Icon className="h-5 w-5" />
-      </span>
-      <div>
-        <p className="text-sm font-semibold text-slate-900 dark:text-white">
-          {value}
-        </p>
-        <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-slate-400">
-          {label}
-        </p>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          {description}
-        </p>
+    <SurfaceCard className="px-4 py-3">
+      <div className="grid gap-3 xl:grid-cols-[1fr_auto] xl:items-center">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          {metrics.map((metric) => (
+            <div
+              key={metric.label}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-950/60"
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                {metric.label}
+              </p>
+              <p className={`mt-1 truncate text-lg font-semibold ${metric.tone}`}>
+                {metric.value}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 xl:min-w-[360px]">
+          {insights.map((item) => (
+            <div
+              key={item.label}
+              className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-800"
+            >
+              <item.icon className={`h-4 w-4 shrink-0 ${item.tone}`} />
+              <div className="min-w-0">
+                <p className={`text-sm font-semibold ${item.tone}`}>
+                  {item.value}
+                </p>
+                <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  {item.label}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </SurfaceCard>
   );
@@ -484,7 +545,8 @@ export default function Invoices() {
         invoice.customerNotificationStatus
       );
 
-      const invoiceDate = invoice.date ? new Date(invoice.date) : null;
+      const rawInvoiceDate = invoice.date || invoice.dueDate || invoice.createdAt;
+      const invoiceDate = rawInvoiceDate ? new Date(rawInvoiceDate) : null;
       const dateFrom = invoiceFilters.dateFrom
         ? new Date(`${invoiceFilters.dateFrom}T00:00:00`)
         : null;
@@ -617,7 +679,7 @@ export default function Invoices() {
   const updateInvoiceFilterForm = (field, value) => {
     setInvoiceFilterForm((current) => ({
       ...current,
-      value,
+      [field]: value,
     }));
   };
 
@@ -1111,56 +1173,29 @@ export default function Invoices() {
         </button>
       </div>
 
-      <StatGrid>
-        {activePage === "invoices" ? (
-          <>
-            <StatCard label="Open invoices" value={actionableInvoices.length} tone="slate" />
-            <StatCard label="Total amount" value={formatCurrency(totalInvoiceAmount)} tone="blue" />
-            <StatCard label="Balance pending" value={formatCurrency(balancePendingAmount)} tone="orange" />
-            <StatCard
-              label="Collection rate"
-              value={`${collectionRate}%`}
-              tone={collectionRate >= 80 ? "emerald" : "orange"}
-            />
-          </>
-        ) : (
+      {activePage === "invoices" ? (
+        <CompactInvoiceSummary
+          actionableCount={actionableInvoices.length}
+          totalInvoiceAmount={totalInvoiceAmount}
+          balancePendingAmount={balancePendingAmount}
+          collectionRate={collectionRate}
+          overdueCount={overdueCount}
+          preparedNotificationCount={preparedNotificationCount}
+          unpaidCount={unpaidCount}
+        />
+      ) : (
+        <StatGrid>
           <>
             <StatCard label="Total schedules" value={recurringInvoices.length} tone="slate" />
             <StatCard label="Scheduled amount" value={formatCurrency(recurringTotalAmount)} tone="blue" />
             <StatCard label="Active" value={activeRecurringCount} tone="emerald" />
             <StatCard label="Due now" value={dueRecurringCount} tone="orange" />
           </>
-        )}
-      </StatGrid>
+        </StatGrid>
+      )}
 
       {activePage === "invoices" ? (
         <>
-          <div className="grid gap-3 md:grid-cols-3">
-            <InsightCard
-              icon={FiClock}
-              label="Overdue"
-              value={`${overdueCount} invoice${overdueCount === 1 ? "" : "s"}`}
-              description="Invoices past their due date."
-              tone={overdueCount ? "red" : "slate"}
-            />
-
-            <InsightCard
-              icon={FiMessageCircle}
-              label="Prepared messages"
-              value={`${preparedNotificationCount} ready`}
-              description="Messages prepared for follow-up."
-              tone="blue"
-            />
-
-            <InsightCard
-              icon={FiCreditCard}
-              label="Unpaid"
-              value={`${unpaidCount} open`}
-              description="Awaiting full settlement."
-              tone="orange"
-            />
-          </div>
-
           <InvoiceFilterPanel
             invoiceFilterForm={invoiceFilterForm}
             updateInvoiceFilterForm={updateInvoiceFilterForm}
@@ -1285,8 +1320,8 @@ function InvoiceFilterPanel({
         </div>
       </div>
 
-      <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
-        <div className="relative 2xl:col-span-2">
+      <div className="grid gap-2 p-3 md:grid-cols-2 xl:grid-cols-7">
+        <div className="relative">
           <FiSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <InputField
             type="search"
@@ -1295,7 +1330,7 @@ function InvoiceFilterPanel({
               updateInvoiceFilterForm("search", event.target.value)
             }
             placeholder="Search invoice, customer, phone"
-            className="w-full pl-10"
+            className="h-10 w-full px-3 pl-9"
           />
         </div>
 
@@ -1304,6 +1339,7 @@ function InvoiceFilterPanel({
           onChange={(event) =>
             updateInvoiceFilterForm("category", event.target.value)
           }
+          className="h-10 px-3"
         >
           <option value="all">All categories</option>
           {invoiceCategoryOptions.map((category) => (
@@ -1318,6 +1354,7 @@ function InvoiceFilterPanel({
           onChange={(event) =>
             updateInvoiceFilterForm("provider", event.target.value)
           }
+          className="h-10 px-3"
         >
           <option value="all">All gateways</option>
           {invoiceProviderOptions.map((provider) => (
@@ -1332,6 +1369,7 @@ function InvoiceFilterPanel({
           onChange={(event) =>
             updateInvoiceFilterForm("status", event.target.value)
           }
+          className="h-10 px-3"
         >
           <option value="all">All statuses</option>
           {invoiceStatusOptions.map((status) => (
@@ -1346,6 +1384,7 @@ function InvoiceFilterPanel({
           onChange={(event) =>
             updateInvoiceFilterForm("notification", event.target.value)
           }
+          className="h-10 px-3"
         >
           <option value="all">All notifications</option>
           {notificationStatusOptions.map((status) => (
@@ -1361,6 +1400,7 @@ function InvoiceFilterPanel({
           onChange={(event) =>
             updateInvoiceFilterForm("dateFrom", event.target.value)
           }
+          className="h-10 px-3"
         />
 
         <InputField
@@ -1369,6 +1409,7 @@ function InvoiceFilterPanel({
           onChange={(event) =>
             updateInvoiceFilterForm("dateTo", event.target.value)
           }
+          className="h-10 px-3"
         />
       </div>
     </SurfaceCard>

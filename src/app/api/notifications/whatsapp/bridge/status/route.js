@@ -4,6 +4,7 @@ import {
   findUserById,
   resolveWhatsAppWebConfigForUser,
 } from "../../../../../../lib/paymentGatewaySettings";
+import { flushPendingWhatsAppMessagesForOwner } from "../../../../../../lib/whatsappMessageQueue";
 import {
   fetchWhatsAppWebBridgeOverview,
   fetchWhatsAppWebLogs,
@@ -54,6 +55,19 @@ async function loadBridgeSnapshot(config = {}) {
   };
 }
 
+async function flushQueueIfReady(db, user, config, snapshot) {
+  if (snapshot?.status?.status !== "ready") {
+    return { attempted: 0, sent: 0, pending: 0 };
+  }
+
+  return flushPendingWhatsAppMessagesForOwner({
+    db,
+    owner: user,
+    config,
+    bridgeStatus: snapshot.status,
+  });
+}
+
 export async function GET(req) {
   try {
     const userId = requireAuth(req);
@@ -86,11 +100,13 @@ export async function GET(req) {
 
       let snapshot = null;
       let lastBridgeError = null;
+      let activeConfig = null;
 
       for (const candidate of candidates) {
         try {
           snapshot = await loadBridgeSnapshot(candidate);
           if (snapshot?.status) {
+            activeConfig = candidate;
             break;
           }
         } catch (bridgeError) {
@@ -102,9 +118,17 @@ export async function GET(req) {
         throw lastBridgeError || new Error("WhatsApp bridge is offline");
       }
 
+      const queueFlush = await flushQueueIfReady(
+        db,
+        user,
+        activeConfig || config,
+        snapshot
+      );
+
       return Response.json({
         success: true,
         provider: "whatsappWeb",
+        queueFlush,
         ...snapshot,
       });
     } catch (bridgeError) {
