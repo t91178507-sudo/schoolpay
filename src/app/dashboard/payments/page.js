@@ -605,42 +605,34 @@ export default function Payments() {
       </StatGrid>
 
       <SurfaceCard className="overflow-hidden">
-        <div className="border-b border-slate-200 bg-slate-50/90 px-5 py-4 dark:border-slate-800 dark:bg-slate-950/60">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                Collection filters
-              </h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Narrow the ledger by date, source, settlement state, notification state,
-                and customer details.
-              </p>
-            </div>
+        <div className="border-b border-slate-200 bg-slate-50/90 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/60">
+          <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+              Collection filters
+            </h2>
 
-            <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 dark:border-slate-700 dark:bg-slate-900">
                 {filterSummary}
               </span>
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 dark:border-slate-700 dark:bg-slate-900">
-                {latestPaymentDate
-                  ? `Latest: ${latestPaymentDate}`
-                  : "No activity date yet"}
+              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 dark:border-slate-700 dark:bg-slate-900">
+                {latestPaymentDate ? `Latest ${latestPaymentDate}` : "No activity date"}
               </span>
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 dark:border-slate-700 dark:bg-slate-900">
-                Pending: {pendingCount}
+              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 dark:border-slate-700 dark:bg-slate-900">
+                Pending {pendingCount}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="p-5">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-8">
+        <div className="p-3">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-8">
             <InputField
               type="text"
               placeholder={`Search ${customerLabels.singular}, phone, reference, transaction ID...`}
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              className="2xl:col-span-2"
+              className="h-10 px-3 xl:col-span-2"
             />
 
             <InputField
@@ -648,6 +640,7 @@ export default function Payments() {
               value={startDate}
               onChange={(event) => setStartDate(event.target.value)}
               aria-label="Start date"
+              className="h-10 px-3"
             />
 
             <InputField
@@ -655,11 +648,13 @@ export default function Payments() {
               value={endDate}
               onChange={(event) => setEndDate(event.target.value)}
               aria-label="End date"
+              className="h-10 px-3"
             />
 
             <SelectField
               value={sourceFilter}
               onChange={(event) => setSourceFilter(event.target.value)}
+              className="h-10 px-3"
             >
               <option value="all">All sources</option>
               <option value="invoice">Invoice</option>
@@ -669,6 +664,7 @@ export default function Payments() {
             <SelectField
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
+              className="h-10 px-3"
             >
               <option value="all">All statuses</option>
               <option value="paid">Paid</option>
@@ -681,7 +677,7 @@ export default function Payments() {
             <SelectField
               value={notificationFilter}
               onChange={(event) => setNotificationFilter(event.target.value)}
-              className="md:col-span-2 2xl:col-span-2"
+              className="h-10 px-3"
             >
               <option value="all">All notifications</option>
               <option value="sent">Sent</option>
@@ -693,7 +689,7 @@ export default function Payments() {
               type="button"
               onClick={exportPayments}
               disabled={filteredRows.length === 0}
-              className="h-11 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-blue-600 dark:hover:bg-blue-500 dark:disabled:bg-slate-700"
+              className="h-10 rounded-xl bg-slate-900 px-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-blue-600 dark:hover:bg-blue-500 dark:disabled:bg-slate-700"
             >
               Export
             </button>
@@ -708,7 +704,7 @@ export default function Payments() {
                 setStartDate("");
                 setEndDate("");
               }}
-              className="h-11 rounded-xl border border-slate-300 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="h-10 rounded-xl border border-slate-300 px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               Clear filters
             </button>
