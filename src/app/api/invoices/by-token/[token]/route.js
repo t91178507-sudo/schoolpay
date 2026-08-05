@@ -8,8 +8,10 @@ import {
 export async function GET(req, context) {
   try {
     const { token } = await context.params;
+    const url = new URL(req.url);
+    const invoiceId = url.searchParams.get("invoiceId") || "";
     const db = await connectDB();
-    const invoice = await findAccessibleInvoice(db, { token });
+    const invoice = await findAccessibleInvoice(db, { token, invoiceId });
 
     if (!invoice) {
       return Response.json({ error: "Invoice not found" }, { status: 404 });

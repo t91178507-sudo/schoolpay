@@ -22,6 +22,56 @@ export default function SuccessPage() {
   );
 
   useEffect(() => {
+    if (!token || !invoiceId || status !== "loading") {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let attempts = 0;
+
+    const checkInvoiceStatus = async () => {
+      attempts += 1;
+
+      try {
+        const res = await fetch(
+          `/api/invoices/by-token/${token}?invoiceId=${encodeURIComponent(invoiceId)}`,
+          { cache: "no-store" }
+        );
+        const data = await res.json().catch(() => ({}));
+
+        if (cancelled || !res.ok) {
+          return;
+        }
+
+        const invoiceStatus = String(data.status || data.paymentStatus || "").toLowerCase();
+
+        if (invoiceStatus === "paid") {
+          setStatus("success");
+          setMessage("Your payment has been confirmed successfully.");
+        }
+      } catch {
+        // Verification retry continues below.
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      if (attempts >= 12) {
+        window.clearInterval(intervalId);
+        return;
+      }
+
+      checkInvoiceStatus();
+    }, 5000);
+
+    checkInvoiceStatus();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [invoiceId, status, token]);
+
+  useEffect(() => {
     if (!token || !paymentReference || !invoiceId || alreadyVerified) {
       return;
     }
@@ -38,14 +88,14 @@ export default function SuccessPage() {
       .then(async (res) => {
         const data = await res.json();
 
-        if (!res.ok) {
-          throw new Error(data.error || "Unable to confirm payment");
-        }
-
         if (data.pending) {
           setStatus("loading");
           setMessage(data.message || "Payment received. Final confirmation is pending.");
           return;
+        }
+
+        if (!res.ok) {
+          throw new Error(data.error || "Unable to confirm payment");
         }
 
         setStatus("success");
