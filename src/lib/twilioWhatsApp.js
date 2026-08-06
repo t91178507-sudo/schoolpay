@@ -1,4 +1,8 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import {
+  consumeUnitsForWhatsAppMessage,
+  ensureCanSendWhatsAppMessage,
+} from "./billingService";
 import { toWhatsAppNumber } from "./invoiceUtils";
 
 const TWILIO_API_BASE = "https://api.twilio.com/2010-04-01";
@@ -183,13 +187,31 @@ export async function sendTrackedTwilioWhatsAppMessage({
   messageType = "general",
   relatedId = "",
 } = {}) {
+  const ownerId = user._id?.toString?.() || String(user._id || user.ownerId || "");
+  const businessId = String(user.primaryBusinessId || "");
+
+  if (db) {
+    const unitCheck = await ensureCanSendWhatsAppMessage(db, {
+      ownerId,
+      businessId,
+    });
+
+    if (!unitCheck.allowed) {
+      const error = new Error(unitCheck.reason);
+      error.status = 402;
+      error.code = "INSUFFICIENT_UNITS";
+      throw error;
+    }
+  }
+
   const result = await sendTwilioWhatsAppMessage(config, message);
+
   if (db && result.messageId) {
     await db.collection("twilioMessages").insertOne({
       messageSid: result.messageId,
       accountSid: config.accountSid,
-      ownerId: user._id?.toString?.() || String(user._id || user.ownerId || ""),
-      businessId: String(user.primaryBusinessId || ""),
+      ownerId,
+      businessId,
       provider: "twilio",
       messageType,
       relatedId: String(relatedId || ""),
@@ -200,6 +222,14 @@ export async function sendTrackedTwilioWhatsAppMessage({
       errorMessage: result.errorMessage || "",
       createdAt: new Date(),
       updatedAt: new Date(),
+    });
+
+    await consumeUnitsForWhatsAppMessage(db, {
+      ownerId,
+      businessId,
+      businessName: user.businessName || "",
+      messageId: result.messageId,
+      createdBy: "Twilio delivery",
     });
   }
   return result;

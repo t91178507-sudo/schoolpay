@@ -1,4 +1,8 @@
 import { ObjectId } from "mongodb";
+import {
+  consumeUnitsForWhatsAppMessage,
+  ensureCanSendWhatsAppMessage,
+} from "./billingService";
 import { markInvoiceNotificationPrepared } from "./paymentLifecycle";
 import {
   isWhatsAppWebConfigured,
@@ -66,7 +70,7 @@ export async function markWhatsAppMessageSent(db, messageId, delivery = {}) {
 
   const existing = await db.collection(COLLECTION).findOne(
     { _id: messageId },
-    { projection: { relatedId: 1, type: 1 } }
+    { projection: { ownerId: 1, businessName: 1, relatedId: 1, type: 1 } }
   );
 
   await db.collection(COLLECTION).updateOne(
@@ -93,6 +97,15 @@ export async function markWhatsAppMessageSent(db, messageId, delivery = {}) {
       new ObjectId(String(existing.relatedId)),
       "sent"
     );
+  }
+
+  if (existing?.ownerId) {
+    await consumeUnitsForWhatsAppMessage(db, {
+      ownerId: existing.ownerId,
+      businessName: existing.businessName || "",
+      messageId,
+      createdBy: "WhatsApp delivery",
+    });
   }
 }
 
@@ -183,6 +196,21 @@ export async function sendOrQueueWhatsAppWebMessage({
     };
   }
 
+  const unitCheck = await ensureCanSendWhatsAppMessage(db, {
+    ownerId: queued.ownerId,
+  });
+
+  if (!unitCheck.allowed) {
+    await markWhatsAppMessagePending(db, queued._id, unitCheck.reason);
+    return {
+      sent: false,
+      status: "pending",
+      provider: "whatsappWeb",
+      queuedId: String(queued._id),
+      reason: unitCheck.reason,
+    };
+  }
+
   try {
     const delivery = await sendQueuedWhatsAppMessage(config, queued);
     await markWhatsAppMessageSent(db, queued._id, delivery);
@@ -231,6 +259,15 @@ export async function flushPendingWhatsAppMessagesForOwner({
 
   for (const message of pendingMessages) {
     try {
+      const unitCheck = await ensureCanSendWhatsAppMessage(db, {
+        ownerId: message.ownerId,
+      });
+
+      if (!unitCheck.allowed) {
+        await markWhatsAppMessagePending(db, message._id, unitCheck.reason);
+        break;
+      }
+
       const delivery = await sendQueuedWhatsAppMessage(config, message);
       await markWhatsAppMessageSent(db, message._id, delivery);
       sent += 1;

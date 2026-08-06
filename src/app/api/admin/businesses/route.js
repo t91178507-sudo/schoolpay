@@ -1,5 +1,6 @@
 import { connectDB } from "../../../../lib/mongodb";
 import { requireAdmin } from "../../../../lib/adminAuth";
+import { getBillingSettings } from "../../../../lib/billingService";
 import {
   buildSettingsPayload,
   getPlatformSettings,
@@ -30,11 +31,14 @@ export async function GET(req) {
       .find({}, { projection: { password: 0 } })
       .toArray();
 
-    const [customers, invoices, platformSettings] = await Promise.all([
+    const [customers, invoices, platformSettings, billingSettings, unitWallets] = await Promise.all([
       db.collection("customers").find({}).toArray(),
       db.collection("invoices").find({}).toArray(),
       getPlatformSettings(db),
+      getBillingSettings(db),
+      db.collection("businessUnits").find({}).toArray(),
     ]);
+    const walletMap = new Map(unitWallets.map((wallet) => [String(wallet.ownerId), wallet]));
 
     const businesses = users.map((user) => {
       const userId = user._id.toString();
@@ -59,6 +63,8 @@ export async function GET(req) {
       );
       const whatsappWeb = settings.whatsappProviders.whatsappWeb;
       const monnify = settings.paymentGateways.monnify;
+      const wallet = walletMap.get(userId) || {};
+      const currentUnits = Number(wallet.currentUnits || 0);
 
       return {
         _id: user._id,
@@ -87,6 +93,9 @@ export async function GET(req) {
         revenue,
         collected,
         outstanding,
+        currentUnits,
+        lowUnits: billingSettings.enabled && currentUnits <= billingSettings.lowUnitThreshold,
+        lowUnitThreshold: billingSettings.lowUnitThreshold,
       };
     });
 

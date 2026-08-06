@@ -9,6 +9,7 @@ import {
   BUSINESS_STATUSES,
   serializeBusinessVerification,
 } from "../../../../lib/businessVerification";
+import { creditDefaultUnitsForBusiness } from "../../../../lib/billingService";
 import { connectDB } from "../../../../lib/mongodb";
 import { resolveTwilioWhatsAppConfig, resolveWhatsAppWebConfigForUser } from "../../../../lib/paymentGatewaySettings";
 import {
@@ -275,6 +276,10 @@ export async function PATCH(req) {
       description: timelineEntry.note,
       metadata: { requestedDocument, deadline },
     });
+
+    if (action === "approve") {
+      await creditDefaultUnitsForBusiness(db, business, "InvoiceHub Admin");
+    }
 
     await notifyOwner({
       db,

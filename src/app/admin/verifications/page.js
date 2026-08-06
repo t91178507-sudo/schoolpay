@@ -1,6 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  AdminBadge,
+  AdminCard,
+  AdminHeader,
+  AdminLoading,
+  AdminTh,
+  AdminTd,
+} from "../../../components/AdminUI";
 import { adminFetch } from "../../../lib/adminFetch";
 
 const FILTERS = [
@@ -50,7 +58,10 @@ export default function BusinessVerificationsPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const initialLoad = setTimeout(load, 0);
+    return () => clearTimeout(initialLoad);
+  }, [load]);
 
   const counts = useMemo(
     () =>
@@ -86,14 +97,15 @@ export default function BusinessVerificationsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-950">Business Verification</h1>
-        <p className="mt-1 text-sm text-slate-500">Review documents, record decisions, and track every verification status.</p>
-      </div>
+      <AdminHeader
+        eyebrow="Trust and compliance"
+        title="Business Verification"
+        description="Review business submissions, inspect uploaded documents, and record verification decisions."
+      />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {FILTERS.map(([status, label]) => (
-          <button key={status} onClick={() => setFilter(status)} className={`rounded-xl border p-4 text-left transition ${filter === status ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-900 hover:border-slate-400"}`}>
+          <button key={status} onClick={() => setFilter(status)} className={`rounded-2xl border p-4 text-left shadow-sm transition ${filter === status ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-900 hover:border-slate-400"}`}>
             <span className="text-xs font-medium uppercase">{label}</span>
             <span className="mt-2 block text-2xl font-semibold">{counts[status] || 0}</span>
           </button>
@@ -102,43 +114,44 @@ export default function BusinessVerificationsPage() {
 
       {error ? <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <AdminCard className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[960px]">
             <thead className="border-b border-slate-200 bg-slate-50">
               <tr>
                 {["Business Name", "Owner Name", "Industry", "Phone Number", "Email", "Registration Date", "Verification Status", "Actions"].map((label) => (
-                  <th key={label} className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">{label}</th>
+                  <AdminTh key={label}>{label}</AdminTh>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {visible.map((business) => (
                 <tr key={business._id} className="hover:bg-slate-50">
-                  <td className="px-4 py-4 font-medium text-slate-950">{business.name}</td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{business.owner?.fullName || "-"}</td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{business.industry || "-"}</td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{business.owner?.phoneNumber || business.phone || "-"}</td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{business.owner?.email || business.email || "-"}</td>
-                  <td className="px-4 py-4 text-sm text-slate-500">{business.createdAt ? new Date(business.createdAt).toLocaleDateString() : "-"}</td>
-                  <td className="px-4 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_CLASS[business.verificationStatus] || STATUS_CLASS.pending_verification}`}>{business.verificationStatusLabel}</span></td>
-                  <td className="px-4 py-4"><button onClick={() => { setSelected(business); setError(""); }} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-100">View Details</button></td>
+                  <AdminTd className="font-medium text-slate-950">{business.name}</AdminTd>
+                  <AdminTd>{business.owner?.fullName || "-"}</AdminTd>
+                  <AdminTd>{business.industry || "-"}</AdminTd>
+                  <AdminTd>{business.owner?.phoneNumber || business.phone || "-"}</AdminTd>
+                  <AdminTd>{business.owner?.email || business.email || "-"}</AdminTd>
+                  <AdminTd className="text-sm text-slate-500">{business.createdAt ? new Date(business.createdAt).toLocaleDateString() : "-"}</AdminTd>
+                  <AdminTd><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_CLASS[business.verificationStatus] || STATUS_CLASS.pending_verification}`}>{business.verificationStatusLabel}</span></AdminTd>
+                  <AdminTd><button onClick={() => { setSelected(business); setError(""); }} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-100">Review</button></AdminTd>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         {!loading && visible.length === 0 ? <div className="py-14 text-center text-sm text-slate-500">No businesses in this queue.</div> : null}
-        {loading ? <div className="py-14 text-center text-sm text-slate-500">Loading verifications...</div> : null}
-      </div>
+        {loading ? <AdminLoading /> : null}
+      </AdminCard>
 
       {selected ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/55" onMouseDown={(event) => event.target === event.currentTarget && setSelected(null)}>
           <div className="h-full w-full max-w-2xl overflow-y-auto bg-white shadow-2xl">
             <div className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-200 bg-white px-6 py-5">
               <div>
-                <p className="text-xs font-semibold uppercase text-slate-400">Business Review</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Business Review</p>
                 <h2 className="mt-1 text-xl font-semibold text-slate-950">{selected.name}</h2>
+                <div className="mt-2"><AdminBadge tone={selected.verificationStatus === "verified" ? "green" : selected.verificationStatus === "rejected" ? "red" : "orange"}>{selected.verificationStatusLabel}</AdminBadge></div>
               </div>
               <button onClick={() => setSelected(null)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Close</button>
             </div>

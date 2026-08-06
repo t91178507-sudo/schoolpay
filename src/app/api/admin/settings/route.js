@@ -1,6 +1,10 @@
 import { connectDB } from "../../../../lib/mongodb";
 import { requireAdmin } from "../../../../lib/adminAuth";
 import {
+  normalizeBillingSettings,
+  saveBillingSettings,
+} from "../../../../lib/billingService";
+import {
   decryptSettingsSecret,
   encryptSettingsSecret,
   resolveManagedTwilioPlatformConfig,
@@ -95,6 +99,7 @@ function buildSettingsPayload(settings = {}) {
       verifiedAt: settings.twilioManaged?.verifiedAt || managedTwilio.verifiedAt || null,
       updatedAt: settings.twilioManaged?.updatedAt || managedTwilio.updatedAt || null,
     },
+    billing: normalizeBillingSettings(settings.billing || {}),
   };
 }
 
@@ -300,6 +305,16 @@ async function saveWhatsAppBridge(db, body) {
   });
 }
 
+async function saveBilling(db, body, currentSettings) {
+  const billing = await saveBillingSettings(db, body.billing || {});
+
+  return Response.json({
+    success: true,
+    message: "Billing settings saved.",
+    settings: buildSettingsPayload({ ...currentSettings, billing }),
+  });
+}
+
 export async function GET(req) {
   try {
     requireAdmin(req);
@@ -333,6 +348,10 @@ export async function PUT(req) {
 
     if (section === "twilioManaged") {
       return await saveManagedTwilio(db, body, currentSettings);
+    }
+
+    if (section === "billing") {
+      return await saveBilling(db, body, currentSettings);
     }
 
     return await saveWhatsAppBridge(db, body);

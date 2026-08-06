@@ -1,6 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import {
+  AdminBadge,
+  AdminCard,
+  AdminHeader,
+  AdminLoading,
+  AdminMetric,
+  AdminTd,
+  AdminTh,
+} from "../../../components/AdminUI";
 import { adminFetch } from "../../../lib/adminFetch";
 
 function formatCurrency(value) {
@@ -92,22 +101,23 @@ export default function AdminReconciliationWords() {
   };
 
   if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-t-2 border-slate-400"></div>
-      </div>
-    );
+    return <AdminLoading />;
   }
+
+  const pendingAmount = pending.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">
-          Credit Words
-        </h1>
-        <p className="mt-1 text-slate-500">
-          Validate new bank narration phrases before they are used for reconciliation.
-        </p>
+      <AdminHeader
+        eyebrow="Reconciliation control"
+        title="Credit Words"
+        description="Validate bank narration phrases before they are used to import pending credits."
+      />
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <AdminMetric label="Pending phrases" value={pending.length} hint="Awaiting admin decision" tone={pending.length ? "orange" : "green"} />
+        <AdminMetric label="Pending value" value={formatCurrency(pendingAmount)} hint="Credits waiting on phrase approval" tone="blue" />
+        <AdminMetric label="Reviewed phrases" value={reviewed.length} hint="Approved or rejected" />
       </div>
 
       {message ? (
@@ -122,7 +132,7 @@ export default function AdminReconciliationWords() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <AdminCard className="overflow-hidden">
         <div className="border-b border-slate-100 px-6 py-4">
           <h2 className="font-semibold text-slate-900">Pending validation</h2>
           <p className="mt-1 text-sm text-slate-500">
@@ -202,9 +212,9 @@ export default function AdminReconciliationWords() {
             No pending credit words.
           </div>
         )}
-      </div>
+      </AdminCard>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <AdminCard className="overflow-hidden">
         <div className="border-b border-slate-100 px-6 py-4">
           <h2 className="font-semibold text-slate-900">Reviewed words</h2>
         </div>
@@ -213,31 +223,25 @@ export default function AdminReconciliationWords() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
-                <th className="px-6 py-3 text-left">Phrase</th>
-                <th className="px-6 py-3 text-left">Status</th>
-                <th className="px-6 py-3 text-left">Reviewed</th>
+                <AdminTh>Phrase</AdminTh>
+                <AdminTh>Status</AdminTh>
+                <AdminTh>Reviewed</AdminTh>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {reviewed.map((item) => (
                 <tr key={item._id || item.phraseNormalized}>
-                  <td className="px-6 py-3 font-medium uppercase text-slate-900">
+                  <AdminTd className="font-medium uppercase text-slate-900">
                     {item.phrase}
-                  </td>
-                  <td className="px-6 py-3">
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                        item.status === "approved"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-red-50 text-red-700"
-                      }`}
-                    >
+                  </AdminTd>
+                  <AdminTd>
+                    <AdminBadge tone={item.status === "approved" ? "green" : "red"}>
                       {item.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 text-slate-500">
+                    </AdminBadge>
+                  </AdminTd>
+                  <AdminTd className="text-slate-500">
                     {formatDate(item.reviewedAt || item.updatedAt)}
-                  </td>
+                  </AdminTd>
                 </tr>
               ))}
             </tbody>
@@ -247,7 +251,7 @@ export default function AdminReconciliationWords() {
             No reviewed words yet.
           </div>
         )}
-      </div>
+      </AdminCard>
     </div>
   );
 }

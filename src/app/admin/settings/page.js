@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AdminHeader } from "../../../components/AdminUI";
 import { adminFetch } from "../../../lib/adminFetch";
 
 const EMPTY_SETTINGS = {
@@ -34,6 +35,13 @@ const EMPTY_SETTINGS = {
     verifiedAt: null,
     updatedAt: null,
   },
+  billing: {
+    enabled: true,
+    defaultUnitsForNewBusinesses: 100,
+    costPerUnit: 0,
+    unitsPerWhatsAppMessage: 1,
+    lowUnitThreshold: 20,
+  },
 };
 
 export default function AdminSettings() {
@@ -42,6 +50,7 @@ export default function AdminSettings() {
   const [saving, setSaving] = useState(false);
   const [savingTwilio, setSavingTwilio] = useState(false);
   const [savingOpenAi, setSavingOpenAi] = useState(false);
+  const [savingBilling, setSavingBilling] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
@@ -66,6 +75,10 @@ export default function AdminSettings() {
             ...EMPTY_SETTINGS.twilioManaged,
             ...(data.twilioManaged || {}),
           },
+          billing: {
+            ...EMPTY_SETTINGS.billing,
+            ...(data.billing || {}),
+          },
         });
       } catch {
         setError("Unable to load admin settings");
@@ -87,6 +100,54 @@ export default function AdminSettings() {
     }));
     setMessage("");
     setError("");
+  };
+
+  const updateBillingField = (field, value) => {
+    setSettings((current) => ({
+      ...current,
+      billing: {
+        ...current.billing,
+        [field]: value,
+      },
+    }));
+    setMessage("");
+    setError("");
+  };
+
+  const handleSaveBilling = async (event) => {
+    event.preventDefault();
+    setSavingBilling(true);
+    setMessage("");
+    setError("");
+
+    try {
+      const res = await adminFetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          section: "billing",
+          billing: settings.billing,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Unable to save billing settings");
+      }
+
+      setSettings((current) => ({
+        ...current,
+        billing: {
+          ...EMPTY_SETTINGS.billing,
+          ...(data.settings?.billing || {}),
+        },
+      }));
+      setMessage(data.message || "Billing settings saved.");
+    } catch (saveError) {
+      setError(saveError.message || "Unable to save billing settings");
+    } finally {
+      setSavingBilling(false);
+    }
   };
 
   const updateOpenAiField = (field, value) => {
@@ -234,12 +295,13 @@ export default function AdminSettings() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Settings</h1>
-        <p className="mt-1 text-slate-500">Platform administration settings</p>
-      </div>
+      <AdminHeader
+        eyebrow="Platform configuration"
+        title="Settings"
+        description="Manage billing, receipt analysis, Twilio subaccounts, and the WhatsApp bridge from one admin workspace."
+      />
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-8">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <h2 className="mb-4 text-sm font-medium uppercase text-slate-500">
           Admin Account
         </h2>
@@ -268,6 +330,59 @@ export default function AdminSettings() {
           {error}
         </p>
       ) : null}
+
+      <form onSubmit={handleSaveBilling} className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-950">Billing settings</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+              Control the unit wallet used for WhatsApp delivery across InvoiceHub.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={settings.billing.enabled === true}
+            onClick={() => updateBillingField("enabled", !settings.billing.enabled)}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+              settings.billing.enabled ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {settings.billing.enabled ? "Billing enabled" : "Billing disabled"}
+          </button>
+        </div>
+
+        <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <BillingInput
+            label="Default units for new businesses"
+            value={settings.billing.defaultUnitsForNewBusinesses}
+            onChange={(value) => updateBillingField("defaultUnitsForNewBusinesses", value)}
+          />
+          <BillingInput
+            label="Cost per unit"
+            value={settings.billing.costPerUnit}
+            onChange={(value) => updateBillingField("costPerUnit", value)}
+            step="0.01"
+          />
+          <BillingInput
+            label="Units per WhatsApp message"
+            value={settings.billing.unitsPerWhatsAppMessage}
+            onChange={(value) => updateBillingField("unitsPerWhatsAppMessage", value)}
+            min="1"
+          />
+          <BillingInput
+            label="Low unit threshold"
+            value={settings.billing.lowUnitThreshold}
+            onChange={(value) => updateBillingField("lowUnitThreshold", value)}
+          />
+        </div>
+
+        <div className="mt-6 flex justify-end border-t border-slate-200 pt-5">
+          <button type="submit" disabled={savingBilling} className="min-h-11 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400">
+            {savingBilling ? "Saving..." : "Save billing settings"}
+          </button>
+        </div>
+      </form>
 
       <form onSubmit={handleSaveOpenAi} className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
@@ -535,5 +650,21 @@ export default function AdminSettings() {
         </div>
       </form>
     </div>
+  );
+}
+
+function BillingInput({ label, value, onChange, min = "0", step = "1" }) {
+  return (
+    <label className="block text-sm font-medium text-slate-700">
+      {label}
+      <input
+        type="number"
+        min={min}
+        step={step}
+        value={value ?? ""}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 min-h-12 w-full rounded-lg border border-slate-300 px-4 text-sm outline-none focus:border-slate-500"
+      />
+    </label>
   );
 }

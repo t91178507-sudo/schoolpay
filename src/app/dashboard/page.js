@@ -180,6 +180,7 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
   const [currentTime, setCurrentTime] = useState(null);
   const [whatsAppStatus, setWhatsAppStatus] = useState({ status: "loading" });
+  const [unitSummary, setUnitSummary] = useState(null);
 
   useEffect(() => {
     if (!isHydrated) {
@@ -198,9 +199,10 @@ export default function Dashboard() {
       setError(null);
 
       try {
-        const [customersRes, invoicesRes] = await Promise.all([
+        const [customersRes, invoicesRes, unitsRes] = await Promise.all([
           authFetch("/api/customers"),
           authFetch("/api/invoices"),
+          authFetch("/api/billing/units"),
         ]);
 
         if (customersRes.status === 401 || invoicesRes.status === 401) {
@@ -210,6 +212,7 @@ export default function Dashboard() {
 
         const customers = await readJsonSafely(customersRes, []);
         const invoices = await readJsonSafely(invoicesRes, []);
+        const units = await readJsonSafely(unitsRes, null);
 
         const expectedRevenue = invoices.reduce(
           (sum, inv) => sum + Number(inv.amount || 0),
@@ -237,6 +240,7 @@ export default function Dashboard() {
           incompleteInvoices: incomplete,
         });
         setInvoices(Array.isArray(invoices) ? invoices : []);
+        setUnitSummary(units);
       } catch (err) {
         if (!cancelled) {
           console.error(err);
@@ -394,6 +398,14 @@ export default function Dashboard() {
 
       <StatGrid className="gap-3 xl:grid-cols-5">
         <StatCard
+          label="Available units"
+          value={(unitSummary?.currentUnits || 0).toLocaleString()}
+          tone={unitSummary?.lowUnits ? "orange" : "emerald"}
+          className="p-3.5"
+          labelClassName="text-xs"
+          valueClassName="mt-2 text-3xl"
+        />
+        <StatCard
           label={`Total ${customerLabels.pluralTitle}`}
           value={stats.totalCustomers}
           tone="blue"
@@ -434,6 +446,53 @@ export default function Dashboard() {
           valueClassName="mt-2 text-3xl"
         />
       </StatGrid>
+
+      {unitSummary?.lowUnits ? (
+        <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-medium text-orange-800 dark:border-orange-900/60 dark:bg-orange-950/30 dark:text-orange-200">
+          Your unit balance is running low. Please contact the administrator to top up your account.
+        </div>
+      ) : null}
+
+      {unitSummary ? (
+        <SurfaceCard className="border border-slate-200/70 bg-white/95 p-0 dark:border-slate-800 dark:bg-slate-950/80">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Unit history</p>
+              <h2 className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">Wallet activity</h2>
+            </div>
+            <p className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              Used this month: {(unitSummary.usedThisMonth || 0).toLocaleString()}
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                <tr>
+                  <th className="px-4 py-3 text-left">Date</th>
+                  <th className="px-4 py-3 text-left">Activity</th>
+                  <th className="px-4 py-3 text-left">Units</th>
+                  <th className="px-4 py-3 text-left">Balance</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {(unitSummary.transactions || []).slice(0, 5).map((transaction) => (
+                  <tr key={transaction._id || `${transaction.createdAt}-${transaction.units}`}>
+                    <td className="px-4 py-3 text-slate-500">{transaction.createdAt ? new Date(transaction.createdAt).toLocaleString() : "-"}</td>
+                    <td className="px-4 py-3 text-slate-900 dark:text-white">{transaction.reason || "Unit transaction"}</td>
+                    <td className={transaction.type === "credit" ? "px-4 py-3 font-semibold text-emerald-600" : "px-4 py-3 font-semibold text-orange-600"}>
+                      {transaction.type === "credit" ? "+" : "-"}{Number(transaction.units || 0).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{Number(transaction.balanceAfterTransaction || 0).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!(unitSummary.transactions || []).length ? (
+              <p className="px-4 py-6 text-center text-sm text-slate-500">No unit transactions yet.</p>
+            ) : null}
+          </div>
+        </SurfaceCard>
+      ) : null}
 
       <div className="grid flex-1 gap-3 xl:grid-cols-2">
         <SurfaceCard className="min-w-0 overflow-hidden border border-slate-200/70 bg-white/95 p-0 shadow-[0_24px_60px_-32px_rgba(15,23,42,0.35)] dark:border-slate-800 dark:bg-slate-950/80">

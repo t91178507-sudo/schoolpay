@@ -1,16 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  AdminBadge,
+  AdminHeader,
+  AdminLoading,
+  AdminMetric,
+  AdminTable,
+  AdminTd,
+  AdminTh,
+} from "../../../components/AdminUI";
 import { adminFetch } from "../../../lib/adminFetch";
 
 function formatTimestamp(value) {
   if (!value) return "Never";
   const date = new Date(value);
-  return (
-    date.toLocaleDateString() +
-    " " +
-    date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-  );
+  if (Number.isNaN(date.getTime())) return "Never";
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
 }
 
 export default function AdminUsers() {
@@ -30,10 +39,7 @@ export default function AdminUsers() {
   };
 
   useEffect(() => {
-    const initialLoad = setTimeout(() => {
-      loadUsers();
-    }, 0);
-    // Refresh every 30s so the Online/Offline status stays current
+    const initialLoad = setTimeout(loadUsers, 0);
     const interval = setInterval(loadUsers, 30000);
     return () => {
       clearTimeout(initialLoad);
@@ -41,81 +47,63 @@ export default function AdminUsers() {
     };
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-slate-400"></div>
-      </div>
-    );
-  }
+  if (loading) return <AdminLoading />;
 
-  const onlineCount = users.filter((u) => u.isOnline).length;
+  const onlineCount = users.filter((user) => user.isOnline).length;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Users</h1>
-        <p className="text-slate-500 mt-1">
-          {users.length} registered user{users.length !== 1 ? "s" : ""} ·{" "}
-          <span className="text-emerald-600 font-medium">{onlineCount} online</span>
-        </p>
+      <AdminHeader
+        eyebrow="Access monitoring"
+        title="Users"
+        description={`${users.length} registered user${users.length === 1 ? "" : "s"}. ${onlineCount} currently online.`}
+      />
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <AdminMetric label="Registered users" value={users.length} hint="Owner accounts" tone="blue" />
+        <AdminMetric label="Online now" value={onlineCount} hint="Active in the current session window" tone="green" />
+        <AdminMetric label="Offline" value={users.length - onlineCount} hint="No recent activity" />
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase">Name</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase">Email</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase">Business</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase">Last Login</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase">Last Active</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {users.map((user) => (
-                <tr key={user._id} className="hover:bg-slate-50">
-                  <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
-                        user.isOnline
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          user.isOnline ? "bg-emerald-500" : "bg-slate-400"
-                        }`}
-                      />
-                      {user.isOnline ? "Online" : "Offline"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 font-medium text-slate-900">
-                    {user.fullName || "—"}
-                  </td>
-                  <td className="px-6 py-4 text-slate-600">{user.email}</td>
-                  <td className="px-6 py-4 text-slate-600">{user.businessName || "—"}</td>
-                  <td className="px-6 py-4 text-slate-500 text-sm">
-                    {formatTimestamp(user.lastLogin)}
-                  </td>
-                  <td className="px-6 py-4 text-slate-500 text-sm">
-                    {formatTimestamp(user.lastActive)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <AdminTable minWidth="940px">
+        <thead>
+          <tr className="border-b border-slate-200">
+            <AdminTh className="w-[12%]">Status</AdminTh>
+            <AdminTh className="w-[20%]">Name</AdminTh>
+            <AdminTh className="w-[25%]">Email</AdminTh>
+            <AdminTh className="w-[19%]">Business</AdminTh>
+            <AdminTh className="w-[12%]">Last Login</AdminTh>
+            <AdminTh className="w-[12%]">Last Active</AdminTh>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {users.map((user) => (
+            <tr key={user._id} className="hover:bg-slate-50">
+              <AdminTd>
+                <AdminBadge tone={user.isOnline ? "green" : "slate"}>
+                  <span
+                    className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${
+                      user.isOnline ? "bg-emerald-500" : "bg-slate-400"
+                    }`}
+                  />
+                  {user.isOnline ? "Online" : "Offline"}
+                </AdminBadge>
+              </AdminTd>
+              <AdminTd className="font-medium text-slate-900">{user.fullName || "-"}</AdminTd>
+              <AdminTd>{user.email || "-"}</AdminTd>
+              <AdminTd>{user.businessName || "-"}</AdminTd>
+              <AdminTd className="text-xs text-slate-500">{formatTimestamp(user.lastLogin)}</AdminTd>
+              <AdminTd className="text-xs text-slate-500">{formatTimestamp(user.lastActive)}</AdminTd>
+            </tr>
+          ))}
+        </tbody>
+      </AdminTable>
 
-          {users.length === 0 && (
-            <div className="text-center py-16 text-slate-500">
-              No users registered yet
-            </div>
-          )}
+      {users.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center text-slate-500">
+          No users registered yet.
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

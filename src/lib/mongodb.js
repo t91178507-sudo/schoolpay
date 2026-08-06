@@ -12,7 +12,10 @@ if (!uri) {
 let clientPromise;
 
 if (!global._mongoClientPromise) {
-  const client = new MongoClient(uri);
+  const client = new MongoClient(uri, {
+    maxPoolSize: 10,
+    serverSelectionTimeoutMS: 8000,
+  });
   global._mongoClientPromise = client.connect().catch((error) => {
     console.error("MongoDB connection failed:", error);
     throw error;

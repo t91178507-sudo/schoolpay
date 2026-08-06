@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { FiCheck, FiChevronDown, FiEye, FiEyeOff } from "react-icons/fi";
+import { getPasswordChecks } from "../../../lib/passwordPolicy";
 
 const COUNTRIES = ["Nigeria"];
 
@@ -22,6 +23,23 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
+  const passwordChecks = useMemo(
+    () => getPasswordChecks(formData.password),
+    [formData.password]
+  );
+  const passwordIsStrong = passwordChecks.every((check) => check.valid);
+  const passwordsMatch =
+    formData.confirmPassword.length > 0 &&
+    formData.password === formData.confirmPassword;
+  const canSubmit =
+    !loading &&
+    formData.firstName.trim() &&
+    formData.lastName.trim() &&
+    formData.email.trim() &&
+    formData.country.trim() &&
+    formData.acceptTerms &&
+    passwordIsStrong &&
+    passwordsMatch;
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
@@ -35,12 +53,12 @@ export default function Register() {
     event.preventDefault();
     setError("");
 
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match.");
+    if (!passwordIsStrong) {
+      setError("Complete every password requirement before creating your account.");
       return;
     }
-    if (formData.password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match.");
       return;
     }
     if (!formData.acceptTerms) {
@@ -216,7 +234,42 @@ export default function Register() {
                   inputClass={inputClass}
                 />
               </div>
-              <p className="-mt-2 text-xs text-slate-500">Use at least 8 characters.</p>
+
+              <div className="-mt-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Password must include
+                </p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {passwordChecks.map((check) => (
+                    <p
+                      key={check.key}
+                      className={`flex items-center gap-2 text-xs font-medium ${
+                        check.valid ? "text-emerald-700" : "text-slate-500"
+                      }`}
+                    >
+                      <span
+                        className={`flex h-4 w-4 items-center justify-center rounded-full ${
+                          check.valid
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-white text-slate-300"
+                        }`}
+                      >
+                        <FiCheck className="h-3 w-3" />
+                      </span>
+                      {check.label}
+                    </p>
+                  ))}
+                </div>
+                {formData.confirmPassword ? (
+                  <p
+                    className={`mt-2 text-xs font-medium ${
+                      passwordsMatch ? "text-emerald-700" : "text-red-600"
+                    }`}
+                  >
+                    {passwordsMatch ? "Passwords match." : "Passwords do not match yet."}
+                  </p>
+                ) : null}
+              </div>
 
               {error ? (
                 <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -240,7 +293,7 @@ export default function Register() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={!canSubmit}
                 className="inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-[#123B5D] px-5 text-sm font-semibold text-white transition hover:bg-[#0E2E48] disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {loading ? "Creating account..." : "Create account"}

@@ -150,8 +150,6 @@ export async function resolveRoleForUser(db, user = {}) {
     return null;
   }
 
-  await ensureDefaultRoles(db, ownerId);
-
   const roleId = String(user.roleId || "");
 
   if (roleId && ObjectId.isValid(roleId)) {

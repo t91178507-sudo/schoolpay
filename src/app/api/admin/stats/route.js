@@ -1,5 +1,6 @@
 import { connectDB } from "../../../../lib/mongodb";
 import { requireAdmin } from "../../../../lib/adminAuth";
+import { getAdminUnitReports } from "../../../../lib/billingService";
 import { getPlatformWhatsAppBridgeSettings } from "../../../../lib/paymentGatewaySettings";
 
 function parseMoney(value) {
@@ -115,6 +116,7 @@ export async function GET(req) {
       return Boolean(gateway.enabled && gateway.apiKey && gateway.secretKey && gateway.contractCode);
     }).length;
     const whatsappBridgeHealth = await checkBridgeHealth(platformBridge);
+    const unitReports = await getAdminUnitReports(db);
 
     return Response.json({
       totalBusinesses: users.length,
@@ -135,6 +137,7 @@ export async function GET(req) {
       whatsappWebBusinesses,
       monnifyConfiguredBusinesses,
       whatsappBridgeHealth,
+      units: unitReports,
     });
   } catch (error) {
     console.error("ADMIN STATS ERROR:", error);
