@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { FiChevronRight, FiMessageCircle } from "react-icons/fi";
+import { FiChevronRight, FiCreditCard, FiMessageCircle, FiX } from "react-icons/fi";
 import {
   Bar,
   BarChart,
@@ -181,6 +181,7 @@ export default function Dashboard() {
   const [currentTime, setCurrentTime] = useState(null);
   const [whatsAppStatus, setWhatsAppStatus] = useState({ status: "loading" });
   const [unitSummary, setUnitSummary] = useState(null);
+  const [unitHistoryOpen, setUnitHistoryOpen] = useState(false);
 
   useEffect(() => {
     if (!isHydrated) {
@@ -372,39 +373,61 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <Link
-          href="/dashboard/settings#whatsapp"
-          className="group flex min-h-16 w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:w-[235px] dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-800"
-          aria-label={`WhatsApp status: ${whatsAppStatusView.label}`}
-        >
-          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${whatsAppStatusView.iconClassName}`}>
-            <FiMessageCircle className="h-5 w-5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-              <span className={`h-2 w-2 shrink-0 rounded-full ${whatsAppStatusView.dotClassName}`} />
-              WhatsApp
+        <div className="grid w-full gap-3 sm:w-auto sm:grid-cols-2">
+          <Link
+            href="/dashboard/settings#whatsapp"
+            className="group flex min-h-16 w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:w-[235px] dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-800"
+            aria-label={`WhatsApp status: ${whatsAppStatusView.label}`}
+          >
+            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${whatsAppStatusView.iconClassName}`}>
+              <FiMessageCircle className="h-5 w-5" />
             </span>
-            <span className="mt-0.5 block truncate text-sm font-semibold text-slate-900 dark:text-white">
-              {whatsAppStatusView.label}
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${whatsAppStatusView.dotClassName}`} />
+                WhatsApp
+              </span>
+              <span className="mt-0.5 block truncate text-sm font-semibold text-slate-900 dark:text-white">
+                {whatsAppStatusView.label}
+              </span>
+              <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+                {whatsAppStatusView.detail}
+              </span>
             </span>
-            <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
-              {whatsAppStatusView.detail}
+            <FiChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5" />
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => setUnitHistoryOpen(true)}
+            className="group flex min-h-16 w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-3.5 py-3 text-left shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:w-[235px] dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-800"
+            aria-label="Open unit history"
+          >
+            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+              unitSummary?.lowUnits
+                ? "bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300"
+                : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+            }`}>
+              <FiCreditCard className="h-5 w-5" />
             </span>
-          </span>
-          <FiChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5" />
-        </Link>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${unitSummary?.lowUnits ? "bg-orange-500" : "bg-emerald-500"}`} />
+                Units
+              </span>
+              <span className={`mt-0.5 block truncate text-sm font-semibold ${unitSummary?.lowUnits ? "text-orange-600" : "text-slate-900 dark:text-white"}`}>
+                {(unitSummary?.currentUnits || 0).toLocaleString()} available
+              </span>
+              <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+                Used this month: {(unitSummary?.usedThisMonth || 0).toLocaleString()}
+              </span>
+            </span>
+            <FiChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5" />
+          </button>
+        </div>
       </div>
 
       <StatGrid className="gap-3 xl:grid-cols-5">
-        <StatCard
-          label="Available units"
-          value={(unitSummary?.currentUnits || 0).toLocaleString()}
-          tone={unitSummary?.lowUnits ? "orange" : "emerald"}
-          className="p-3.5"
-          labelClassName="text-xs"
-          valueClassName="mt-2 text-3xl"
-        />
         <StatCard
           label={`Total ${customerLabels.pluralTitle}`}
           value={stats.totalCustomers}
@@ -451,47 +474,6 @@ export default function Dashboard() {
         <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-medium text-orange-800 dark:border-orange-900/60 dark:bg-orange-950/30 dark:text-orange-200">
           Your unit balance is running low. Please contact the administrator to top up your account.
         </div>
-      ) : null}
-
-      {unitSummary ? (
-        <SurfaceCard className="border border-slate-200/70 bg-white/95 p-0 dark:border-slate-800 dark:bg-slate-950/80">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Unit history</p>
-              <h2 className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">Wallet activity</h2>
-            </div>
-            <p className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              Used this month: {(unitSummary.usedThisMonth || 0).toLocaleString()}
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-                <tr>
-                  <th className="px-4 py-3 text-left">Date</th>
-                  <th className="px-4 py-3 text-left">Activity</th>
-                  <th className="px-4 py-3 text-left">Units</th>
-                  <th className="px-4 py-3 text-left">Balance</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {(unitSummary.transactions || []).slice(0, 5).map((transaction) => (
-                  <tr key={transaction._id || `${transaction.createdAt}-${transaction.units}`}>
-                    <td className="px-4 py-3 text-slate-500">{transaction.createdAt ? new Date(transaction.createdAt).toLocaleString() : "-"}</td>
-                    <td className="px-4 py-3 text-slate-900 dark:text-white">{transaction.reason || "Unit transaction"}</td>
-                    <td className={transaction.type === "credit" ? "px-4 py-3 font-semibold text-emerald-600" : "px-4 py-3 font-semibold text-orange-600"}>
-                      {transaction.type === "credit" ? "+" : "-"}{Number(transaction.units || 0).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{Number(transaction.balanceAfterTransaction || 0).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {!(unitSummary.transactions || []).length ? (
-              <p className="px-4 py-6 text-center text-sm text-slate-500">No unit transactions yet.</p>
-            ) : null}
-          </div>
-        </SurfaceCard>
       ) : null}
 
       <div className="grid flex-1 gap-3 xl:grid-cols-2">
@@ -614,6 +596,62 @@ export default function Dashboard() {
           </div>
         </SurfaceCard>
       </div>
+
+      {unitHistoryOpen && unitSummary ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4">
+          <div className="max-h-[88vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Unit history</p>
+                <h2 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">Wallet activity</h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Available units: {(unitSummary.currentUnits || 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <p className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  Used this month: {(unitSummary.usedThisMonth || 0).toLocaleString()}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setUnitHistoryOpen(false)}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-900"
+                  aria-label="Close unit history"
+                >
+                  <FiX className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="max-h-[65vh] overflow-auto">
+              <table className="w-full min-w-[720px] text-sm">
+                <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                  <tr>
+                    <th className="px-5 py-3 text-left">Date</th>
+                    <th className="px-5 py-3 text-left">Activity</th>
+                    <th className="px-5 py-3 text-left">Units</th>
+                    <th className="px-5 py-3 text-left">Balance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {(unitSummary.transactions || []).map((transaction) => (
+                    <tr key={transaction._id || `${transaction.createdAt}-${transaction.units}`}>
+                      <td className="px-5 py-4 text-slate-500">{transaction.createdAt ? new Date(transaction.createdAt).toLocaleString() : "-"}</td>
+                      <td className="px-5 py-4 text-slate-900 dark:text-white">{transaction.reason || "Unit transaction"}</td>
+                      <td className={transaction.type === "credit" ? "px-5 py-4 font-semibold text-emerald-600" : "px-5 py-4 font-semibold text-orange-600"}>
+                        {transaction.type === "credit" ? "+" : "-"}{Number(transaction.units || 0).toLocaleString()}
+                      </td>
+                      <td className="px-5 py-4 font-medium text-slate-900 dark:text-white">{Number(transaction.balanceAfterTransaction || 0).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!(unitSummary.transactions || []).length ? (
+                <p className="px-4 py-10 text-center text-sm text-slate-500">No unit transactions yet.</p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </PageShell>
   );
 }
