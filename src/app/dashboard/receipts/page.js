@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import {
   FiAlertTriangle,
   FiCheck,
@@ -18,7 +17,6 @@ import {
 import { useConfirm } from "../../../components/AppFeedback";
 import { PageHeader, PageShell, StatusBadge, SurfaceCard } from "../../../components/DashboardUI";
 import { authFetch } from "../../../lib/authFetch";
-import { isSchoolBusinessType } from "../../../lib/businessLabels";
 import { useBusinessSession, useHydrated } from "../../../lib/clientSession";
 
 function formatCurrency(value) {
@@ -85,11 +83,9 @@ const QUEUES = [
 ];
 
 export default function ReceiptValidationPage() {
-  const router = useRouter();
   const confirm = useConfirm();
-  const session = useBusinessSession();
+  useBusinessSession();
   const isHydrated = useHydrated();
-  const isSchoolBusiness = isSchoolBusinessType(session.businessType);
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -123,25 +119,21 @@ export default function ReceiptValidationPage() {
 
   useEffect(() => {
     if (!isHydrated) return undefined;
-    if (!isSchoolBusiness) {
-      router.replace("/dashboard");
-      return undefined;
-    }
     const initialLoad = setTimeout(() => loadReceipts(), 0);
     return () => clearTimeout(initialLoad);
-  }, [isHydrated, isSchoolBusiness, router]);
+  }, [isHydrated]);
 
   const hasProcessingReceipts = receipts.some(isReceiptProcessing);
 
   useEffect(() => {
-    if (!isSchoolBusiness || !hasProcessingReceipts) return undefined;
+    if (!hasProcessingReceipts) return undefined;
 
     const refreshTimer = window.setInterval(
       () => loadReceipts({ silent: true }),
       3000
     );
     return () => window.clearInterval(refreshTimer);
-  }, [hasProcessingReceipts, isSchoolBusiness]);
+  }, [hasProcessingReceipts]);
   const displayedActiveReceipt = useMemo(() => {
     if (!activeReceipt) return null;
 
@@ -276,7 +268,7 @@ export default function ReceiptValidationPage() {
     }
   };
 
-  if (!isHydrated || !isSchoolBusiness) {
+  if (!isHydrated) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-r-transparent" />
