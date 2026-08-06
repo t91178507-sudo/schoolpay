@@ -181,8 +181,8 @@ export async function deliverInvoiceMessage({
   const pendingBalance = outstandingAmount;
 
   const baseMessage = buildInvoiceMessage({
-    businessLogo: invoice.businessLogo || owner?.businessLogo || "",
-    businessName: invoice.businessName || owner?.businessName || "",
+    businessLogo: owner?.businessLogo || invoice.businessLogo || "",
+    businessName: owner?.businessName || invoice.businessName || "",
     invoiceNumber: invoice.invoiceNumber || "",
     customerName,
     customerLabel: getCustomerMessageLabel(owner),
@@ -231,7 +231,7 @@ export async function deliverInvoiceMessage({
     );
 
     const hasDocumentTemplate = Boolean(documentMediaUrl && documentContentSid);
-    const businessName = invoice.businessName || owner?.businessName || "InvoiceHub";
+    const businessName = owner?.businessName || invoice.businessName || "InvoiceHub";
     const formattedInvoiceAmount = `N${Number(invoice.amount || 0).toLocaleString()}`;
     const formattedBalance = `N${Number(outstandingAmount || 0).toLocaleString()}`;
 
@@ -385,7 +385,7 @@ export async function deliverPaymentConfirmation({
     invoice.customer || invoice.customerName || invoice.student || "Customer";
 
   const message = buildPaymentConfirmationMessage({
-    businessName: invoice.businessName || owner?.businessName || "",
+    businessName: owner?.businessName || invoice.businessName || "",
     invoiceNumber: invoice.invoiceNumber || "",
     customerName,
     customerLabel: getCustomerMessageLabel(owner),
@@ -429,7 +429,7 @@ export async function deliverPaymentConfirmation({
         ? ""
         : getTwilioTemplate(twilioConfig, "payment");
 
-    const businessName = invoice.businessName || owner?.businessName || "InvoiceHub";
+    const businessName = owner?.businessName || invoice.businessName || "InvoiceHub";
 
     const contentVariables = hasReceiptTemplate
       ? {
@@ -560,7 +560,7 @@ export async function deliverReceiptRejection({
   const customerName =
     invoice?.customer || invoice?.customerName || invoice?.student || "Customer";
 
-  const businessName = invoice?.businessName || owner?.businessName || "the business";
+  const businessName = owner?.businessName || invoice?.businessName || "the business";
   const invoiceNumber = invoice?.invoiceNumber || "your invoice";
   const rejectionReason = String(reason || "Receipt could not be validated").trim();
 

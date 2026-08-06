@@ -17,6 +17,17 @@ const BUSINESS_TYPES = [
   "Other",
 ];
 
+const INDUSTRIES = [
+  "Education",
+  "Healthcare",
+  "Retail & Supermarkets",
+  "Professional Services",
+  "Hospitality",
+  "Manufacturing",
+  "Logistics & Transportation",
+  "Other",
+];
+
 export default function BusinessSetupPage() {
   const router = useRouter();
   const session = useBusinessSession();
@@ -117,7 +128,14 @@ export default function BusinessSetupPage() {
             </select>
           </Field>
           <Field label="Industry" required>
-            <input name="industry" value={form.industry} onChange={update} required placeholder="e.g. Education, Retail" className="form-input" />
+            <select name="industry" value={form.industry} onChange={update} required className="form-input">
+              <option value="">Select industry</option>
+              {INDUSTRIES.map((industry) => (
+                <option key={industry} value={industry}>
+                  {industry}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Business Email" required>
             <input type="email" name="email" value={form.email} onChange={update} required className="form-input" />

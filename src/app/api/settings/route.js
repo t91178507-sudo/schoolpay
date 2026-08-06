@@ -8,6 +8,63 @@ import {
   sanitizeSettingsInput,
 } from "../../../lib/paymentGatewaySettings";
 
+function hasProfileFieldChanged(existingUser = {}, payload = {}) {
+  return ["businessName", "businessLogo", "businessEmail", "businessPhone"].some(
+    (field) => String(existingUser[field] || "") !== String(payload[field] || "")
+  );
+}
+
+async function syncBusinessProfileSnapshots(db, userId, payload = {}) {
+  const now = new Date();
+  const profileSnapshot = {
+    businessName: payload.businessName || "",
+    businessLogo: payload.businessLogo || "",
+    businessEmail: payload.businessEmail || "",
+    businessPhone: payload.businessPhone || "",
+    updatedAt: now,
+  };
+
+  await Promise.all([
+    db.collection("businesses").updateMany(
+      { ownerId: String(userId) },
+      {
+        $set: {
+          name: payload.businessName || "",
+          logo: payload.businessLogo || "",
+          email: payload.businessEmail || "",
+          phone: payload.businessPhone || "",
+          updatedAt: now,
+        },
+      }
+    ),
+    db.collection("invoices").updateMany(
+      { ownerId: String(userId) },
+      { $set: profileSnapshot }
+    ),
+    db.collection("recurringInvoices").updateMany(
+      { ownerId: String(userId) },
+      { $set: profileSnapshot }
+    ),
+    db.collection("quickPayProfiles").updateMany(
+      { ownerId: String(userId) },
+      { $set: profileSnapshot }
+    ),
+    db.collection("quickPayTransactions").updateMany(
+      { ownerId: String(userId) },
+      { $set: profileSnapshot }
+    ),
+    db.collection("whatsappMessageQueue").updateMany(
+      { ownerId: String(userId), status: "pending" },
+      {
+        $set: {
+          businessName: payload.businessName || "",
+          updatedAt: now,
+        },
+      }
+    ),
+  ]);
+}
+
 export async function GET(req) {
   try {
     const userId = requireAuth(req);
@@ -78,6 +135,8 @@ export async function PUT(req) {
       );
     }
 
+    const shouldSyncProfileSnapshots = hasProfileFieldChanged(existingUser, payload);
+
     await db.collection("users").updateOne(
       { _id: new ObjectId(userId) },
       {
@@ -87,6 +146,10 @@ export async function PUT(req) {
         },
       }
     );
+
+    if (shouldSyncProfileSnapshots) {
+      await syncBusinessProfileSnapshots(db, userId, payload);
+    }
 
     const updatedUser = await db.collection("users").findOne({
       _id: new ObjectId(userId),

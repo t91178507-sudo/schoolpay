@@ -732,19 +732,21 @@ export default function SettingsPage() {
     setError("");
 
     try {
+      const settingsToSave = {
+        ...settings,
+        businessType: session.businessType || settings.businessType,
+      };
+      const profileSettingsToSave = { ...settingsToSave };
+      delete profileSettingsToSave.paymentGateways;
+      delete profileSettingsToSave.whatsappProviders;
+      delete profileSettingsToSave.defaultPaymentGateway;
+      delete profileSettingsToSave.defaultWhatsAppProvider;
+
       const res = await authFetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          session.businessVerified
-            ? settings
-            : (({
-                paymentGateways,
-                whatsappProviders,
-                defaultPaymentGateway,
-                defaultWhatsAppProvider,
-                ...profileSettings
-              }) => profileSettings)(settings)
+          session.businessVerified ? settingsToSave : profileSettingsToSave
         ),
       });
 
@@ -1294,11 +1296,10 @@ export default function SettingsPage() {
                 onChange={(value) => updateField("businessName", value)}
                 placeholder="InvoiceHub Limited"
               />
-              <Field
+              <ReadOnlyField
                 label="Business type"
                 value={settings.businessType}
-                onChange={(value) => updateField("businessType", value)}
-                placeholder="Professional Service"
+                hint="Set during business creation"
               />
               <Field
                 label="Business email"
@@ -2374,6 +2375,23 @@ function Field({ label, value, onChange, placeholder, type = "text" }) {
   );
 }
 
+function ReadOnlyField({ label, value, hint = "" }) {
+  return (
+    <div>
+      <p className="mb-2 text-sm font-medium text-gray-700 dark:text-slate-300">{label}</p>
+      <div className="flex min-h-[50px] items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-200">
+        <span className="truncate font-medium">{value || "-"}</span>
+        {hint ? (
+          <span className="shrink-0 rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            Locked
+          </span>
+        ) : null}
+      </div>
+      {hint ? <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">{hint}</p> : null}
+    </div>
+  );
+}
+
 function SummaryItem({ label, value, multiline = false }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/60">
@@ -2389,9 +2407,5 @@ function SummaryItem({ label, value, multiline = false }) {
     </div>
   );
 }
-
-
-
-
 
 

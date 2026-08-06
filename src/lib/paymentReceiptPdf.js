@@ -403,7 +403,7 @@ export function buildPaymentReceiptPdf({
         : "Awaiting payment";
 
   const customerName = getCustomerName(invoice);
-  const businessName = invoice.businessName || owner.businessName || "InvoiceHub";
+  const businessName = owner.businessName || invoice.businessName || "InvoiceHub";
   const invoiceNumber = invoice.invoiceNumber || "Pending";
   const useCurrency = owner.currency || currency || "NGN";
   const selectedProvider = provider || invoice.paymentProvider || "Manual";
@@ -521,7 +521,7 @@ export function buildPaymentReceiptPdf({
     cardWidth - 36
   );
 
-  leftY = addDetailRow(
+  addDetailRow(
     doc,
     "Description",
     description,
@@ -552,7 +552,7 @@ export function buildPaymentReceiptPdf({
     cardWidth - 36
   );
 
-  rightY = addDetailRow(
+  addDetailRow(
     doc,
     "Date",
     formatDate(invoice.paidAt || invoice.updatedAt || new Date()),

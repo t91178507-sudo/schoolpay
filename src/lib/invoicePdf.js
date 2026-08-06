@@ -357,7 +357,7 @@ export function buildInvoicePdf({ invoice = {}, owner = {}, origin = "" } = {}) 
     invoice.studentName ||
     "Customer";
 
-  const businessName = invoice.businessName || owner.businessName || "InvoiceHub";
+  const businessName = owner.businessName || invoice.businessName || "InvoiceHub";
   const invoiceNumber = invoice.invoiceNumber || "Pending";
   const invoiceDate = invoice.date || invoice.createdAt || new Date();
   const dueDate = invoice.dueDate || invoice.date || invoice.createdAt || new Date();
@@ -455,11 +455,11 @@ export function buildInvoicePdf({ invoice = {}, owner = {}, origin = "" } = {}) 
 
   leftY = addLabelValue(doc, "Invoice No.", invoiceNumber, leftX, leftY, colWidth);
   leftY = addLabelValue(doc, "Invoice Date", formatDate(invoiceDate), leftX, leftY, colWidth);
-  leftY = addLabelValue(doc, "Due Date", formatDate(dueDate), leftX, leftY, colWidth);
+  addLabelValue(doc, "Due Date", formatDate(dueDate), leftX, leftY, colWidth);
 
   rightY = addLabelValue(doc, "Customer", customerName, rightX, rightY, colWidth);
   rightY = addLabelValue(doc, "Phone", invoice.phone || "-", rightX, rightY, colWidth);
-  rightY = addLabelValue(doc, "Email", invoice.email || "-", rightX, rightY, colWidth);
+  addLabelValue(doc, "Email", invoice.email || "-", rightX, rightY, colWidth);
 
   y += detailsHeight + 14;
 

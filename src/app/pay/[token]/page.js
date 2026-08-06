@@ -64,6 +64,18 @@ function formatInvoiceDate(value) {
   })}`;
 }
 
+function canEditInvoicePaymentAmount(customer = {}) {
+  const businessType = String(customer.businessType || "").toLowerCase();
+  const industry = String(customer.industry || "").toLowerCase();
+
+  return (
+    businessType.includes("school") ||
+    businessType.includes("education") ||
+    industry.includes("education") ||
+    industry.includes("school")
+  );
+}
+
 export default function PaymentPage() {
   const toast = useToast();
   const { token } = useParams();
@@ -96,7 +108,7 @@ export default function PaymentPage() {
 
 const openInvoice = (invoice) => {
   setActiveInvoice(invoice);
-  setPayAmount("");
+  setPayAmount(String(getOutstandingAmount(invoice)));
   setPayazaAccount(null);
   setReceiptFormOpen(false);
   setReceiptUploadProgress(0);
@@ -632,6 +644,7 @@ const openInvoice = (invoice) => {
   const receiptUploadEnabled =
     customer.defaultPaymentGateway === "receiptUpload" &&
     customer.receiptUpload?.enabled;
+  const canEditPaymentAmount = canEditInvoicePaymentAmount(customer);
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] px-3 py-3 dark:bg-slate-950 sm:px-4 sm:py-16">
@@ -742,18 +755,25 @@ const openInvoice = (invoice) => {
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-medium">
                 N
               </span>
-             <input
-  type="number"
-  min="1"
-  max={outstandingAmount}
-  value={payAmount}
-  onChange={handlePayAmountChange}
-  placeholder={`Enter amount (max N${outstandingAmount.toLocaleString()})`}
-  className="w-full pl-9 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-[15px] font-medium text-slate-900 dark:text-slate-100 tabular-nums focus:outline-none focus:border-slate-400"
-/>
+              <input
+                type="number"
+                min="1"
+                max={outstandingAmount}
+                value={payAmount}
+                onChange={handlePayAmountChange}
+                readOnly={!canEditPaymentAmount}
+                placeholder={`Enter amount (max N${outstandingAmount.toLocaleString()})`}
+                className={`w-full rounded-xl border border-slate-200 py-3 pl-9 pr-4 text-[15px] font-medium tabular-nums text-slate-900 focus:outline-none focus:border-slate-400 dark:border-slate-700 dark:text-slate-100 ${
+                  canEditPaymentAmount
+                    ? "bg-white dark:bg-slate-900"
+                    : "cursor-not-allowed bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                }`}
+              />
             </div>
             <p className="mt-2 text-[12px] text-slate-400">
-              You can enter any amount up to N{outstandingAmount.toLocaleString()}.
+              {canEditPaymentAmount
+                ? `You can enter any amount up to N${outstandingAmount.toLocaleString()}.`
+                : "This invoice must be paid in full."}
             </p>
           </div>
           )}

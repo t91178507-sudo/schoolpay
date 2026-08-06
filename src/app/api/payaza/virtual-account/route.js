@@ -20,6 +20,18 @@ function buildAccountName(invoice = {}, owner = {}) {
   return `${businessName} ${invoiceNumber}`.slice(0, 90);
 }
 
+function canUseFlexiblePaymentAmount(owner = {}, business = {}) {
+  const businessType = String(owner.businessType || business.type || "").toLowerCase();
+  const industry = String(business.industry || owner.industry || "").toLowerCase();
+
+  return (
+    businessType.includes("school") ||
+    businessType.includes("education") ||
+    industry.includes("education") ||
+    industry.includes("school")
+  );
+}
+
 export async function POST(req) {
   try {
     const db = await connectDB();
@@ -67,6 +79,21 @@ export async function POST(req) {
     }
 
     const owner = invoice.ownerId ? await findUserById(db, invoice.ownerId) : null;
+    const business = invoice.ownerId
+      ? await db.collection("businesses").findOne({
+          ownerId: String(invoice.ownerId),
+          active: { $ne: false },
+          $or: [{ isPrimary: true }, { _id: invoice.businessId }],
+        })
+      : null;
+
+    if (!canUseFlexiblePaymentAmount(owner || {}, business || {}) && requestedAmount !== invoiceAmount) {
+      return Response.json(
+        { error: "This invoice must be paid in full." },
+        { status: 400 }
+      );
+    }
+
     await requireVerifiedOwnerBusiness(db, invoice.ownerId, invoice.businessId);
     const payazaConfig = resolvePayazaConfig(owner || {});
 
