@@ -16,6 +16,11 @@ function hasProfileFieldChanged(existingUser = {}, payload = {}) {
 
 async function syncBusinessProfileSnapshots(db, userId, payload = {}) {
   const now = new Date();
+  const ownerId = String(userId || "");
+  const ownerObjectId = ObjectId.isValid(ownerId) ? new ObjectId(ownerId) : null;
+  const ownerBusinessQuery = ownerObjectId
+    ? { $or: [{ ownerId }, { ownerId: ownerObjectId }] }
+    : { ownerId };
   const profileSnapshot = {
     businessName: payload.businessName || "",
     businessLogo: payload.businessLogo || "",
@@ -26,7 +31,7 @@ async function syncBusinessProfileSnapshots(db, userId, payload = {}) {
 
   await Promise.all([
     db.collection("businesses").updateMany(
-      { ownerId: String(userId) },
+      ownerBusinessQuery,
       {
         $set: {
           name: payload.businessName || "",
@@ -38,23 +43,23 @@ async function syncBusinessProfileSnapshots(db, userId, payload = {}) {
       }
     ),
     db.collection("invoices").updateMany(
-      { ownerId: String(userId) },
+      { ownerId },
       { $set: profileSnapshot }
     ),
     db.collection("recurringInvoices").updateMany(
-      { ownerId: String(userId) },
+      { ownerId },
       { $set: profileSnapshot }
     ),
     db.collection("quickPayProfiles").updateMany(
-      { ownerId: String(userId) },
+      { ownerId },
       { $set: profileSnapshot }
     ),
     db.collection("quickPayTransactions").updateMany(
-      { ownerId: String(userId) },
+      { ownerId },
       { $set: profileSnapshot }
     ),
     db.collection("whatsappMessageQueue").updateMany(
-      { ownerId: String(userId), status: "pending" },
+      { ownerId, status: "pending" },
       {
         $set: {
           businessName: payload.businessName || "",

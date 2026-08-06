@@ -295,8 +295,8 @@ export function serializeSessionUser(context) {
     username: context.user.username || "",
     businessName:
       context.user.activeBusinessName ||
-      primaryBusiness?.name ||
       context.owner.businessName ||
+      primaryBusiness?.name ||
       "",
     businessType:
       primaryBusiness?.type || context.owner.businessType || context.user.businessType || "",
