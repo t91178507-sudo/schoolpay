@@ -2,6 +2,38 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+## Environment Separation
+
+InvoiceHub uses separate databases for local development and production.
+
+- Local development defaults to `invoicehub_dev`.
+- Production defaults to `invoicehub`.
+- You can override either environment with `MONGODB_DB`.
+
+Recommended local `.env.local`:
+
+```env
+MONGODB_URI=your_development_mongodb_connection_string
+MONGODB_DB=invoicehub_dev
+JWT_SECRET=your_local_secret
+ADMIN_JWT_SECRET=your_local_admin_secret
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+APP_URL=http://localhost:3000
+```
+
+Recommended production environment variables in Vercel:
+
+```env
+MONGODB_URI=your_production_mongodb_connection_string
+MONGODB_DB=invoicehub
+JWT_SECRET=your_production_secret
+ADMIN_JWT_SECRET=your_production_admin_secret
+NEXT_PUBLIC_APP_URL=https://your-production-domain.com
+APP_URL=https://your-production-domain.com
+```
+
+Keep payment gateway, Twilio, WhatsApp bridge, and OpenAI keys separate between development and production whenever possible.
+
 First, run the development server:
 
 ```bash

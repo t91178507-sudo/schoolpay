@@ -1,7 +1,9 @@
 import { MongoClient } from "mongodb";
 
 const uri = process.env.MONGODB_URI;
-const dbName = process.env.MONGODB_DB || "invoicehub";
+const defaultDbName =
+  process.env.NODE_ENV === "production" ? "invoicehub" : "invoicehub_dev";
+const dbName = process.env.MONGODB_DB || defaultDbName;
 
 if (!uri) {
   throw new Error("MONGODB_URI is missing in environment variables");
