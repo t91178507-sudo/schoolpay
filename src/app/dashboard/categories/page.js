@@ -87,7 +87,6 @@ export default function CategoriesPage() {
   const confirm = useConfirm();
   const session = useBusinessSession();
   const customerLabels = getCustomerLabels(session.businessType);
-  const isSchoolBusiness = String(session.businessType || "").toLowerCase() === "school";
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -180,22 +179,17 @@ export default function CategoriesPage() {
     )
   );
 
-  const getBusinessInvoiceItems = (items, description, editable) => {
-    if (editable) {
-      return items;
-    }
-    const firstItem = items[0] || createEmptyInvoiceItem();
-    return [
-      {
-        ...firstItem,
-        description: description.trim() || "Invoice payment",
-        quantity: 1,
-      },
-    ];
+  const getBusinessInvoiceItems = (items, description) => {
+    const fallbackDescription = description.trim() || "Invoice payment";
+    return items.map((item) => ({
+      ...item,
+      description: String(item.description || "").trim() || fallbackDescription,
+      quantity: Number(item.quantity || 1) < 1 ? 1 : item.quantity,
+    }));
   };
 
   const invoiceTotal = calculateInvoiceTotal(
-    getBusinessInvoiceItems(invoiceItems, invoiceDescription, isSchoolBusiness)
+    getBusinessInvoiceItems(invoiceItems, invoiceDescription)
   );
 
   const createInvoicePayload = (
@@ -228,6 +222,18 @@ export default function CategoriesPage() {
       businessLogo: businessLogo || "",
       date: new Date().toISOString(),
     };
+  };
+
+  const getCustomerInvoiceHistoryHref = (customer) => {
+    const params = new URLSearchParams({
+      search: customer.name || "",
+    });
+
+    if (selectedCategory) {
+      params.set("category", selectedCategory);
+    }
+
+    return `/dashboard/invoices?${params.toString()}`;
   };
 
   const deleteCustomer = async (id) => {
@@ -333,8 +339,7 @@ export default function CategoriesPage() {
     try {
       const invoiceItemsForBusiness = getBusinessInvoiceItems(
         invoiceItems,
-        invoiceDescription,
-        isSchoolBusiness
+        invoiceDescription
       );
       const sanitizedItems = sanitizeInvoiceItems(invoiceItemsForBusiness);
       const amount = calculateInvoiceTotal(sanitizedItems);
@@ -417,8 +422,7 @@ export default function CategoriesPage() {
   const confirmBulkGenerate = async () => {
     const bulkItemsForBusiness = getBusinessInvoiceItems(
       bulkItems,
-      bulkDescription,
-      isSchoolBusiness
+      bulkDescription
     );
     const sanitizedBulkItems = sanitizeInvoiceItems(bulkItemsForBusiness);
     const amount = calculateInvoiceTotal(sanitizedBulkItems);
@@ -1037,9 +1041,7 @@ export default function CategoriesPage() {
                                 Invoice
                               </button>
                               <Link
-                                href={`/dashboard/payments?student=${encodeURIComponent(
-                                  customer.name
-                                )}&category=${encodeURIComponent(selectedCategory)}`}
+                                href={getCustomerInvoiceHistoryHref(customer)}
                                 className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20 transition hover:bg-blue-100 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-500/20"
                               >
                                 History
@@ -1142,9 +1144,7 @@ export default function CategoriesPage() {
                                   Invoice
                                 </button>
                                 <Link
-                                  href={`/dashboard/payments?student=${encodeURIComponent(
-                                    customer.name
-                                  )}&category=${encodeURIComponent(selectedCategory)}`}
+                                  href={getCustomerInvoiceHistoryHref(customer)}
                                   className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20 transition hover:bg-blue-100 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-500/20"
                                 >
                                   History
@@ -1216,29 +1216,24 @@ export default function CategoriesPage() {
                   <div className="mb-4 flex items-center justify-between">
                     <div>
                       <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-                        {isSchoolBusiness ? "Line items" : "Invoice amount"}
+                        Line items
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {isSchoolBusiness
-                          ? "Add each charge as a separate line item"
-                          : "Enter the fixed amount for this invoice"}
+                        Add each charge as a separate line item
                       </p>
                     </div>
-                    {isSchoolBusiness && (
-                      <button
-                        type="button"
-                        onClick={addInvoiceItem}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
-                      >
-                        <FiPlus className="h-3.5 w-3.5" />
-                        Add item
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={addInvoiceItem}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                    >
+                      <FiPlus className="h-3.5 w-3.5" />
+                      Add item
+                    </button>
                   </div>
 
                   <div className="space-y-3">
-                    {isSchoolBusiness ? (
-                      invoiceItems.map((item, index) => {
+                    {invoiceItems.map((item, index) => {
                         const quantity = Number(item.quantity || 0);
                         const unitPrice = Number(item.unitPrice || 0);
                         const lineTotal =
@@ -1311,24 +1306,7 @@ export default function CategoriesPage() {
                             </div>
                           </div>
                         );
-                      })
-                    ) : (
-                      <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-950/30">
-                        <label className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
-                          Amount
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={invoiceItems[0]?.unitPrice || ""}
-                          onChange={(e) =>
-                            updateInvoiceItem(invoiceItems[0].id, "unitPrice", e.target.value)
-                          }
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                          placeholder="0"
-                        />
-                      </div>
-                    )}
+                      })}
                   </div>
                 </div>
 
@@ -1338,7 +1316,7 @@ export default function CategoriesPage() {
                       Invoice total
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {isSchoolBusiness ? "Sum of all line items" : "Fixed amount"}
+                      Sum of all line items
                     </p>
                   </div>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">
@@ -1413,29 +1391,24 @@ export default function CategoriesPage() {
                   <div className="mb-4 flex items-center justify-between">
                     <div>
                       <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-                        {isSchoolBusiness ? "Line items" : "Invoice amount"}
+                        Line items
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {isSchoolBusiness
-                          ? "Shared across all recipients"
-                          : "Fixed amount per customer"}
+                        Shared across all recipients
                       </p>
                     </div>
-                    {isSchoolBusiness && (
-                      <button
-                        type="button"
-                        onClick={addBulkItem}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
-                      >
-                        <FiPlus className="h-3.5 w-3.5" />
-                        Add item
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={addBulkItem}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                    >
+                      <FiPlus className="h-3.5 w-3.5" />
+                      Add item
+                    </button>
                   </div>
 
                   <div className="space-y-3">
-                    {isSchoolBusiness ? (
-                      bulkItems.map((item, index) => {
+                    {bulkItems.map((item, index) => {
                         const quantity = Number(item.quantity || 0);
                         const unitPrice = Number(item.unitPrice || 0);
                         const lineTotal =
@@ -1508,24 +1481,7 @@ export default function CategoriesPage() {
                             </div>
                           </div>
                         );
-                      })
-                    ) : (
-                      <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-950/30">
-                        <label className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
-                          Amount per {customerLabels.singular}
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={bulkItems[0]?.unitPrice || ""}
-                          onChange={(e) =>
-                            updateBulkItem(bulkItems[0].id, "unitPrice", e.target.value)
-                          }
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                          placeholder="0"
-                        />
-                      </div>
-                    )}
+                      })}
                   </div>
                 </div>
 
@@ -1535,12 +1491,12 @@ export default function CategoriesPage() {
                       Amount per {customerLabels.singular}
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {isSchoolBusiness ? "Sum of shared line items" : "Fixed amount"}
+                      Sum of shared line items
                     </p>
                   </div>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">
                     N{calculateInvoiceTotal(
-                      getBusinessInvoiceItems(bulkItems, bulkDescription, isSchoolBusiness)
+                      getBusinessInvoiceItems(bulkItems, bulkDescription)
                     ).toLocaleString()}
                   </p>
                 </div>

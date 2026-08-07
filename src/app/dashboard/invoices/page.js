@@ -433,6 +433,37 @@ export default function Invoices() {
     setNotice({ tone, text });
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const search =
+      params.get("search") ||
+      params.get("customer") ||
+      params.get("student") ||
+      "";
+    const category = params.get("category") || "";
+
+    if (!search && !category) return;
+
+    const nextFilters = {
+      search,
+      category: category || "all",
+      provider: "all",
+      status: "all",
+      notification: "all",
+      dateFrom: "",
+      dateTo: "",
+    };
+
+    const applyUrlFilters = window.setTimeout(() => {
+      setInvoiceFilterForm(nextFilters);
+      setInvoiceFilters(nextFilters);
+    }, 0);
+
+    return () => window.clearTimeout(applyUrlFilters);
+  }, []);
+
   const loadInvoices = useCallback(async () => {
     setLoading(true);
 
@@ -1209,6 +1240,7 @@ export default function Invoices() {
             invoiceProviderOptions={invoiceProviderOptions}
             invoiceStatusOptions={invoiceStatusOptions}
             notificationStatusOptions={notificationStatusOptions}
+            customerLabels={customerLabels}
           />
 
           <InvoiceList
@@ -1288,6 +1320,7 @@ function InvoiceFilterPanel({
   invoiceProviderOptions,
   invoiceStatusOptions,
   notificationStatusOptions,
+  customerLabels,
 }) {
   return (
     <SurfaceCard className="overflow-hidden">
@@ -1333,7 +1366,7 @@ function InvoiceFilterPanel({
             onChange={(event) =>
               updateInvoiceFilterForm("search", event.target.value)
             }
-            placeholder="Search invoice, customer, phone"
+            placeholder={`Search invoice, ${customerLabels.singular}, phone`}
             className="h-10 w-full px-3 pl-9"
           />
         </div>
@@ -1466,7 +1499,7 @@ function InvoiceList({
                 Invoice
               </th>
               <th className="w-[20%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Customer
+                {customerLabels.singularTitle}
               </th>
               <th className="w-[24%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Details
@@ -1972,7 +2005,7 @@ function RecurringInvoiceModal({
               Create recurring invoice
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Define the customer, billing amount, and date window.
+              Define the {customerLabels.singular}, billing amount, and date window.
             </p>
           </div>
 
@@ -1989,7 +2022,7 @@ function RecurringInvoiceModal({
           <div className="grid gap-4 lg:grid-cols-[1.35fr_0.9fr]">
             <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-800 dark:bg-slate-950/40">
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Customer and invoice details
+                {customerLabels.singularTitle} and invoice details
               </p>
 
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
