@@ -137,6 +137,10 @@ function getInvoiceStatus(invoice = {}) {
   return String(invoice.status || invoice.paymentStatus || "Unpaid");
 }
 
+function isInvoicePaid(invoice = {}) {
+  return getOutstandingAmount(invoice) <= 0;
+}
+
 function getDueStatus(invoice = {}) {
   const outstanding = getOutstandingAmount(invoice);
 
@@ -502,42 +506,42 @@ export default function Invoices() {
     () =>
       Array.from(
         new Set(
-          actionableInvoices.map((invoice) => getInvoiceCategory(invoice))
+          invoices.map((invoice) => getInvoiceCategory(invoice))
         )
       ).sort((a, b) => a.localeCompare(b)),
-    [actionableInvoices]
+    [invoices]
   );
 
   const invoiceProviderOptions = useMemo(
     () =>
       Array.from(
-        new Set(actionableInvoices.map((invoice) => getInvoiceProvider(invoice)))
+        new Set(invoices.map((invoice) => getInvoiceProvider(invoice)))
       ).sort((a, b) => a.localeCompare(b)),
-    [actionableInvoices]
+    [invoices]
   );
 
   const invoiceStatusOptions = useMemo(
     () =>
       Array.from(
-        new Set(actionableInvoices.map((invoice) => getInvoiceStatus(invoice)))
+        new Set(invoices.map((invoice) => getInvoiceStatus(invoice)))
       ).sort((a, b) => a.localeCompare(b)),
-    [actionableInvoices]
+    [invoices]
   );
 
   const notificationStatusOptions = useMemo(
     () =>
       Array.from(
         new Set(
-          actionableInvoices.map((invoice) =>
+          invoices.map((invoice) =>
             normalizeNotificationStatus(invoice.customerNotificationStatus)
           )
         )
       ).sort((a, b) => a.localeCompare(b)),
-    [actionableInvoices]
+    [invoices]
   );
 
-  const filteredActionableInvoices = useMemo(() => {
-    return actionableInvoices.filter((invoice) => {
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter((invoice) => {
       const invoiceCategory = getInvoiceCategory(invoice);
       const paymentProvider = getInvoiceProvider(invoice);
       const invoiceStatus = getInvoiceStatus(invoice);
@@ -604,7 +608,7 @@ export default function Invoices() {
         matchesSearch
       );
     });
-  }, [actionableInvoices, invoiceFilters]);
+  }, [invoices, invoiceFilters]);
 
   const filteredRecurringInvoices = useMemo(() => {
     return recurringInvoices.filter((schedule) =>
@@ -628,11 +632,11 @@ export default function Invoices() {
 
   const totalInvoiceAmount = useMemo(
     () =>
-      actionableInvoices.reduce(
+      invoices.reduce(
         (sum, invoice) => sum + getOriginalInvoiceAmount(invoice),
         0
       ),
-    [actionableInvoices]
+    [invoices]
   );
 
   const balancePendingAmount = useMemo(
@@ -1208,8 +1212,8 @@ export default function Invoices() {
           />
 
           <InvoiceList
-            invoices={filteredActionableInvoices}
-            allInvoicesCount={actionableInvoices.length}
+            invoices={filteredInvoices}
+            allInvoicesCount={invoices.length}
             customerLabels={customerLabels}
             onRecordPayment={openManualPaymentModal}
             onShareWhatsApp={shareWhatsApp}
@@ -1291,10 +1295,10 @@ function InvoiceFilterPanel({
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-base font-semibold text-slate-950 dark:text-white">
-              Invoice workspace
+              Invoice history
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Filter, review, share, and record payments for open invoices.
+              Filter, review, share, and record payments across every invoice.
             </p>
           </div>
 
@@ -1428,10 +1432,10 @@ function InvoiceList({
     return (
       <SurfaceCard className="p-6">
         <EmptyState
-          title={allInvoicesCount === 0 ? "No open invoices found" : "No matching invoices"}
+          title={allInvoicesCount === 0 ? "No invoices found" : "No matching invoices"}
           description={
             allInvoicesCount === 0
-              ? "Only unpaid or partially paid invoices are shown here."
+              ? "Create an invoice to start building your invoice history."
               : "Try another name, phone number, invoice number, description, or status."
           }
         />
@@ -1493,6 +1497,7 @@ function InvoiceList({
                 invoice.customerNotificationStatus
               );
               const dueStatus = getDueStatus(invoice);
+              const invoicePaid = isInvoicePaid(invoice);
 
               return (
                 <tr
@@ -1552,7 +1557,7 @@ function InvoiceList({
 
                   <td className="px-4 py-4 align-top">
                     <div className="flex flex-col items-start gap-1.5">
-                      <StatusBadge tone={invoice.status === "Paid" ? "green" : "orange"}>
+                      <StatusBadge tone={invoicePaid ? "green" : "orange"}>
                         {invoice.status || "Unpaid"}
                       </StatusBadge>
                       <StatusBadge tone={notificationTone}>
@@ -1563,7 +1568,7 @@ function InvoiceList({
 
                   <td className="px-4 py-4 align-top">
                     <div className="flex justify-end gap-1.5">
-                      {invoice.status !== "Paid" ? (
+                      {!invoicePaid ? (
                         <button
                           type="button"
                           onClick={() => onRecordPayment(invoice)}
@@ -1622,6 +1627,7 @@ function InvoiceCard({
     invoice.customerNotificationStatus
   );
   const dueStatus = getDueStatus(invoice);
+  const invoicePaid = isInvoicePaid(invoice);
 
   return (
     <div className="space-y-4 p-4">
@@ -1651,7 +1657,7 @@ function InvoiceCard({
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             <StatusBadge tone="slate">{invoiceCategory}</StatusBadge>
-            <StatusBadge tone={invoice.status === "Paid" ? "green" : "orange"}>
+            <StatusBadge tone={invoicePaid ? "green" : "orange"}>
               {invoice.status || "Unpaid"}
             </StatusBadge>
           </div>
@@ -1674,7 +1680,7 @@ function InvoiceCard({
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        {invoice.status !== "Paid" ? (
+        {!invoicePaid ? (
           <button
             type="button"
             onClick={() => onRecordPayment(invoice)}
