@@ -3,31 +3,31 @@ import Link from "next/link";
 import PublicLegalFooter from "../components/PublicLegalFooter";
 
 const proofPoints = [
-  { label: "Keep every collection organised", value: "Save time" },
-  { label: "See payment status at a glance", value: "Know who paid" },
-  { label: "Follow up from one dashboard", value: "Reduce manual work" },
+  { label: "Invoices, receipts and payments in one place", value: "Organised" },
+  { label: "See paid, unpaid and partial payments clearly", value: "Visible" },
+  { label: "Send invoice and reminder messages through WhatsApp", value: "Connected" },
 ];
 
 const workflow = [
   {
-    title: "Get Paid Faster",
-    text: "Create professional invoices and share them instantly using WhatsApp or secure payment links.",
+    title: "Create invoices",
+    text: "Prepare invoices with customer details, line items, due dates and payment links.",
   },
   {
-    title: "Receive Payments Into Your Own Account",
-    text: "Use your existing payment provider so customers pay directly into your business account.",
+    title: "Track payment status",
+    text: "Record and monitor paid, unpaid, partial and overdue invoices from one dashboard.",
   },
   {
-    title: "Know Exactly Who Has Paid",
-    text: "Track paid, unpaid, partial and overdue invoices without manually checking chats or spreadsheets.",
+    title: "Follow up clearly",
+    text: "Send WhatsApp invoice messages, reminders and payment confirmations from your workspace.",
   },
 ];
 
 const features = [
-  "1. Create an Invoice. Generate an invoice in seconds.",
-  "2. Share It. Send it through WhatsApp, email or a payment link.",
-  "3. Track Payment. See who has paid, who has not and follow up automatically.",
-  "Payment tracking, QR payment support, WhatsApp reminders, customer records and collection reports.",
+  "1. Create an invoice with description, line items, due date and customer details.",
+  "2. Share the invoice through WhatsApp or a payment link.",
+  "3. Track paid, unpaid and partially paid invoices in one place.",
+  "Use payment links, receipt upload, WhatsApp reminders, customer records and collection reports.",
 ];
 
 const audiences = [
@@ -37,11 +37,11 @@ const audiences = [
   },
   {
     title: "Businesses",
-    text: "Send invoices, receive payments and keep customer balances organised.",
+    text: "Send invoices, record payments and keep customer balances organised.",
   },
   {
-    title: "Finance Teams",
-    text: "Monitor collections, reconcile payments and follow up outstanding invoices with confidence.",
+    title: "Collection Teams",
+    text: "Monitor invoice status, review receipts and follow up outstanding balances with confidence.",
   },
 ];
 
@@ -60,52 +60,79 @@ export default function Home() {
         <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(2,6,23,0.96)_0%,rgba(15,23,42,0.88)_48%,rgba(6,78,59,0.72)_100%)]" />
 
         <div className="relative mx-auto flex min-h-[100svh] max-w-7xl flex-col px-5 pb-5 pt-4 sm:px-6 lg:px-10">
-          <header className="rounded-[1.75rem] border border-white/10 bg-slate-950/75 px-4 py-3 shadow-2xl shadow-black/20 backdrop-blur-xl md:px-5">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <Link href="/" className="flex items-center gap-3">
-                  <div className="h-11 w-11">
-                    <img src="/logo.svg" alt="InvoiceHub" className="h-11 w-11 object-contain" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-lg font-semibold leading-5 text-white">InvoiceHub</p>
-                    <p className="hidden text-xs leading-5 text-slate-300 sm:block">Know who has paid. Follow up who hasn&apos;t.</p>
-                  </div>
+          <header className="rounded-2xl border border-white/10 bg-slate-950/62 px-4 py-3 shadow-xl shadow-black/15 backdrop-blur-xl md:px-5">
+            <div className="flex items-center justify-between gap-4">
+              <Link href="/" className="flex min-w-0 items-center gap-3" aria-label="InvoiceHub home">
+                <Image
+                  src="/logo.svg"
+                  alt=""
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 shrink-0 object-contain"
+                />
+                <div className="min-w-0">
+                  <p className="text-base font-semibold leading-5 text-white sm:text-lg">InvoiceHub</p>
+                  <p className="hidden truncate text-xs leading-5 text-slate-300 sm:block">
+                    Invoices, receipts and WhatsApp follow-ups
+                  </p>
+                </div>
+              </Link>
+
+              <nav className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1 text-sm font-medium text-slate-300 lg:flex">
+                {[
+                  ["Problem", "#problem"],
+                  ["Who it's for", "#audience"],
+                  ["How it works", "#how-it-works"],
+                ].map(([label, href]) => (
+                  <a
+                    key={label}
+                    href={href}
+                    className="rounded-full px-3.5 py-2 transition hover:bg-white/8 hover:text-white"
+                  >
+                    {label}
+                  </a>
+                ))}
+                <Link
+                  href="/book-demo"
+                  className="rounded-full px-3.5 py-2 transition hover:bg-white/8 hover:text-white"
+                >
+                  Book a demo
+                </Link>
+              </nav>
+
+              <div className="flex shrink-0 items-center gap-2">
+                <Link
+                  href="/auth/login"
+                  className="hidden rounded-xl border border-white/15 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10 sm:inline-flex"
+                >
+                  Log in
+                </Link>
+                <Link
+                  href="/auth/register"
+                  className="inline-flex rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-950/25 transition hover:bg-emerald-400 sm:px-5"
+                >
+                  Start free
                 </Link>
               </div>
-
-              <div className="flex flex-wrap items-center gap-3 lg:gap-7">
-                <nav className="hidden flex-wrap items-center gap-5 text-sm font-medium text-slate-300 md:flex">
-                  <a href="#problem" className="transition hover:text-white">
-                    Problem
-                  </a>
-                  <a href="#audience" className="transition hover:text-white">
-                    Who it&apos;s for
-                  </a>
-                  <a href="#how-it-works" className="transition hover:text-white">
-                    How it works
-                  </a>
-                  <Link href="/book-demo" className="transition hover:text-white">
-                    Book a Demo
-                  </Link>
-                </nav>
-
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <Link
-                    href="/auth/login"
-                    className="rounded-2xl border border-white/15 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
-                  >
-                    Log in
-                  </Link>
-                  <Link
-                    href="/auth/register"
-                    className="rounded-2xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-400"
-                  >
-                    Start Free
-                  </Link>
-                </div>
-              </div>
             </div>
+
+            <nav className="mt-3 flex gap-2 overflow-x-auto border-t border-white/10 pt-3 text-sm font-medium text-slate-300 lg:hidden">
+              {[
+                ["Problem", "#problem"],
+                ["Who it's for", "#audience"],
+                ["How it works", "#how-it-works"],
+                ["Demo", "/book-demo"],
+                ["Log in", "/auth/login"],
+              ].map(([label, href]) => (
+                <Link
+                  key={label}
+                  href={href}
+                  className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 transition hover:bg-white/10 hover:text-white"
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
           </header>
 
           <div className="flex flex-1 flex-col justify-center py-7 lg:py-8">
@@ -116,13 +143,13 @@ export default function Home() {
                   InvoiceHub
                 </div>
                 <h1 className="mt-4 max-w-4xl text-[2.25rem] font-semibold leading-[1.06] tracking-normal sm:text-[3rem] lg:text-[3rem] xl:text-[3.25rem]">
-                  Send invoices. Track payments. Follow up{" "}
+                  Create invoices. Track payments. Follow up{" "}
                   <span className="text-emerald-300">unpaid customers.</span>
                 </h1>
                 <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">
-                  Stop managing payments across WhatsApp chats, screenshots, bank alerts
-                  and spreadsheets. InvoiceHub brings invoicing, payment tracking,
-                  reminders and customer communication into one workspace.
+                  Stop managing invoices, receipts and payment follow-ups across
+                  chats, screenshots and spreadsheets. InvoiceHub keeps billing,
+                  payment status and WhatsApp communication in one workspace.
                 </p>
 
                 <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -149,28 +176,28 @@ export default function Home() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-xl font-bold leading-6 text-white">
-                      Collect payments using your own business account
+                      Keep payment records tied to every invoice
                     </p>
                     <p className="mt-2 max-w-sm text-sm leading-6 text-slate-200">
-                      Connect your preferred payment provider and receive customer payments
-                      directly into your own business account. InvoiceHub does not hold
-                      your money; it simply helps you organise and track every payment.
+                      Use your configured payment method, record confirmations and keep
+                      every invoice status easy to review. InvoiceHub helps organise the
+                      workflow; it does not hold business funds.
                     </p>
                   </div>
                 </div>
 
                 <div className="mt-5 grid gap-2 text-sm text-slate-100">
                   <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/8 px-4 py-3">
-                    <span>Payment setup</span>
-                    <span className="font-semibold text-emerald-300">Your provider</span>
+                    <span>Invoice setup</span>
+                    <span className="font-semibold text-emerald-300">Line items</span>
                   </div>
                   <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/8 px-4 py-3">
                     <span>Payment tracking</span>
-                    <span className="font-semibold text-emerald-300">Automatic updates</span>
+                    <span className="font-semibold text-emerald-300">Status history</span>
                   </div>
                   <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/8 px-4 py-3">
-                    <span>Customer receipts</span>
-                    <span className="font-semibold text-emerald-300">WhatsApp-ready</span>
+                    <span>Receipt records</span>
+                    <span className="font-semibold text-emerald-300">Review-ready</span>
                   </div>
                 </div>
 
@@ -211,13 +238,13 @@ export default function Home() {
               The problem
             </p>
             <h2 className="mt-4 max-w-2xl text-4xl font-semibold text-slate-950 dark:text-slate-100">
-              Businesses waste too much time chasing payments.
+              Businesses lose time when invoice follow-up is scattered.
             </h2>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-400">
-              Many businesses still manage invoices using WhatsApp, spreadsheets and manual
-              bank checks. Customers ask if payment was received, teams waste time checking
-              alerts, follow-ups are missed, payment visibility is poor and reconciliation
-              becomes difficult. InvoiceHub keeps everything in one place.
+              Many businesses still manage invoices using WhatsApp, screenshots and
+              spreadsheets. Customers ask for confirmation, teams struggle to see who
+              has paid, and follow-ups are easy to miss. InvoiceHub keeps invoice status,
+              receipt records and payment conversations in one place.
             </p>
             <div className="mt-10 space-y-8">
               {workflow.map((item, index) => (
@@ -244,7 +271,7 @@ export default function Home() {
                 <div className="flex items-center justify-between">
                   <div>
                      <p className="text-sm text-slate-400">Collections snapshot</p>
-                     <p className="mt-1 text-xl font-semibold">One dashboard for all your collections</p>
+                     <p className="mt-1 text-xl font-semibold">One dashboard for invoice status</p>
                   </div>
                   <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-300">
                     Actionable
@@ -266,8 +293,8 @@ export default function Home() {
 
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-300">Invoice sent</span>
-                    <span className="text-emerald-300">Payment page opened</span>
+                    <span className="text-slate-300">Invoice created</span>
+                    <span className="text-emerald-300">Shared with customer</span>
                   </div>
                   <div className="mt-3 h-2 rounded-full bg-white/10">
                     <div className="h-2 w-[92%] rounded-full bg-emerald-400" />
@@ -287,7 +314,7 @@ export default function Home() {
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-300">Receipt prepared</span>
-                    <span className="text-sky-300">Shared with customer</span>
+                    <span className="text-sky-300">Ready for review</span>
                   </div>
                   <div className="mt-3 h-2 rounded-full bg-white/10">
                     <div className="h-2 w-[36%] rounded-full bg-sky-400" />
@@ -306,10 +333,10 @@ export default function Home() {
               Who it&apos;s for
             </p>
             <h2 className="mt-4 text-4xl font-semibold text-slate-950 dark:text-slate-100">
-              Clearer collections for schools, businesses and finance teams.
+              Clearer billing for schools, businesses and collection teams.
             </h2>
             <p className="mt-4 text-lg leading-8 text-slate-600 dark:text-slate-400">
-              Save time, reduce manual work and keep every payment organised.
+              Keep invoices, payment status and customer follow-up organised.
             </p>
           </div>
 
@@ -330,7 +357,7 @@ export default function Home() {
               How it works
             </p>
             <h2 className="mt-4 text-4xl font-semibold text-slate-950 dark:text-slate-100">
-              Create it, share it and track every payment.
+              Create it, share it and track the status.
             </h2>
           </div>
 
@@ -346,9 +373,8 @@ export default function Home() {
           </div>
 
           <div className="mt-10 rounded-2xl border border-slate-200 bg-white px-6 py-5 text-sm leading-7 text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
-            InvoiceHub helps businesses organise collections from start to finish. Businesses
-            use their preferred payment provider while InvoiceHub manages invoices, payment
-            tracking, customer communication and reconciliation.
+            InvoiceHub helps businesses organise invoice creation, payment status,
+            receipt records, WhatsApp reminders and collection history from one workspace.
           </div>
         </div>
       </section>
@@ -364,7 +390,7 @@ export default function Home() {
             </h2>
             <p className="mt-4 text-lg leading-8 text-slate-300">
               Book a live demonstration and see how InvoiceHub can simplify invoicing,
-              payment tracking, customer communication and collections for your business.
+              payment tracking, receipt review and WhatsApp follow-up for your business.
             </p>
           </div>
 
@@ -388,7 +414,7 @@ export default function Home() {
       <footer className="border-t border-slate-200 bg-white px-6 py-6 dark:border-slate-800 dark:bg-slate-950 lg:px-10">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            InvoiceHub helps businesses organise invoices, payments, collections and customer communication from one simple platform.
+            InvoiceHub helps businesses organise invoices, payment status, receipt records and WhatsApp follow-up from one simple platform.
           </p>
           <PublicLegalFooter />
         </div>
