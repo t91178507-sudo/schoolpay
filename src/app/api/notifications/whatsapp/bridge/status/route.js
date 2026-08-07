@@ -12,8 +12,19 @@ import {
   fetchWhatsAppWebStatus,
   hasWhatsAppWebBridgeConfig,
   isLocalWhatsAppBridgeUrl,
+  recoverWhatsAppWebSession,
   requestWhatsAppWebPairingCode,
 } from "../../../../../../lib/whatsappWebBridge";
+
+const RECOVERABLE_STATUSES = new Set([
+  "starting",
+  "loading",
+  "connecting",
+  "retrying",
+  "authenticated",
+]);
+const STUCK_SESSION_MS = 90 * 1000;
+const RECOVERY_THROTTLE_MS = 2 * 60 * 1000;
 
 function buildLocalFallbackConfig(config = {}) {
   return {
@@ -68,6 +79,94 @@ async function flushQueueIfReady(db, user, config, snapshot) {
   });
 }
 
+function normalizeStatus(status = "") {
+  return String(status || "").trim().toLowerCase();
+}
+
+async function trackSessionHealth(db, user, status) {
+  const currentStatus = normalizeStatus(status?.status);
+  const now = new Date();
+  const health = user.whatsappWebHealth || {};
+  const previousStatus = normalizeStatus(health.status);
+  const previousSession = String(health.sessionName || "");
+  const currentSession = String(status?.sessionName || "");
+  const isRecoverable = RECOVERABLE_STATUSES.has(currentStatus);
+  const set = {
+    "whatsappWebHealth.status": currentStatus,
+    "whatsappWebHealth.sessionName": currentSession,
+    "whatsappWebHealth.lastCheckedAt": now,
+    "whatsappWebHealth.lastError": status?.lastError || "",
+  };
+
+  if (!isRecoverable) {
+    set["whatsappWebHealth.stuckSince"] = null;
+    set["whatsappWebHealth.lastRecoveryReason"] = "";
+    await db.collection("users").updateOne({ _id: user._id }, { $set: set });
+    return { shouldRecover: false, stuckForMs: 0 };
+  }
+
+  const shouldResetWindow =
+    previousStatus !== currentStatus || previousSession !== currentSession;
+  const stuckSince = shouldResetWindow || !health.stuckSince
+    ? now
+    : new Date(health.stuckSince);
+  const stuckForMs = Math.max(now.getTime() - stuckSince.getTime(), 0);
+  const lastRecoveryAt = health.lastRecoveryAt
+    ? new Date(health.lastRecoveryAt)
+    : null;
+  const recentlyRecovered =
+    lastRecoveryAt &&
+    now.getTime() - lastRecoveryAt.getTime() < RECOVERY_THROTTLE_MS;
+  const shouldRecover = stuckForMs >= STUCK_SESSION_MS && !recentlyRecovered;
+
+  set["whatsappWebHealth.stuckSince"] = stuckSince;
+
+  if (shouldRecover) {
+    set["whatsappWebHealth.lastRecoveryAt"] = now;
+    set["whatsappWebHealth.lastRecoveryReason"] =
+      `Session stayed ${currentStatus} for ${Math.round(stuckForMs / 1000)} seconds.`;
+  }
+
+  await db.collection("users").updateOne({ _id: user._id }, { $set: set });
+
+  return {
+    shouldRecover,
+    stuckForMs,
+    stuckSince: stuckSince.toISOString(),
+  };
+}
+
+async function recoverIfSessionIsStuck(db, user, config, snapshot) {
+  const health = await trackSessionHealth(db, user, snapshot?.status || {});
+
+  if (!health.shouldRecover) {
+    return {
+      attempted: false,
+      stuckForMs: health.stuckForMs,
+      stuckSince: health.stuckSince || null,
+    };
+  }
+
+  const recovery = await recoverWhatsAppWebSession(config);
+
+  await db.collection("users").updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        "whatsappWebHealth.lastRecoverySuccess": Boolean(recovery.success),
+        "whatsappWebHealth.lastRecoveryError": recovery.error || "",
+        "whatsappWebHealth.lastRecoveryEndpoint": recovery.endpoint || "",
+      },
+    }
+  );
+
+  return {
+    ...recovery,
+    stuckForMs: health.stuckForMs,
+    stuckSince: health.stuckSince || null,
+  };
+}
+
 export async function GET(req) {
   try {
     const userId = requireAuth(req);
@@ -118,6 +217,13 @@ export async function GET(req) {
         throw lastBridgeError || new Error("WhatsApp bridge is offline");
       }
 
+      const recovery = await recoverIfSessionIsStuck(
+        db,
+        user,
+        activeConfig || config,
+        snapshot
+      );
+
       const queueFlush = await flushQueueIfReady(
         db,
         user,
@@ -128,6 +234,7 @@ export async function GET(req) {
       return Response.json({
         success: true,
         provider: "whatsappWeb",
+        recovery,
         queueFlush,
         ...snapshot,
       });

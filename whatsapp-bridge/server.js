@@ -739,6 +739,55 @@ app.get("/api/session/status", async (req, res) => {
   res.json(serializeSessionState(sessionState));
 });
 
+async function handleSessionRecovery(req, res, reasonPrefix = "Manual recovery requested") {
+  const sessionName = normalizeSessionName(readSessionName(req));
+  const sessionState = getSessionState(sessionName);
+
+  try {
+    if (sessionState.status === "ready" && sessionState.client) {
+      res.json({
+        success: true,
+        recovered: false,
+        message: "WhatsApp session is already ready",
+        ...serializeSessionState(sessionState),
+      });
+      return;
+    }
+
+    await restartSessionImmediately(
+      sessionState,
+      `${reasonPrefix} at ${new Date().toISOString()}`
+    );
+
+    res.json({
+      success: true,
+      recovered: true,
+      message: "WhatsApp session restart started",
+      ...serializeSessionState(sessionState),
+    });
+  } catch (error) {
+    sessionState.lastError = error.message || "Unable to restart WhatsApp session";
+    touchSession(sessionState, "retrying");
+    res.status(500).json({
+      success: false,
+      error: sessionState.lastError,
+      ...serializeSessionState(sessionState),
+    });
+  }
+}
+
+app.post("/api/session/restart", requireApiKey, async (req, res) => {
+  await handleSessionRecovery(req, res, "InvoiceHub recovery restart requested");
+});
+
+app.post("/api/session/reconnect", requireApiKey, async (req, res) => {
+  await handleSessionRecovery(req, res, "InvoiceHub recovery reconnect requested");
+});
+
+app.post("/api/session/start", requireApiKey, async (req, res) => {
+  await handleSessionRecovery(req, res, "InvoiceHub recovery start requested");
+});
+
 app.get("/api/session/qr", async (req, res) => {
   const sessionState = await ensureSession(readSessionName(req));
   res.json({

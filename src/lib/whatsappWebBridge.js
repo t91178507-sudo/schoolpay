@@ -216,6 +216,55 @@ export async function fetchWhatsAppWebStatus(config = {}) {
   );
 }
 
+export async function recoverWhatsAppWebSession(config = {}) {
+  assertReachableWhatsAppBridgeConfig(config);
+
+  const payload = JSON.stringify({
+    sessionName: config.sessionName,
+  });
+
+  const attempts = [
+    { url: `${config.bridgeBaseUrl}/api/session/restart`, method: "POST" },
+    { url: `${config.bridgeBaseUrl}/api/session/reconnect`, method: "POST" },
+    { url: `${config.bridgeBaseUrl}/api/session/start`, method: "POST" },
+  ];
+
+  let lastError = null;
+
+  for (const attempt of attempts) {
+    try {
+      const response = await fetch(attempt.url, {
+        method: attempt.method,
+        headers: buildBridgeHeaders(config),
+        body: payload,
+        cache: "no-store",
+      });
+
+      const data = await parseBridgeResponse(response);
+      return {
+        attempted: true,
+        success: true,
+        endpoint: attempt.url,
+        data,
+      };
+    } catch (error) {
+      lastError = error;
+
+      if (![404, 405].includes(Number(error?.status))) {
+        break;
+      }
+    }
+  }
+
+  return {
+    attempted: true,
+    success: false,
+    error:
+      lastError?.message ||
+      "The WhatsApp bridge does not expose an automatic recovery endpoint.",
+  };
+}
+
 export async function fetchWhatsAppWebBridgeOverview(config = {}) {
   assertReachableWhatsAppBridgeConfig(config);
 
